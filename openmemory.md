@@ -4,7 +4,7 @@
 
 **Syrin** is a Python library for building AI agents with budget management, declarative agent definitions, and DSL-to-Python code generation. Companion to the Syrin DSL.
 
-- **Package:** `Syrin` (src layout: `src/Syrin/`)
+- **Package:** `Syrin` (src layout: `src/syrin/`)
 - **Tooling:** uv (project/venv), ruff (format + lint), mypy (strict), pytest + pytest-asyncio
 - **Python:** >= 3.10
 
