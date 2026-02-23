@@ -104,8 +104,8 @@ class BudgetAgent(Agent):
             monthly=500.00,     # Max $500 per month
             on_exceeded=OnExceeded.ERROR,  # or WARN
             thresholds=[
-                BudgetThreshold(at=80, action={...}),
-                BudgetThreshold(at=95, action={...}),
+                BudgetThreshold(at=80, action=lambda ctx: print(f"Budget at {ctx.percentage}%")),
+                BudgetThreshold(at=95, action=lambda ctx: ctx.parent.switch_model(Model("openai/gpt-4o-mini"))),
             ]
         )
 ```

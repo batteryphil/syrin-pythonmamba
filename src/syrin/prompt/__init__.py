@@ -139,9 +139,21 @@ class Prompt:
         return variables
 
     def _compute_hash(self) -> str:
-        """Compute hash of the function source for versioning."""
-        source = inspect.getsource(self._func)
-        return hashlib.sha256(source.encode()).hexdigest()[:16]
+        """Compute hash of the function source for versioning.
+
+        Falls back to name+module+signature hash when source is unavailable
+        (e.g. stdin, exec, pytest, or inaccessible paths).
+        """
+        try:
+            source = inspect.getsource(self._func)
+            return hashlib.sha256(source.encode()).hexdigest()[:16]
+        except OSError:
+            fallback = (
+                f"{getattr(self._func, '__module__', '')}:"
+                f"{self._func.__name__}:"
+                f"{self._signature}"
+            )
+            return hashlib.sha256(fallback.encode()).hexdigest()[:16]
 
     def _make_cache_key(self, **kwargs: Any) -> str:
         """Create cache key from arguments."""

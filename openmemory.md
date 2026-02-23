@@ -42,6 +42,10 @@
 - **pipe.py** — `Pipe(value).then(fn).result()` / `.result_async()`, `pipe(value, f1, f2, ...)`; async steps run via asyncio.run in result()
 - **cli.py** — `CLI(user_tag=..., agent_tag=..., style=...)`, `serve(agent)` (agent instance or class); REPL commands /quit, /cost, /trace, /clear, /switch <model_id>; on exit prints budget summary. Entry point: `Syrin serve -a module:attr`, `Syrin run script.py`, `Syrin cost`, `Syrin version`. `_resolve_agent(spec)` loads module:attr.
 
+## Launch / GTM
+
+- **plan/GTM_PRODUCTHUNT_HN.md** — Full playbook for ProductHunt and Hacker News launches (30-day prep, tagline formats, maker comment structure, timing)
+
 ## Patterns
 
 - Virtual env: always use `.venv` and `uv`; install with `uv pip install -e ".[dev]"` from project root

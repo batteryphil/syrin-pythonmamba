@@ -3,6 +3,7 @@
 
 plan/
 openmemory.md
+.pypirc
 
 # Python
 __pycache__/

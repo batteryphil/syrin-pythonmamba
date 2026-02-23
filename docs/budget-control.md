@@ -54,14 +54,8 @@ class BudgetAwareAgent(Agent):
             run=1.00,  # Max $1 per single request
             on_exceeded=OnExceeded.WARN,  # Warn if we hit 80% or 95%
             thresholds=[
-                BudgetThreshold(
-                    at=80,  # When we hit 80% of budget
-                    action={"type": "warn", "message": "80% budget used"}
-                ),
-                BudgetThreshold(
-                    at=95,  # When we hit 95% of budget
-                    action={"type": "warn", "message": "95% budget used"}
-                ),
+                BudgetThreshold(at=80, action=lambda ctx: print(f"80% budget used: ${ctx.current_value:.2f}")),
+                BudgetThreshold(at=95, action=lambda ctx: print(f"95% budget used: ${ctx.current_value:.2f}")),
             ]
         )
 
@@ -249,21 +243,9 @@ class ThresholdAgent(Agent):
         self.budget = Budget(
             run=1.00,
             thresholds=[
-                # When we hit 50% ($0.50), do something
-                BudgetThreshold(
-                    at=50,
-                    action={"type": "log", "message": "Halfway there!"}
-                ),
-                # When we hit 80% ($0.80), warn
-                BudgetThreshold(
-                    at=80,
-                    action={"type": "warn", "message": "Getting close!"}
-                ),
-                # When we hit 95% ($0.95), switch to cheaper model
-                BudgetThreshold(
-                    at=95,
-                    action={"type": "switch_model", "model": "gpt-4o-mini"}
-                ),
+                BudgetThreshold(at=50, action=lambda ctx: print(f"Halfway there! Budget at {ctx.percentage}%")),
+                BudgetThreshold(at=80, action=lambda ctx: print(f"Getting close! Budget at {ctx.percentage}%")),
+                BudgetThreshold(at=95, action=lambda ctx: ctx.parent.switch_model(Model("openai/gpt-4o-mini"))),
             ]
         )
 ```
@@ -339,16 +321,8 @@ class ProductionAgent(Agent):
             monthly=1000.00,    # Month max $1000
             on_exceeded=OnExceeded.ERROR,  # Fail hard if exceeded
             thresholds=[
-                # Alert at 75% of run budget
-                BudgetThreshold(
-                    at=75,
-                    action={"type": "log", "message": "Run budget at 75%"}
-                ),
-                # Alert at 90% of hourly budget
-                BudgetThreshold(
-                    at=90,
-                    action={"type": "log", "message": "Hourly budget at 90%"}
-                ),
+                BudgetThreshold(at=75, action=lambda ctx: print(f"Run budget at {ctx.percentage}%")),
+                BudgetThreshold(at=90, action=lambda ctx: print(f"Run budget at {ctx.percentage}%")),
             ]
         )
 

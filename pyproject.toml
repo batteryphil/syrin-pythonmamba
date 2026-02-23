@@ -1,7 +1,7 @@
 [project]
 name = "syrin"
 version = "0.1.0"
-description = "Python library for building AI agents with budget management, declarative definitions, and DSL-to-Python code generation. Companion to the Syrin DSL."
+description = "Python library for building AI agents with budget management, declarative definitions, and production-ready observability."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -18,9 +18,13 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-Homepage = "https://syrin.ai/"
-Repository = "https://github.com/syrin-labs/syrin-python"
 dependencies = ["pydantic>=2.0", "httpx", "tiktoken", "python-dotenv>=1.2.1"]
+
+[project.urls]
+Homepage = "https://syrin.ai/"
+"GitHub" = "https://github.com/syrin-labs/syrin-python"
+"Documentation" = "https://syrin.ai/docs"
+"PyPI" = "https://pypi.org/project/syrin/"
 
 [project.optional-dependencies]
 litellm = ["litellm"]
@@ -36,7 +40,7 @@ dev = [
 ]
 
 [project.scripts]
-syrin = "Syrin.cli:main"
+syrin = "syrin.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -97,15 +101,15 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = "Syrin.providers.anthropic"
+module = "syrin.providers.anthropic"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "Syrin.providers.openai"
+module = "syrin.providers.openai"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "Syrin.providers.litellm"
+module = "syrin.providers.litellm"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -147,7 +151,7 @@ addopts = "-v --tb=short"
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.coverage.run]
-source = ["src/Syrin"]
+source = ["src/syrin"]
 branch = true
 
 [tool.coverage.report]
