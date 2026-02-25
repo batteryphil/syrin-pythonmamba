@@ -20,12 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Documentation (Step 7):** README: Discord link updated to https://discord.gg/p4jnKxYKpB, Twitter to https://x.com/syrin_dev; added “Connect here” community section. Docs: fixed dead links (anomalyco → syrin-labs/syrin-python, CHANGES.md → CHANGELOG.md); docs/README.md Quick Start uses `syrin` (lowercase). Created CONTRIBUTING.md and docs/code-quality.md. docs/guardrails.md and docs/ratelimit.md: corrected support/import links and `from syrin` imports. docs/advanced-topics.md: rate-limiting.md → ratelimit.md. Removed plan/*.md references from public docs (CHANGELOG).
+
 - **Code quality (Step 6):** `syrin.run()` signature: `tools` typed as `list[ToolSpec] | None`, return as `Response[str]`. Removed duplicate entries from `syrin.__all__` (BudgetThreshold, CheckpointTrigger). `syrin.config.__all__`: removed duplicate GlobalConfig. Ruff ignore list in pyproject.toml documented (E501, E402, ARG002, ARG001, F821, F811).
 
 - **Model resolution:** `get_provider(provider_name, *, strict=False)` — new `strict` parameter; Agent construction with `ModelConfig(provider="typo")` now raises `ProviderNotFoundError` (breaking for callers relying on fallback to LiteLLM).
 - **Observability:** Session ID from `trace.session()` now propagates to all spans created during agent runs (spans already had `session_id`; context was already used by tracer).
 - **Docs:** `docs/observability.md` — Updated "What's Traced by Default" with exact span kinds and tree shape; added Metrics schema subsection; fixed Production Setup imports (create_sampler from sampling).
-- **Plan:** Observability checklist in `plan/v0.2.0.md` marked complete.
+- **Plan:** Observability checklist for v0.2.0 marked complete.
 
 ### Fixed
 

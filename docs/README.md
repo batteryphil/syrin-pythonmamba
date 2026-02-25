@@ -88,8 +88,7 @@ Learn by doing! Pick a use case that matches what you want to build:
 Copy and run this to test your setup:
 
 ```python
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent, Model
 
 class MyAgent(Agent):
     model = Model.OpenAI("gpt-4o-mini")
@@ -166,7 +165,7 @@ Trace and debug agent execution with spans and sessions.
 
 ## 📋 Recent Changes
 
-**[Changelog & Breaking Changes](CHANGES.md)** — Removed aliases (ContextBudget, BlockedWordsGuardrail, MemoryConfig, etc.), migration guide, and bug fixes.
+**[Changelog](../CHANGELOG.md)** — Release history, added/changed/fixed/deprecated/removed.
 
 ---
 
@@ -178,10 +177,10 @@ Trace and debug agent execution with spans and sessions.
 - See [Feature Reference FAQ](reference.md)
 
 **Found a bug?**
-- Report on [GitHub Issues](https://github.com/anomalyco/syrin)
+- Report on [GitHub Issues](https://github.com/syrin-labs/syrin-python/issues)
 
 **Want to contribute?**
-- Fork on [GitHub](https://github.com/anomalyco/syrin)
+- Fork on [GitHub](https://github.com/syrin-labs/syrin-python)
 
 ## 📚 Code Examples
 

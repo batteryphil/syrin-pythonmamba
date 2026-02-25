@@ -16,10 +16,10 @@ pip install redis
 ## Quick Start
 
 ```python
-from Syrin import Agent, Model
-from Syrin.ratelimit import APIRateLimit
-from Syrin.enums import RateLimitAction, ThresholdMetric
-from Syrin.ratelimit import RateLimitThreshold
+from syrin import Agent, Model
+from syrin.ratelimit import APIRateLimit
+from syrin.enums import RateLimitAction, ThresholdMetric
+from syrin.ratelimit import RateLimitThreshold
 
 # Auto-detect limits (recommended)
 agent = Agent(
@@ -68,8 +68,8 @@ Syrin handles this automatically so you don't have to think about it.
 The easiest way to get started:
 
 ```python
-from Syrin import Agent, Model
-from Syrin.ratelimit import APIRateLimit
+from syrin import Agent, Model
+from syrin.ratelimit import APIRateLimit
 
 agent = Agent(
     model=Model("openai/gpt-4o"),
@@ -84,8 +84,8 @@ print(agent.rate_limit.tpm)   # 150000
 ### Manual Configuration
 
 ```python
-from Syrin import Agent, Model
-from Syrin.ratelimit import APIRateLimit
+from syrin import Agent, Model
+from syrin.ratelimit import APIRateLimit
 
 agent = Agent(
     model=Model("openai/gpt-4o"),
@@ -104,8 +104,8 @@ agent = Agent(
 Define actions at specific usage percentages:
 
 ```python
-from Syrin.ratelimit import APIRateLimit, RateLimitThreshold
-from Syrin.enums import RateLimitAction, ThresholdMetric
+from syrin.ratelimit import APIRateLimit, RateLimitThreshold
+from syrin.enums import RateLimitAction, ThresholdMetric
 
 rate_limit = APIRateLimit(
     rpm=500,
@@ -150,7 +150,7 @@ rate_limit = APIRateLimit(
 ### Custom Handler
 
 ```python
-from Syrin.ratelimit import APIRateLimit, RateLimitThreshold, RateLimitThresholdContext
+from syrin.ratelimit import APIRateLimit, RateLimitThreshold, RateLimitThresholdContext
 
 def my_handler(ctx: RateLimitThresholdContext):
     print(f"Approaching {ctx.metric} limit: {ctx.percentage}% ({ctx.used}/{ctx.limit})")
@@ -186,7 +186,7 @@ rate_limit = APIRateLimit(
 ### APIRateLimit
 
 ```python
-from Syrin.ratelimit import APIRateLimit
+from syrin.ratelimit import APIRateLimit
 
 rate_limit = APIRateLimit(
     rpm=500,              # Requests per minute (None = unlimited)
@@ -204,8 +204,8 @@ rate_limit = APIRateLimit(
 ### RateLimitThreshold
 
 ```python
-from Syrin.ratelimit import RateLimitThreshold
-from Syrin.enums import RateLimitAction, ThresholdMetric
+from syrin.ratelimit import RateLimitThreshold
+from syrin.enums import RateLimitAction, ThresholdMetric
 
 threshold = RateLimitThreshold(
     at=80,                           # Percentage (0-100)
@@ -263,9 +263,9 @@ The rate limiter emits events you can listen to:
 Emitted when a threshold is crossed:
 
 ```python
-from Syrin import Agent, Model
-from Syrin.ratelimit import APIRateLimit, RateLimitThreshold
-from Syrin.enums import RateLimitAction, ThresholdMetric
+from syrin import Agent, Model
+from syrin.ratelimit import APIRateLimit, RateLimitThreshold
+from syrin.enums import RateLimitAction, ThresholdMetric
 
 agent = Agent(
     model=Model("openai/gpt-4o"),
@@ -306,7 +306,7 @@ agent.events.on("ratelimit.exceeded", on_exceeded)
 Syrin includes presets for known providers:
 
 ```python
-from Syrin.ratelimit import auto_detect_limits, suggest_limits
+from syrin.ratelimit import auto_detect_limits, suggest_limits
 
 # Get limits for a model
 limits = auto_detect_limits("openai/gpt-4o")
@@ -341,7 +341,7 @@ For multi-instance deployments, use persistent storage:
 ### Memory (Default)
 
 ```python
-from Syrin.ratelimit import get_rate_limit_backend
+from syrin.ratelimit import get_rate_limit_backend
 
 backend = get_rate_limit_backend("memory")
 ```
@@ -368,8 +368,8 @@ backend = get_rate_limit_backend(
 ### Using with Agent
 
 ```python
-from Syrin import Agent, Model
-from Syrin.ratelimit import APIRateLimit, create_rate_limit_manager, get_rate_limit_backend
+from syrin import Agent, Model
+from syrin.ratelimit import APIRateLimit, create_rate_limit_manager, get_rate_limit_backend
 
 # Create rate limit manager
 rate_limit = APIRateLimit(rpm=500)
@@ -390,8 +390,8 @@ manager.set_backend(backend, key="my-agent")
 Automatic retry on 429 errors:
 
 ```python
-from Syrin.ratelimit import RetryConfig, create_retry_handler
-from Syrin.enums import RetryBackoff
+from syrin.ratelimit import RetryConfig, create_retry_handler
+from syrin.enums import RetryBackoff
 
 # Configure retry behavior
 config = RetryConfig(
@@ -431,7 +431,7 @@ Output shows:
 For advanced use cases, implement the `RateLimitManager` Protocol:
 
 ```python
-from Syrin.ratelimit import RateLimitManager, RateLimitStats, APIRateLimit
+from syrin.ratelimit import RateLimitManager, RateLimitStats, APIRateLimit
 
 class MyRateLimitManager(RateLimitManager):
     """Custom rate limit strategy."""
@@ -467,9 +467,9 @@ agent = Agent(
 ## Complete Example
 
 ```python
-from Syrin import Agent, Model
-from Syrin.ratelimit import APIRateLimit, RateLimitThreshold
-from Syrin.enums import RateLimitAction, ThresholdMetric
+from syrin import Agent, Model
+from syrin.ratelimit import APIRateLimit, RateLimitThreshold
+from syrin.enums import RateLimitAction, ThresholdMetric
 
 # Create agent with full rate limit configuration
 agent = Agent(

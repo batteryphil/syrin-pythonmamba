@@ -13,7 +13,6 @@
 
 <p align="center">
   <a href="https://pypi.org/project/syrin/"><img src="https://img.shields.io/pypi/v/syrin.svg" alt="PyPI"></a>
-  <a href="https://github.com/syrin-labs/syrin-python/actions"><img src="https://github.com/syrin-labs/syrin-python/workflows/Tests/badge.svg" alt="Tests"></a>
   <a href="https://codecov.io/gh/syrin-labs/syrin-python"><img src="https://codecov.io/gh/syrin-labs/syrin-python/branch/main/graph/badge.svg" alt="Coverage"></a>
   <a href="https://github.com/syrin-labs/syrin-python/blob/main/LICENSE"><img src="https://img.shields.io/github/license/syrin-labs/syrin-python.svg" alt="License"></a>
   <a href="https://pypi.org/project/syrin/"><img src="https://img.shields.io/pypi/pyversions/syrin.svg" alt="Python"></a>
@@ -22,23 +21,47 @@
 <p align="center">
   <a href="https://syrin.ai">Website</a> ·
   <a href="https://syrin.ai/docs">Documentation</a> ·
-  <a href="https://discord.gg/syrin">Discord</a> ·
-  <a href="https://twitter.com/syrin_ai">Twitter</a>
+  <a href="https://discord.gg/p4jnKxYKpB">Discord</a> ·
+  <a href="https://x.com/syrin_dev">Twitter (X)</a>
 </p>
 
 ---
 
-> **TL;DR** — A Python library for building AI agents with built-in observability & cost control. Set per-run budgets, get real-time cost tracking, and automatic limits. You can observe every step with lifecycle hooks and get type-safe, IDE-friendly APIs. `pip install syrin`
+## The problem
+
+**You must have felt this:**
+
+1. **How am I gonna monitor the budget for this agent?** — No built-in cap, no “stop at $X,” no way to see spend until the bill arrives.
+2. **What is actually happening in the flow?** — LLM calls, tool calls, retries—all invisible. You don’t know where time and tokens went.
+3. **Where is the bug?** — Something failed or looped. Logs are scattered. No single place to see every step.
+4. **Why do I have no control over my agent?** — Can’t act at 80% budget, can’t switch model when limits hit, can’t enforce guardrails in the pipeline.
+5. **How do I know what each run cost?** — No cost or token count on the response. You’re guessing or building it yourself.
+
+Syrin gives you budgeting, thresholds, hooks, observability, context, memory, guardrails, and checkpoints in one lightweight library—so you can answer these questions instead of wondering.
 
 ---
 
-## What is an AI agent?
+## Comparison: Syrin vs. LangChain, LangGraph, AutoGen
 
-An AI agent is a program that uses an LLM (like GPT-4) to reason and can call tools (search, calculate, look up data) in a loop until it completes a task. The catch: without limits, agents can make thousands of API calls and burn through your budget.
+| Capability | Syrin | LangChain | LangGraph | AutoGen |
+|------------|:-----:|:---------:|:---------:|:-------:|
+| **Built-in budget per run** | ✅ First-class | ❌ Missing | ❌ Missing | ❌ Missing |
+| **Budget thresholds → auto actions** (warn, switch model, stop) | ✅ Declarative | ❌ You build it | ❌ You build it | ❌ You build it |
+| **Rate-limited budgets** (per hour/day/month) | ✅ Built-in | ❌ Missing | ❌ Missing | ❌ Missing |
+| **72+ lifecycle hooks, single event path** | ✅ Every step visible | Callbacks + LangSmith | Graph nodes only | Limited |
+| **First-party cost/tokens per response** | ✅ Every response | Add-on / LangSmith | Add-on | Manual |
+| **Context window control + compaction** | ✅ Config + thresholds | DIY | DIY | DIY |
+| **Memory (remember/recall/forget)** | ✅ Built-in, multiple backends | Patterns only | Patterns only | Limited |
+| **Guardrails in pipeline** | ✅ Input/output, reports | DIY | DIY | DIY |
+| **Checkpoints (save/restore state)** | ✅ Triggers + API | DIY | DIY | DIY |
+| **StrEnum everywhere, mypy strict** | ✅ Type-safe | Partial | Partial | Partial |
+| **Lightweight core** | ✅ Minimal deps | Heavy | Heavy | Moderate |
+
+Use Syrin when you need **production-grade control and observability in one place**, without gluing together multiple products or building it yourself.
 
 ---
 
-## Try it now
+## Install and first run
 
 ```bash
 pip install syrin
@@ -54,376 +77,365 @@ class Researcher(Agent):
 
 result = Researcher().response("Summarize quantum computing in 3 sentences")
 print(result.content)
+# Quantum computing uses qubits to represent multiple states simultaneously...
 print(f"Cost: ${result.cost:.4f}  |  Budget used: ${result.budget_used:.4f}")
+# Cost: $0.0012  |  Budget used: $0.0012
 ```
 
-Pass your API key explicitly. Run it.
+Pass your API key explicitly. The run is capped at $0.50; when the budget is exceeded, the agent stops.
 
 ---
 
-## The problem
+## Basic agent (no budget)
 
-I spent **$1,410** when an AI agent got stuck in a recursive loop.
+**When to use:** Simple Q&A, demos, or when cost is not a concern yet.
 
-47,000 API calls in 6 hours. No circuit breaker. No budget limit. No way to stop it.
+```python
+import os
+from syrin import Agent, Model
 
-Current frameworks give you nice abstractions and easy demos—but they don't give you **per-agent budgets**, **real-time cost tracking**, or **automatic circuit breakers**.
+class Greeter(Agent):
+    model = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+    system_prompt = "You are a helpful assistant."
 
-Budget overruns on AI agent deployments are common. I was one of them.
+result = Greeter().response("Say hello in one sentence.")
+print(result.content)
+# Hello! How can I help you today?
+print(result.cost, result.tokens.total_tokens)
+# 0.0004 42
+```
 
 ---
 
-## The solution
+## Run budget with hard stop
 
-**Syrin** gives you **budget control**, **lifecycle visibility**, **declarative thresholds**, and **type-safe APIs** — designed to stay simple as you move from prototype to production.
+**When to use:** You want “this single run must never exceed $X.” No thresholds—just stop when exceeded.
+
+```python
+import os
+from syrin import Agent, Model, Budget, stop_on_exceeded
+
+class SafeResearcher(Agent):
+    model = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+    budget = Budget(run=0.50, on_exceeded=stop_on_exceeded)
+
+result = SafeResearcher().response("Explain photosynthesis briefly.")
+print(result.content)
+# Photosynthesis is the process by which plants...
+print(result.cost, result.budget_used)
+# 0.0015 0.0015
+# If the run had exceeded $0.50, it would stop and you'd get a clear error.
+```
+
+---
+
+## Budget thresholds (warn, then switch model)
+
+**When to use:** At 70% budget you want to log; at 90% you want to switch to a cheaper model; at 100% you stop. No custom glue—declare it.
 
 ```python
 import os
 from syrin import Agent, Model, Budget, BudgetThreshold
 
-class Researcher(Agent):
+class AdaptiveResearcher(Agent):
     model = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
     budget = Budget(
         run=0.50,
         thresholds=[
             BudgetThreshold(at=70, action=lambda ctx: print(f"Budget at {ctx.percentage}%")),
             BudgetThreshold(at=90, action=lambda ctx: ctx.parent.switch_model(Model("openai/gpt-4o-mini"))),
-        ]
+        ],
     )
 
-result = Researcher().response("Research AI frameworks")
-print(result.cost)        # ~$0.02
-print(result.budget_used) # cost in USD
+result = AdaptiveResearcher().response("Research AI frameworks in depth.")
+# (If budget crosses 70% you'll see: Budget at 70%)
+# (If it crosses 90%, the agent switches to the cheaper model automatically)
+print(result.cost, result.budget_used)
+# e.g. 0.0234 0.0234
 ```
-
-**That's it.** Budget control with threshold actions (each `action` is a function that receives `ctx` with `percentage`, `parent` agent, etc.).
 
 ---
 
-## Why Syrin?
+## Real-time cost, tokens, and duration
 
-**Budget** · **Lifecycle** · **Thresholds** · **Developer experience.** Four pillars.
-
-### 1. Budget-First Design
-
-Every agent declares its budget upfront. Automatic actions when thresholds hit.
-
-```python
-from syrin import Agent, Budget, BudgetThreshold, Model, RateLimit, raise_on_exceeded
-from syrin.exceptions import BudgetExceededError
-
-def stop_on_limit(ctx):
-    raise BudgetExceededError("Budget limit reached")
-
-budget = Budget(
-    run=0.50,
-    per=RateLimit(hour=10.00, day=100.00),
-    on_exceeded=raise_on_exceeded,
-    thresholds=[
-        BudgetThreshold(at=70, action=lambda ctx: print(f"Budget at {ctx.percentage}%")),
-        BudgetThreshold(at=90, action=lambda ctx: ctx.parent.switch_model(Model("openai/gpt-4o-mini"))),
-        BudgetThreshold(at=100, action=stop_on_limit),
-    ]
-)
-# Each action is a callable receiving ThresholdContext (ctx.percentage, ctx.parent, etc.)
-```
-
-### 2. Real-Time Cost Tracking
-
-See exactly what every operation costs:
+**When to use:** You need to show or log what every call cost and how long it took. Other libs often don’t attach this to the response.
 
 ```python
 result = agent.response("Your prompt here")
-print(f"Cost: ${result.cost:.4f}")        # $0.0234
-print(f"Tokens: {result.tokens.total_tokens}")    # 1247
-print(f"Budget used: ${result.budget_used:.4f}")  # cost in USD
-print(f"Duration: {result.duration}s")      # 1.23s
+print(f"Cost: ${result.cost:.4f}")
+# Cost: $0.0234
+print(f"Tokens: {result.tokens.total_tokens} (in: {result.tokens.input_tokens}, out: {result.tokens.output_tokens})")
+# Tokens: 1247 (in: 890, out: 357)
+print(f"Budget used: ${result.budget_used:.4f}")
+# Budget used: $0.0234
+print(f"Duration: {result.duration}s")
+# Duration: 1.23
 ```
-
-### 3. Persistent Memory
-
-Four memory types with Ebbinghaus-inspired decay curves:
-
-```python
-from syrin import Agent, Memory
-from syrin.enums import MemoryType
-
-agent = Agent(
-    model=Model.OpenAI("gpt-4o-mini"),
-    memory=Memory(types=[MemoryType.CORE, MemoryType.EPISODIC])
-)
-
-agent.remember("User's name is John", memory_type=MemoryType.CORE)
-memories = agent.recall("name")  # Semantic search
-agent.forget(memory_id="...")    # Selective forgetting
-```
-
-### 4. Guardrails
-
-Input/output validation with hooks and reporting:
-
-```python
-from syrin import Agent, GuardrailChain
-from syrin.guardrails import LengthGuardrail, ContentFilter
-
-class SafeAgent(Agent):
-    guardrails = GuardrailChain([
-        LengthGuardrail(max_length=4000),
-        ContentFilter(blocked_words=["spam", "malicious"])
-    ])
-
-result = SafeAgent().response("Hello!")
-print(result.report.guardrail.passed)    # True/False
-print(result.report.guardrail.blocked)   # True/False
-```
-
-### 5. Comprehensive Reporting
-
-Every response includes detailed reports:
-
-```python
-result = agent.response("Your prompt")
-
-# Access any report
-result.report.guardrail    # GuardrailReport
-result.report.tokens       # TokenReport (input, output, total, cost)
-result.report.budget       # BudgetStatus (remaining, used, total)
-result.report.memory       # MemoryReport (stores, recalls, forgets)
-result.report.context      # ContextReport (tokens, compressions)
-result.report.output       # OutputReport (validation results)
-result.report.ratelimits   # RateLimitReport
-result.report.checkpoints  # CheckpointReport
-```
-
-### 6. Extensible by Design
-
-Add any LLM in 30 lines:
-
-```python
-from syrin import Model
-from syrin.providers.base import ProviderResponse
-
-class DeepSeekModel(Model):
-    provider = "deepseek"
-    
-    def complete(self, messages, **kwargs):
-        # Your implementation
-        return ProviderResponse(...)
-    
-    def get_pricing(self):
-        return ModelPricing(input=0.14, output=0.28)
-
-model = Model("deepseek/deepseek-chat")
-```
-
-### 7. Lifecycle & Events (72+ Hooks)
-
-Every step is observable. No black boxes, no hidden prompt rewrites:
-
-```python
-from syrin import Agent, Model, Budget
-from syrin.enums import Hook
-
-class Researcher(Agent):
-    model = Model.OpenAI("gpt-4o-mini")
-    system_prompt = "You are a research assistant."
-    budget = Budget(run=0.50)
-
-agent = Researcher()
-
-agent.events.on(Hook.LLM_REQUEST_START, lambda ctx: print(f"Call #{ctx.iteration}"))
-agent.events.on(Hook.BUDGET_THRESHOLD, lambda ctx: print(f"Budget {ctx.threshold_percent}% used"))
-
-result = agent.response("Research AI frameworks")
-```
-
-Other hooks: `TOOL_CALL_START`, `GUARDRAIL_BLOCKED`, `CONTEXT_COMPRESSED`, `MEMORY_STORE`, and 60+ more. See [docs](https://syrin.ai/docs) for the full list.
 
 ---
 
-## Quick Start
+## Hooks—observe every step
 
-### Installation
-
-```bash
-pip install syrin
-```
-
-### Basic Usage
+**When to use:** You want one event path for logging, metrics, or debugging. No hidden prompt rewrites; you see every LLM request and every threshold.
 
 ```python
+import os
+from syrin import Agent, Model, Budget
+from syrin.enums import Hook
+
+class ObservableAgent(Agent):
+    model = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+    system_prompt = "You are a research assistant."
+    budget = Budget(run=0.50)
+
+agent = ObservableAgent()
+agent.events.on(Hook.LLM_REQUEST_START, lambda ctx: print(f"LLM call #{ctx.iteration}"))
+agent.events.on(Hook.BUDGET_THRESHOLD, lambda ctx: print(f"Budget at {ctx.threshold_percent}%"))
+
+result = agent.response("Research AI frameworks.")
+# LLM call #1
+# (if threshold hits: Budget at 70%)
+# ...
+```
+
+**In plain English:** Every time the agent calls the LLM, your handler runs. Every time a budget threshold fires, your handler runs. Same for tool calls, guardrails, memory, and 60+ other hooks. One place to plug in observability.
+
+---
+
+## Persistent memory (remember, recall, forget)
+
+**When to use:** The agent should remember facts across turns (e.g. user name, preferences) and you want semantic recall and optional forgetting.
+
+```python
+import os
+from syrin import Agent, Model, Memory
+from syrin.enums import MemoryType
+
+agent = Agent(
+    model=Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY")),
+    memory=Memory(types=[MemoryType.CORE, MemoryType.EPISODIC]),
+)
+
+agent.remember("The user's name is Alice and she prefers short answers.", memory_type=MemoryType.CORE)
+# Stored in memory.
+
+entries = agent.recall("user name")
+# Semantic search over memories; returns list of MemoryEntry.
+# e.g. [MemoryEntry(id='...', content="The user's name is Alice...", ...)]
+
+agent.forget(memory_id=entries[0].id)
+# That memory is removed.
+```
+
+**In plain English:** You store facts with a type (e.g. CORE for long-term facts). Recall runs a search over stored content. Forget removes by ID. You get this without wiring a vector DB yourself; multiple backends (in-memory, SQLite, Chroma, etc.) are supported.
+
+---
+
+## Guardrails (input/output validation)
+
+**When to use:** You want to block or warn on length, banned words, or custom rules before/after the LLM. Results show up in the response report.
+
+```python
+import os
+from syrin import Agent, Model, GuardrailChain
+from syrin.guardrails import LengthGuardrail, ContentFilter
+
+class SafeAgent(Agent):
+    model = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+    guardrails = GuardrailChain([
+        LengthGuardrail(max_length=4000),
+        ContentFilter(blocked_words=["spam", "malicious"]),
+    ])
+
+result = SafeAgent().response("Hello!")
+print(result.report.guardrail.passed)
+# True
+print(result.report.guardrail.blocked)
+# False
+# If input or output had been blocked, passed would be False and blocked True.
+```
+
+**In plain English:** Guardrails run in the pipeline. Input is checked before the LLM; output after. Every response carries a guardrail report so you can alert or log.
+
+---
+
+## Context window control
+
+**When to use:** You need a cap on context size (e.g. 8K tokens) so long conversations don’t blow the model’s window. Syrin lets you set `max_tokens` and optional compaction.
+
+```python
+import os
 from syrin import Agent, Model
+from syrin.context import Context
 
-class Greeter(Agent):
-    model = Model.OpenAI("gpt-4o-mini")
-    system_prompt = "You are a helpful assistant."
+agent = Agent(
+    model=Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY")),
+    context=Context(max_tokens=8000),
+)
 
-result = Greeter().response("Say hello!")
-print(result.content)  # "Hello!"
-print(result.cost)     # ~$0.0005
+result = agent.response("Summarize the previous conversation.")
+# Context is capped at 8000 tokens; you can add thresholds and compactors for auto-compaction.
+if result.context_stats:
+    print(result.context_stats.total_tokens, result.context_stats.max_tokens)
+# e.g. 1200 8000
 ```
 
-### With Budget
+---
+
+## Checkpoints (save and restore state)
+
+**When to use:** Long or expensive runs where you want to save state (e.g. after each step or on error) and resume later.
 
 ```python
-from syrin import Agent, Model, Budget, raise_on_exceeded
+import os
+from syrin import Agent, Model, CheckpointConfig, CheckpointTrigger
 
-class Researcher(Agent):
-    model = Model.OpenAI("gpt-4o-mini")
-    budget = Budget(run=0.50, on_exceeded=raise_on_exceeded)
+agent = Agent(
+    model=Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY")),
+    checkpoint=CheckpointConfig(storage="memory", trigger=CheckpointTrigger.STEP),
+)
 
-result = Researcher().response("Research quantum computing")
-print(result.cost)       # ~$0.04
-print(result.budget_used)  # cost in USD
+agent.response("First step.")
+cid = agent.save_checkpoint(reason="after_step_1")
+# Returns checkpoint ID.
+
+# Later: restore and continue.
+agent.load_checkpoint(cid)
+agent.response("Continue from where we left off.")
 ```
 
-### With Tools
+**In plain English:** You enable checkpoints with a trigger (step, tool, error, budget). You can save manually or let the library auto-save. Load by ID to restore messages and state.
+
+---
+
+## Tools (agent can call functions)
+
+**When to use:** The agent should use tools (search, calculator, API calls). You decorate functions with `@tool` and pass them to the agent.
 
 ```python
+import os
 from syrin import Agent, Model, tool, Budget
 
 @tool
 def search_web(query: str) -> str:
     """Search the web for information."""
-    return requests.get(f"https://api.search.com?q={query}").text
+    return f"Results for: {query}"  # Replace with real search in production
 
 class Assistant(Agent):
-    model = Model.OpenAI("gpt-4o-mini")
+    model = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
     tools = [search_web]
     budget = Budget(run=0.25)
 
 result = Assistant().response("What is the weather in Tokyo?")
+print(result.content)
+# e.g. Based on the search results, the weather in Tokyo is...
+print(result.cost, result.tool_calls)
+# 0.008 [] or list of tool calls if any were made
 ```
 
-### Streaming
+---
+
+## Streaming (async, token-by-token)
+
+**When to use:** You want to stream the reply to the user and show running cost (e.g. in a UI).
 
 ```python
-for chunk in agent.astream("Write a story"):
-    print(chunk.text, end="")
-    print(f" [${chunk.cost_so_far:.4f}]", end="\r")
+import asyncio
+import os
+from syrin import Agent, Model
+
+class Writer(Agent):
+    model = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+
+async def main():
+    agent = Writer()
+    async for chunk in agent.astream("Write a short story in 2 sentences."):
+        print(chunk.text, end="")
+        print(f" [${chunk.cost_so_far:.4f}]", end="\r")
+    # Once upon a time... [$0.0023]
+
+asyncio.run(main())
 ```
 
 ---
 
-## Features
+## Per-response reports (guardrail, tokens, budget, memory, checkpoints)
 
-### Core
-- **Budget & Thresholds** - Per-run, hourly, daily budgets; declare actions at 70%, 90%, 100%
-- **Cost Tracking** - Real-time cost and token tracking on every operation
-- **Model Switching** - Automatic fallback to cheaper models on budget thresholds
-- **Extensible Models** - Add any LLM provider in 30 lines
-- **Type Safety** - Full mypy strict compliance, StrEnum everywhere
+**When to use:** You need a single object that describes what happened on that run: guardrail result, token usage, budget status, memory ops, checkpoints. No scraping logs.
 
-### Memory
-- **4 Memory Types** - Core, Episodic, Semantic, Procedural
-- **Forgetting Curves** - Ebbinghaus-inspired decay
-- **Budget-Aware** - Memory operations adapt to remaining budget
-- **Multiple Backends** - In-memory, SQLite, Qdrant, Chroma, Redis, PostgreSQL
+```python
+result = agent.response("Your prompt")
 
-### Guardrails
-- **Input/Output Validation** - Block harmful content, enforce length limits
-- **Built-in Guardrails** - PII detection, content filtering, budget limits
-- **Custom Guardrails** - Extend with your own logic
-- **Hooks** - GUARDRAIL_INPUT, GUARDRAIL_OUTPUT, GUARDRAIL_BLOCKED
+# Guardrail: did input/output pass? Was it blocked?
+result.report.guardrail.passed   # True/False
+result.report.guardrail.blocked   # True if blocked
 
-### Lifecycle & Observability
-- **72+ Hooks** - Every step observable (LLM, tools, budget, memory, guardrails)
-- **Tracing** - Built-in span-based tracing with OTLP export
-- **Audit Logging** - Immutable logs for compliance (SOC 2, GDPR)
-- **Reports** - Every response includes detailed operation reports
+# Tokens and cost for this run
+result.report.tokens.input_tokens
+result.report.tokens.output_tokens
+result.report.tokens.total_tokens
+result.report.tokens.cost_usd
 
-### Context Management
-- **Auto-Compaction** - Smart context compression at 75%
-- **Token Counting** - Accurate tiktoken-based counting
-- **Threshold Actions** - Warn, summarize, compress, or stop
+# Budget status (also on result.budget)
+result.budget.remaining
+result.budget.used
+result.budget.cost
 
-### Multi-Agent
-- **Sequential** - Agent A → Agent B → Agent C
-- **Parallel** - Run multiple agents simultaneously
-- **Router** - Intelligent handoffs between specialists
+# Memory: how many stores/recalls/forgets this run
+result.report.memory.stores
+result.report.memory.recalls
+result.report.memory.forgets
 
----
+# Context: compressions this run; optional context_stats has compacted/utilization
+result.report.context.compressions
+result.context_stats.compacted  # if context_stats is set
 
-## Syrin vs. LangChain, LangGraph, AutoGen
+# Checkpoints: saves/loads this run
+result.report.checkpoints.saves
+result.report.checkpoints.loads
 
-Syrin is built for developers who want **simplicity**, **visibility**, and **production control** — without the problems reported across existing frameworks.
+# Rate limits
+result.report.ratelimits.checks
+result.report.ratelimits.exceeded
+```
 
-### What Syrin has that others don't
-
-| Feature | Syrin | LangChain | LangGraph | AutoGen |
-|---------|:-----:|:---------:|:---------:|:-------:|
-| **Built-in budget per run** | ✅ | ❌ | ❌ | ❌ |
-| **Budget thresholds → auto actions** (warn, switch model, stop) | ✅ | ❌ | ❌ | ❌ |
-| **Rate-limited budgets** (per hour/day/month) | ✅ | ❌ | ❌ | ❌ |
-| **72+ lifecycle hooks** (every step observable) | ✅ | Callbacks + LangSmith | Graph nodes | Limited |
-| **StrEnum everywhere** (no magic strings) | ✅ | Partial | Partial | Partial |
-| **mypy strict** (full type safety) | ✅ | Partial | Partial | Partial |
-| **TOON tool schemas** (compact format, ~40% fewer chars than JSON) | ✅ | JSON | JSON | JSON |
-| **Agent inheritance** (Python class inheritance) | ✅ | Composition-based | Graph-based | Composition-based |
-| **Per-response reports** (tokens, cost, budget, guardrails) | ✅ | LangSmith / add-on | Add-on | Manual |
-| **Extensible Model** (add any LLM in ~30 lines) | ✅ | Plugins | Plugins | Complex |
-| **First-party cost/budget** (no separate service) | ✅ | ❌ | ❌ | ❌ |
-
-### Reported problems (from research)
-
-LangChain, LangGraph, CrewAI, and AutoGen each have strengths (LangChain's ecosystem, LangGraph's graph model). The issues below are commonly reported by developers:
-
-| Framework | Reported issues |
-|-----------|-----------------|
-| **LangChain** | Over-abstraction, dependency bloat, breaking changes, inconsistent docs, debugging difficulty, hidden prompt rewrites, token/cost metadata not built-in |
-| **LangGraph** | Experimental features, sparse docs, steep DAG learning curve for simple pipelines |
-| **CrewAI** | Manager-worker architecture fails in practice, telemetry/privacy concerns (GDPR), high setup complexity |
-| **AutoGen** | Complete rewrite v0.2→v0.4 broke existing code; now in maintenance mode (Microsoft Agent Framework) |
-
-### When to use each
-
-- **LangChain** — 300+ integrations, complex RAG, LangSmith observability. Use it for that.
-- **CrewAI** — Quick role-based multi-agent prototyping. Use it for that.
-- **Syrin** — Production deployments where you need first-party budget control, lifecycle visibility, and type-safe APIs.
+**In plain English:** Every response is a single object. You get cost, tokens, and a full report (guardrail, memory, context, checkpoints, rate limits) without wiring another system.
 
 ---
 
-## Built for developers
+## Why Syrin: one stack, full control
 
-- **72+ lifecycle hooks** — Observe every step: `agent.events.on(Hook.LLM_REQUEST_START, handler)`, `Hook.BUDGET_THRESHOLD`, `Hook.TOOL_CALL_START`, etc. No black boxes.
-- **Declarative thresholds** — Define actions at 70%, 90%, 100% budget. Warn, switch model, or stop. No custom glue code.
-- **Callbacks for behavior** — `on_exceeded=raise_on_exceeded` or your own function; `MemoryType.CORE` and other enums for options.
-- **TOON schemas** — Compact tool format (~40% fewer characters than JSON; see [examples/core/toon_format.py](examples/core/toon_format.py)).
-- **mypy strict** — Full type safety across the API.
-- **Extensible Model** — Add any LLM in ~30 lines by inheriting `syrin.Model`.
+- **Budget and thresholds** — Per-run and per-period limits with declarative actions. Other libs don’t ship this; you’d build it yourself.
+- **Hooks and observability** — One event path, 72+ hooks. You see every LLM call, tool call, threshold, and guardrail. No black box.
+- **Context, memory, guardrails, checkpoints** — All in the same library. Control context size, remember/recall/forget, validate input/output, save/restore state. No scattered integrations.
+- **Reports per response** — Cost, tokens, budget, guardrail, memory, checkpoints on every `Response`. First-party, no extra product.
+- **Lightweight** — Minimal dependencies. One coherent API instead of a patchwork of callbacks and third-party dashboards.
+- **Type-safe** — StrEnum everywhere, mypy strict. Fewer runtime surprises and better IDE support.
 
----
-
-## Research-backed
-
-Built on insights from 50+ academic papers:
-
-- **A-MEM** (NeurIPS 2025): Agentic self-organizing memory
-- **MIRIX** (2025): 6 memory types, 85.4% accuracy
-- **Memory-R1**: RL-trained memory management
-- **Google BATS**: Budget-aware tool use
+For deep dives: [Budget & thresholds](docs/budget-control.md), [Memory](docs/memory.md), [Observability](docs/observability.md), [Guardrails](docs/guardrails.md), [Context](docs/context.md), [Checkpoints](docs/checkpoint.md), [Architecture](docs/ARCHITECTURE.md). Full [docs index](docs/README.md).
 
 ---
 
-## Community
+## Community — Connect here
 
-- 💬 [Discord](https://discord.gg/syrin) - Chat with the community
-- 🐦 [Twitter](https://twitter.com/syrin_ai) - Updates and tips
-- 📧 [Email](mailto:hello@syrin.ai) - Questions and feedback
-- 🐛 [Issues](https://github.com/syrin-labs/syrin-python/issues) - Bug reports
-- 💡 [Discussions](https://github.com/syrin-labs/syrin-python/discussions) - Feature requests
+- 🌐 [Website](https://syrin.ai) — syrin.ai
+- 💬 [Discord](https://discord.gg/p4jnKxYKpB) — Chat and support
+- 🐦 [Twitter (X)](https://x.com/syrin_dev) — Updates and tips
+- 📧 [Email](mailto:hello@syrin.ai) — Questions and feedback
+- 🐛 [Issues](https://github.com/syrin-labs/syrin-python/issues) — Bug reports
+- 💡 [Discussions](https://github.com/syrin-labs/syrin-python/discussions) — Feature requests
 
 ---
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and guidelines.
 
 ---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 

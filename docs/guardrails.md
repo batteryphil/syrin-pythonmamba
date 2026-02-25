@@ -1627,10 +1627,10 @@ result = await guardrail.evaluate(context)
 
 ## Support
 
-- **Documentation:** [docs.syrin.ai/guardrails](https://docs.syrin.ai)
-- **GitHub Issues:** [github.com/syrin/syrin/issues](https://github.com/syrin/syrin)
-- **Discord:** [discord.gg/syrin](https://discord.gg/syrin)
-- **Enterprise Support:** enterprise@syrin.ai
+- **Website:** [syrin.ai](https://syrin.ai)
+- **GitHub Issues:** [github.com/syrin-labs/syrin-python/issues](https://github.com/syrin-labs/syrin-python/issues)
+- **Discord:** [discord.gg/p4jnKxYKpB](https://discord.gg/p4jnKxYKpB)
+- **Twitter (X):** [x.com/syrin_dev](https://x.com/syrin_dev)
 
 ---
 
