@@ -1,10 +1,13 @@
 """Tests for the events system using Hook enums."""
 
-from unittest.mock import patch
+from __future__ import annotations
+
+from unittest.mock import AsyncMock, patch
 
 from syrin import Agent, Model
 from syrin.enums import Hook
 from syrin.events import EventContext, Events
+from syrin.types import ProviderResponse, TokenUsage
 
 
 class TestEvents:
@@ -324,3 +327,39 @@ class TestHooksEdgeCases:
         events = Events(lambda _e, _c: None)
         # Should not raise with valid hook
         events._trigger(Hook.AGENT_RUN_START, EventContext())
+
+
+class TestHookEmissionAudit:
+    """Regression: agent/loop emit only Hook enum values (or mapped legacy strings)."""
+
+    def test_agent_run_emits_only_hook_enum_values(self) -> None:
+        """During response(), every emitted hook is a Hook enum member."""
+        emitted: list[Hook] = []
+
+        def capture(hook: Hook, _ctx: EventContext) -> None:
+            emitted.append(hook)
+
+        model = Model("anthropic/claude-3-5-sonnet")
+        agent = Agent(model=model, system_prompt="Test.")
+        agent.events.on_all(capture)
+
+        mock_resp = ProviderResponse(
+            content="Hi",
+            tool_calls=[],
+            token_usage=TokenUsage(
+                input_tokens=5,
+                output_tokens=10,
+                total_tokens=15,
+            ),
+        )
+        with patch.object(
+            agent._provider,
+            "complete",
+            new_callable=AsyncMock,
+            return_value=mock_resp,
+        ):
+            agent.response("Hello")
+
+        for h in emitted:
+            assert isinstance(h, Hook), f"Expected Hook enum, got {type(h).__name__}: {h}"
+            assert h in Hook

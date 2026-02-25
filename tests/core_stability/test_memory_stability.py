@@ -129,3 +129,41 @@ class TestMemoryEdgeCases:
         agent = Agent(model=model, system_prompt="Test.")
         deleted = agent.forget(memory_id="nonexistent-uuid-12345")
         assert deleted == 1
+
+
+class TestRecallContract:
+    """recall() present and correct in Agent, Memory, MemoryStore; return type and shape."""
+
+    def test_agent_recall_returns_memory_entries_with_required_attrs(self) -> None:
+        """recall() returns list of objects with id, content, type, importance."""
+        from syrin.memory.config import MemoryEntry
+
+        model = Model("anthropic/claude-3-5-sonnet")
+        agent = Agent(model=model, system_prompt="Test.")
+        agent.remember("User name is Bob", memory_type=MemoryType.CORE, importance=0.9)
+        entries = agent.recall("Bob", memory_type=MemoryType.CORE, limit=5)
+        assert isinstance(entries, list)
+        assert len(entries) >= 1
+        for e in entries:
+            assert isinstance(e, MemoryEntry)
+            assert hasattr(e, "id") and isinstance(e.id, str)
+            assert hasattr(e, "content") and isinstance(e.content, str)
+            assert hasattr(e, "type") and e.type == MemoryType.CORE
+            assert hasattr(e, "importance") and isinstance(e.importance, (int, float))
+
+    def test_agent_recall_without_persistent_memory_raises(self) -> None:
+        """Agent with only conversation memory (no persistent): recall() raises RuntimeError."""
+        model = Model("anthropic/claude-3-5-sonnet")
+        agent = Agent(model=model, system_prompt="Test.", memory=BufferMemory())
+        with pytest.raises(RuntimeError, match="persistent memory"):
+            agent.recall("anything")
+
+    def test_agent_recall_with_query_none_lists_all_up_to_limit(self) -> None:
+        """recall(query=None, limit=N) lists all entries up to N."""
+        model = Model("anthropic/claude-3-5-sonnet")
+        agent = Agent(model=model, system_prompt="Test.")
+        agent.remember("A", memory_type=MemoryType.EPISODIC)
+        agent.remember("B", memory_type=MemoryType.EPISODIC)
+        entries = agent.recall(limit=5)
+        assert len(entries) >= 1
+        assert len(entries) <= 5

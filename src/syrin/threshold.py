@@ -195,7 +195,8 @@ class ContextThreshold(BaseThreshold):
 class RateLimitThreshold(BaseThreshold):
     """Threshold for APIRateLimit (tracks RPM, TPM, or RPD).
 
-    Requires metric to be specified.
+    Requires metric to be specified. Use the action callback to do anything when
+    the threshold is crossed (e.g. raise, wait, switch model, log).
 
     Args:
         at: Percentage (0-100) at which to trigger
@@ -206,7 +207,10 @@ class RateLimitThreshold(BaseThreshold):
         >>> from syrin.threshold import RateLimitThreshold
         >>> from syrin.enums import ThresholdMetric
         >>>
-        >>> RateLimitThreshold(at=80, action=lambda ctx: print(f"RPM at {ctx.percentage}%"), metric=ThresholdMetric.RPM)
+        >>> def on_threshold(ctx):
+        ...     if ctx.percentage >= 80:
+        ...         raise RuntimeError("Rate limit threshold reached")
+        >>> RateLimitThreshold(at=80, action=on_threshold, metric=ThresholdMetric.RPM)
     """
 
     metric: Any = None

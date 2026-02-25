@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Any, cast
 
@@ -46,7 +45,6 @@ from syrin.enums import (
     LoopStrategy,
     MemoryBackend,
     MemoryType,
-    RateLimitAction,
 )
 from syrin.events import EventContext, Events
 from syrin.exceptions import BudgetExceededError, BudgetThresholdError, ToolExecutionError
@@ -1695,69 +1693,9 @@ class Agent:
             _log.error("Rate limit exceeded: %s", reason)
             raise RuntimeError(f"Rate limit exceeded: {reason}")
 
-        triggered_action = manager.get_triggered_action()
-        if triggered_action is None:
-            return
-
-        action = triggered_action.action
-
-        if action == RateLimitAction.SWITCH_MODEL and triggered_action.switch_to_model:
-            _log.warning(
-                "Rate limit threshold %d%%: switching from %s to %s",
-                triggered_action.at,
-                self._model_config.model_id,
-                triggered_action.switch_to_model,
-            )
-            self.switch_model(Model(triggered_action.switch_to_model))
-
-        elif action == RateLimitAction.STOP:
-            _log.error(
-                "Rate limit threshold %d%%: stop",
-                triggered_action.at,
-            )
-            raise RuntimeError(
-                triggered_action.message or f"Rate limit threshold reached: {triggered_action.at}%"
-            )
-
-        elif action == RateLimitAction.ERROR:
-            _log.error(
-                "Rate limit threshold %d%%: error",
-                triggered_action.at,
-            )
-            raise RuntimeError(
-                triggered_action.message or f"Rate limit threshold reached: {triggered_action.at}%"
-            )
-
-        elif action == RateLimitAction.WARN:
-            _log.warning(
-                "Rate limit threshold %d%%: %s",
-                triggered_action.at,
-                triggered_action.message or "threshold reached",
-            )
-
-        elif action == RateLimitAction.WAIT:
-            import asyncio
-
-            wait_time = (
-                triggered_action.wait_seconds or self._rate_limit_manager.config.wait_backoff
-            )
-            _log.warning(
-                "Rate limit threshold %d%%: waiting %.2fs",
-                triggered_action.at,
-                wait_time,
-            )
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    import concurrent.futures
-
-                    with concurrent.futures.ThreadPoolExecutor() as pool:
-                        future = pool.submit(time.sleep, wait_time)
-                        future.result()
-                else:
-                    time.sleep(wait_time)
-            except RuntimeError:
-                time.sleep(wait_time)
+        # Threshold actions (wait, stop, switch model, etc.) are run by the manager
+        # in _check_thresholds() via each threshold's action(ctx) callback. The user
+        # implements desired behavior in that callback (e.g. raise, time.sleep, switch_model).
 
     def _record_rate_limit_usage(self, token_usage: TokenUsage) -> None:
         """Record token usage and re-check rate limits after LLM call.

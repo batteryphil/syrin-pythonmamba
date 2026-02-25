@@ -418,9 +418,12 @@ class TestHumanInTheLoop:
         assert approval_calls[0][0] == "search"
 
     def test_rejected_tool_blocks_execution(self):
-        """Verifies rejected tools don't execute."""
+        """Verifies rejected tools don't execute; approval callback is still invoked."""
 
-        async def approve(_name, _args):
+        approval_calls = []
+
+        async def approve(name, args):
+            approval_calls.append((name, args))
             return False  # Reject all
 
         loop = HumanInTheLoop(approve=approve)
@@ -440,33 +443,9 @@ class TestHumanInTheLoop:
 
         asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
-        assert len(approval_calls) == 1
-        assert approval_calls[0][0] == "search"
-
-    def test_rejected_tool_blocks_execution(self):
-        """Verifies rejected tools don't execute."""
-
-        async def approve(_name, _args):
-            return False  # Reject all
-
-        loop = HumanInTheLoop(approve=approve)
-
-        mock_agent = MagicMock()
-        mock_agent.complete = AsyncMock(
-            return_value=MagicMock(
-                content="",
-                tool_calls=[ToolCall(id="call_1", name="delete", arguments={})],
-            )
-        )
-        mock_agent.execute_tool = AsyncMock()
-        mock_agent._model_config = MagicMock()
-        mock_agent._model_config.model_id = "gpt-4o"
-        mock_agent._emit_event = MagicMock()
-        mock_agent._check_and_apply_budget = MagicMock()
-
-        asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
-
-        # Tool should NOT have been executed
+        assert len(approval_calls) >= 1
+        assert approval_calls[0][0] == "delete"
+        # Tool should NOT have been executed when approval returns False
         mock_agent.execute_tool.assert_not_called()
 
     def test_populates_cost(self):

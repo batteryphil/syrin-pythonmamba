@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Step 5 (Bug fixes):** Response data regression tests for sync/async parity and tool_calls from loop. recall() contract tests (Agent/Memory/MemoryStore return shape). spawn() return type (Response vs Agent) and budget inheritance tests. Hook emission audit (agent run emits only Hook enum). Rate limit: threshold behavior is fully controlled by the user’s `action(ctx)` callback on `RateLimitThreshold` (no separate `rate_limit_action`; user implements stop/wait/switch in the callback). Guardrail block tests (input block skips LLM; output block returns GUARDRAIL response). Checkpoint trigger tests (STEP fires, MANUAL does not; save/load). Session `span_count` updated when spans are exported in session context. Edge-case tests (empty tools, no budget, no persistent memory, unknown provider) and typed errors.
+
 ### Deprecated
 
 ### Removed

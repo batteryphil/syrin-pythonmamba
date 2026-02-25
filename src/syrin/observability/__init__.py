@@ -107,7 +107,11 @@ class SpanContext:
 
 @dataclass
 class Session:
-    """A session groups related traces together (e.g., a conversation)."""
+    """A session groups related traces together (e.g., a conversation).
+
+    span_count is updated when spans are exported while this session is the current
+    context (i.e. spans created inside ``with trace.session(...):``).
+    """
 
     id: str
     start_time: datetime = field(default_factory=datetime.now)
@@ -369,6 +373,11 @@ class Tracer:
                 should_sample = True  # Default to sampling on error
             if not should_sample:
                 return
+
+        # Update session span_count when span is associated with current session
+        session = _current_session.get()
+        if session is not None and span.session_id and session.id == span.session_id:
+            session.span_count += 1
 
         # Record metrics
         if self._collect_metrics:

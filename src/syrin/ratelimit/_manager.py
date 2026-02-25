@@ -343,6 +343,15 @@ class DefaultRateLimitManager:
 
         return None
 
+    def get_triggered_action(self) -> Any:
+        """Get the currently triggered threshold action if any.
+
+        Threshold behavior is fully controlled by the user's action callback
+        (executed in _check_thresholds). This method returns None; the Protocol
+        retains it for compatibility.
+        """
+        return None
+
     @property
     def stats(self) -> RateLimitStats:
         """Get current rate limit statistics."""

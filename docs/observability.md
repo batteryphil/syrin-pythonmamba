@@ -100,6 +100,7 @@ with session("conversation_001", user="alice"):
     agent.response("Hi, my name is Bob")
     agent.response("What's my name?")  # Session knows context
     agent.response("Thanks!")           # Continues the conversation
+# session.span_count is updated as spans are exported within the context
 ```
 
 ### Semantic Attributes
