@@ -104,6 +104,7 @@ from syrin.checkpoint import (
     CheckpointState,
     CheckpointTrigger,
 )
+from syrin.circuit import CircuitBreaker
 
 # =============================================================================
 # CLI & Observability (New)
@@ -162,6 +163,7 @@ from syrin.enums import (
 )
 from syrin.events import EventContext, Events
 from syrin.exceptions import (
+    CircuitBreakerOpenError,
     HandoffBlockedError,
     HandoffRetryRequested,
     ValidationError,
@@ -173,6 +175,7 @@ from syrin.guardrails import (
     GuardrailResult,
     LengthGuardrail,
 )
+from syrin.hitl import ApprovalGate, ApprovalGateProtocol
 from syrin.loop import (
     CODE_ACTION,
     HITL,
@@ -438,6 +441,10 @@ __all__ = [
     "ValidationPipeline",
     "validate_output",
     "ValidationError",
+    "ApprovalGate",
+    "ApprovalGateProtocol",
+    "CircuitBreaker",
+    "CircuitBreakerOpenError",
     "HandoffBlockedError",
     "HandoffRetryRequested",
     "Pipeline",

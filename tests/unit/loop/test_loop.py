@@ -390,13 +390,22 @@ class TestHumanInTheLoop:
 
         loop = HumanInTheLoop(approve=approve, max_iterations=5)
         assert loop.name == "human_in_the_loop"
-        assert loop.approve is approve
+        assert loop._gate is not None
         assert loop.max_iterations == 5
 
-    def test_creation_without_callback(self):
-        loop = HumanInTheLoop()
+    def test_creation_with_approval_gate(self):
+        from syrin import ApprovalGate
+
+        gate = ApprovalGate(callback=lambda _m, _t, _c: True)
+        loop = HumanInTheLoop(approval_gate=gate)
         assert loop.name == "human_in_the_loop"
-        assert loop.approve is None
+        assert loop._gate is gate
+
+    def test_creation_without_callback_raises(self):
+        import pytest
+
+        with pytest.raises(ValueError, match="requires approval_gate or approve"):
+            HumanInTheLoop()
 
     def test_approval_called(self):
         """Verifies approval callback is called with tool info."""
@@ -771,10 +780,12 @@ class TestLoopEdgeCases:
         assert result.latency_ms == 100.0
         assert len(result.tool_calls) == 1
 
-    def test_human_in_the_loop_no_approval_callback(self):
-        """HITL without approval callback should still work."""
-        loop = HumanInTheLoop()
-        assert loop.approve is None
+    def test_human_in_the_loop_requires_approval(self):
+        """HITL requires approval_gate or approve."""
+        import pytest
+
+        with pytest.raises(ValueError, match="requires approval_gate or approve"):
+            HumanInTheLoop()
 
     def test_single_shot_loop_with_very_long_content(self):
         """SingleShotLoop handles very long content."""
@@ -936,12 +947,16 @@ class TestReactLoopToolErrorRecovery:
 # =============================================================================
 
 
-class TestHITLNoApprovalCallback:
-    """Verify HumanInTheLoop with no approve callback auto-approves."""
+class TestHITLApprovalGate:
+    """Verify HumanInTheLoop with ApprovalGate executes tools when approved."""
 
-    def test_no_approve_callback_executes_tool_directly(self):
-        """When approve=None, tools are auto-approved and executed."""
-        loop = HumanInTheLoop()  # No approve callback
+    def test_approval_gate_approves_executes_tool_directly(self):
+        """When approval gate approves, tools are executed."""
+
+        async def approve_all(_name, _args):
+            return True
+
+        loop = HumanInTheLoop(approve=approve_all)
 
         call_count = [0]
 

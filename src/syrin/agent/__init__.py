@@ -42,6 +42,7 @@ from syrin.agent._run_context import DefaultAgentRunContext
 from syrin.audit import AuditHookHandler, AuditLog
 from syrin.cost import calculate_cost, estimate_cost_for_call
 from syrin.enums import (
+    CircuitState,
     GuardrailStage,
     Hook,
     LoopStrategy,
@@ -52,6 +53,7 @@ from syrin.events import EventContext, Events
 from syrin.exceptions import (
     BudgetExceededError,
     BudgetThresholdError,
+    CircuitBreakerOpenError,
     HandoffBlockedError,
     HandoffRetryRequested,
     ToolExecutionError,
@@ -256,6 +258,9 @@ class Agent:
         context: Context | DefaultContextManager | None = None,
         rate_limit: APIRateLimit | RateLimitManager | None = None,
         checkpoint: CheckpointConfig | Checkpointer | None = None,
+        circuit_breaker: Any = None,
+        approval_gate: Any = None,
+        hitl_timeout: int = 300,
         debug: bool = False,
         tracer: Any = None,
         bus: Any = None,
@@ -300,6 +305,12 @@ class Agent:
                 metrics, observability, or custom pipelines.
             audit: Optional AuditLog for compliance logging. Writes LLM calls, tool
                 calls, handoffs, spawns to JSONL or custom backend.
+            circuit_breaker: Optional CircuitBreaker for LLM provider failures. Trips
+                after N failures; uses fallback model when open or raises
+                CircuitBreakerOpenError if no fallback.
+            approval_gate: Optional ApprovalGate for HITL. When tools have
+                requires_approval=True, blocks until approval. Default: None (reject).
+            hitl_timeout: Seconds to wait for approval. On timeout, reject. Default 300.
 
         Example:
             >>> agent = Agent(
@@ -531,6 +542,21 @@ class Agent:
 
         # Initialize run report for tracking metrics across a response() call
         self._run_report: AgentReport = AgentReport()
+
+        self._approval_gate = approval_gate
+        self._hitl_timeout = hitl_timeout
+
+        # Circuit breaker
+        self._circuit_breaker = circuit_breaker
+        self._fallback_provider: Provider | None = None
+        self._fallback_model_config: ModelConfig | None = None
+        if circuit_breaker is not None:
+            from syrin.circuit import CircuitBreaker
+
+            if not isinstance(circuit_breaker, CircuitBreaker):
+                raise TypeError(
+                    f"circuit_breaker must be CircuitBreaker or None, got {type(circuit_breaker).__name__}"
+                )
 
         # Checkpoint setup
         if checkpoint is None:
@@ -1993,6 +2019,20 @@ class Agent:
             messages=messages, model=self._model_config, tools=tools, **provider_kwargs
         )
 
+    def _resolve_fallback_provider(self) -> tuple[Provider, ModelConfig]:
+        """Resolve fallback model to (provider, config). Cached."""
+        if self._fallback_provider is not None and self._fallback_model_config is not None:
+            return self._fallback_provider, self._fallback_model_config
+        fallback = self._circuit_breaker.fallback
+        if fallback is None:
+            raise ValueError("circuit_breaker has no fallback")
+        fallback_model = Model(model_id=fallback) if isinstance(fallback, str) else fallback
+        prov = fallback_model.get_provider()
+        cfg = fallback_model.to_config()
+        self._fallback_provider = prov
+        self._fallback_model_config = cfg
+        return prov, cfg
+
     async def complete(
         self, messages: list[Message], tools: list[ToolSpec] | None = None
     ) -> ProviderResponse:
@@ -2008,7 +2048,56 @@ class Agent:
         Returns:
             ProviderResponse (content, tool_calls, token_usage, etc.).
         """
-        return await self._complete_async(messages, tools)
+        cb = self._circuit_breaker
+        if cb is not None and not cb.allow_request():
+            if cb.fallback is not None:
+                prov, cfg = self._resolve_fallback_provider()
+                provider_kwargs: dict[str, Any] = {}
+                if hasattr(self._model, "_provider_kwargs"):
+                    provider_kwargs = dict(getattr(self._model, "_provider_kwargs", {}))
+                return await prov.complete(
+                    messages=messages, model=cfg, tools=tools, **provider_kwargs
+                )
+            import time
+
+            state = cb.get_state()
+            recovery_at = time.monotonic() + (
+                cb.recovery_timeout - (time.monotonic() - (state.last_failure_time or 0))
+            )
+            fallback_str = str(cb.fallback) if cb.fallback else None
+            raise CircuitBreakerOpenError(
+                f"Circuit breaker open for agent {self._agent_name!r}. "
+                f"Recovery in {cb.recovery_timeout}s.",
+                agent_name=self._agent_name,
+                circuit_state=state,
+                recovery_at=recovery_at,
+                fallback_model=fallback_str,
+            )
+        try:
+            resp = await self._complete_async(messages, tools)
+            if cb is not None:
+                was_half_open = cb.get_state().state == CircuitState.HALF_OPEN
+                cb.record_success()
+                if was_half_open:
+                    self._emit_event(Hook.CIRCUIT_RESET, EventContext())
+            return resp
+        except Exception as e:
+            if cb is not None:
+                was_closed_or_half = cb.get_state().state in (
+                    CircuitState.CLOSED,
+                    CircuitState.HALF_OPEN,
+                )
+                cb.record_failure(e)
+                if cb.get_state().state == CircuitState.OPEN and was_closed_or_half:
+                    self._emit_event(
+                        Hook.CIRCUIT_TRIP,
+                        EventContext(
+                            error=str(e),
+                            failures=cb.get_state().failures,
+                            agent_name=self._agent_name,
+                        ),
+                    )
+            raise
 
     def _with_context_on_response(self, r: Response[str]) -> Response[str]:
         """Attach per-call context_stats and context to a Response."""

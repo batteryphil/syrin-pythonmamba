@@ -18,6 +18,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import nullcontext
@@ -295,6 +296,51 @@ class ReactLoop(Loop):
             for tc in response.tool_calls:
                 tool_name = tc.name
                 tool_args = tc.arguments or {}
+                tool_spec = next((t for t in (tools or []) if t.name == tool_name), None)
+                needs_approval = tool_spec is not None and getattr(
+                    tool_spec, "requires_approval", False
+                )
+
+                approved = True
+                if needs_approval:
+                    gate = getattr(ctx, "approval_gate", None)
+                    timeout = getattr(ctx, "hitl_timeout", 300)
+                    ctx.emit_event(
+                        Hook.HITL_PENDING,
+                        EventContext(
+                            name=tool_name,
+                            arguments=tool_args,
+                            message=f"Tool {tool_name} requires approval",
+                            iteration=iteration,
+                        ),
+                    )
+                    if gate is not None:
+                        approved = await gate.request(
+                            message=f"Tool {tool_name!r} requested with args: {tool_args}",
+                            timeout=timeout,
+                            context={"tool_name": tool_name, "arguments": tool_args},
+                        )
+                    else:
+                        approved = False
+                    ctx.emit_event(
+                        Hook.HITL_APPROVED if approved else Hook.HITL_REJECTED,
+                        EventContext(
+                            name=tool_name,
+                            arguments=tool_args,
+                            approved=approved,
+                            iteration=iteration,
+                        ),
+                    )
+                if not approved:
+                    messages.append(
+                        Message(
+                            role=MessageRole.TOOL,
+                            content=f"Tool '{tool_name}' not approved.",
+                            tool_call_id=tc.id,
+                        )
+                    )
+                    continue
+
                 tools_used.append(tool_name)
                 tool_calls_all.append(
                     {
@@ -401,23 +447,39 @@ class ReactLoop(Loop):
 
 
 class HumanInTheLoop(Loop):
-    """Human approval before tool execution.
+    """Human approval before every tool execution.
 
-    Use for: Safety-critical applications
+    Use for: Safety-critical applications where all tools need approval.
 
     Args:
-        approve: Async function(tool_name, arguments) -> bool
-                 Return True to allow, False to block
+        approval_gate: ApprovalGate for async request/approve. Use ApprovalGate(callback=fn).
+        approve: Legacy: async (tool_name, args) -> bool. Wrapped into ApprovalGate if set.
+        timeout: Seconds to wait for approval. On timeout, reject. Default 300.
+        max_iterations: Max tool-call loops.
     """
 
     name = "human_in_the_loop"
 
     def __init__(
         self,
+        approval_gate: Any = None,
         approve: ToolApprovalFn | None = None,
+        timeout: int = 300,
         max_iterations: int = 10,
-    ):
-        self.approve = approve
+    ) -> None:
+        from syrin.hitl import ApprovalGate
+
+        if approval_gate is not None:
+            self._gate = approval_gate
+        elif approve is not None:
+
+            async def _wrap(msg: str, t: int, ctx: dict[str, Any]) -> bool:
+                return await approve(ctx.get("tool_name", ""), ctx.get("arguments", {}))
+
+            self._gate = ApprovalGate(_wrap)
+        else:
+            raise ValueError("HumanInTheLoop requires approval_gate or approve")
+        self._timeout = timeout
         self.max_iterations = max_iterations
 
     async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
@@ -469,9 +531,36 @@ class HumanInTheLoop(Loop):
                 tool_name = tc.name
                 tool_args = tc.arguments or {}
 
-                approved = True
-                if self.approve:
-                    approved = await self.approve(tool_name, tool_args)
+                ctx.emit_event(
+                    Hook.HITL_PENDING,
+                    EventContext(
+                        name=tool_name,
+                        arguments=tool_args,
+                        message=f"Tool {tool_name} requires approval",
+                        iteration=iteration,
+                    ),
+                )
+                try:
+                    approved = await asyncio.wait_for(
+                        self._gate.request(
+                            message=f"Tool {tool_name!r} with args: {tool_args}",
+                            timeout=self._timeout,
+                            context={"tool_name": tool_name, "arguments": tool_args},
+                        ),
+                        timeout=self._timeout,
+                    )
+                except asyncio.TimeoutError:
+                    approved = False
+
+                ctx.emit_event(
+                    Hook.HITL_APPROVED if approved else Hook.HITL_REJECTED,
+                    EventContext(
+                        name=tool_name,
+                        arguments=tool_args,
+                        approved=approved,
+                        iteration=iteration,
+                    ),
+                )
 
                 ctx.emit_event(
                     Hook.TOOL_CALL_START,

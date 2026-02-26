@@ -309,6 +309,13 @@ class Hook(StrEnum):
     HARNESS_CIRCUIT_TRIP = "harness.circuit.trip"
     HARNESS_CIRCUIT_RESET = "harness.circuit.reset"
 
+    CIRCUIT_TRIP = "circuit.trip"
+    CIRCUIT_RESET = "circuit.reset"
+
+    HITL_PENDING = "hitl.pending"
+    HITL_APPROVED = "hitl.approved"
+    HITL_REJECTED = "hitl.rejected"
+
     DYNAMIC_PIPELINE_START = "dynamic.pipeline.start"
     DYNAMIC_PIPELINE_PLAN = "dynamic.pipeline.plan"
     DYNAMIC_PIPELINE_EXECUTE = "dynamic.pipeline.execute"

@@ -51,6 +51,8 @@ Syrin emits events at key moments:
 - `tool.error` - An error occurred
 - `handoff.start` / `handoff.end` / `handoff.blocked` - Agent handoff (see [Handoff & Spawn](agent/handoff-spawn.md))
 - `spawn.start` / `spawn.end` - Sub-agent spawn
+- `circuit.trip` / `circuit.reset` - Circuit breaker (see [Circuit Breaker](circuit-breaker.md))
+- `hitl.pending` / `hitl.approved` / `hitl.rejected` - Human-in-the-loop (see [HITL](hitl.md))
 
 ### Basic Hook Usage
 
@@ -711,6 +713,39 @@ def handle_customer(query: str):
 response = handle_customer("I need help with my order #12345")
 print(response)
 ```
+
+---
+
+## Reliability
+
+### Circuit Breaker
+
+Prevent cascading failures when the LLM provider is down. After N consecutive failures, the circuit trips and uses a fallback model or raises `CircuitBreakerOpenError`.
+
+```python
+from syrin import Agent, CircuitBreaker, Model
+
+cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60, fallback=Model.Ollama("llama3.1"))
+agent = Agent(model=model, circuit_breaker=cb)
+```
+
+📚 **Full Documentation**: [Circuit Breaker](circuit-breaker.md)
+
+### Human-in-the-Loop (HITL)
+
+Gate tool execution behind human approval. Use `@syrin.tool(requires_approval=True)` for per-tool approval, or `HumanInTheLoop(approve=fn)` for all-tools approval.
+
+```python
+from syrin import Agent, ApprovalGate, tool
+
+@tool(requires_approval=True)
+def delete_record(id: str) -> str: ...
+
+gate = ApprovalGate(callback=lambda msg, t, ctx: input("Approve? [y/n]: ") == "y")
+agent = Agent(model=model, tools=[delete_record], approval_gate=gate, hitl_timeout=300)
+```
+
+📚 **Full Documentation**: [HITL](hitl.md)
 
 ---
 

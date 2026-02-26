@@ -145,3 +145,22 @@ class HandoffRetryRequested(SyrinError):
     def __init__(self, message: str, format_hint: str = "") -> None:
         super().__init__(message)
         self.format_hint = format_hint or message
+
+
+class CircuitBreakerOpenError(SyrinError):
+    """Raised when circuit breaker is open and request is blocked."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        agent_name: str = "",
+        circuit_state: Any = None,
+        recovery_at: float = 0.0,
+        fallback_model: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.agent_name = agent_name
+        self.circuit_state = circuit_state
+        self.recovery_at = recovery_at
+        self.fallback_model = fallback_model

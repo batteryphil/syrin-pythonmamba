@@ -38,6 +38,10 @@ class ToolSpec(BaseModel):
         ...,
         description="Python function to run. Receives parsed arguments from model.",
     )
+    requires_approval: bool = Field(
+        default=False,
+        description="If True, block execution until human approval via ApprovalGate.",
+    )
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -105,6 +109,7 @@ def tool(
     *,
     name: str | None = None,
     description: str | None = None,
+    requires_approval: bool = False,
 ) -> Callable[..., Any] | ToolSpec:
     """
     Decorator to register a function as a Syrin tool. Extracts name, docstring,
@@ -120,6 +125,7 @@ def tool(
             description=desc,
             parameters_schema=params_schema,
             func=f,
+            requires_approval=requires_approval,
         )
 
     if func is not None:

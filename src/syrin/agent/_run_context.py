@@ -103,6 +103,16 @@ class AgentRunContext(Protocol):
         ...
 
     @property
+    def approval_gate(self) -> Any:
+        """Optional ApprovalGate for HITL. None = no approval required."""
+        ...
+
+    @property
+    def hitl_timeout(self) -> int:
+        """Timeout in seconds for HITL approval. Default 300."""
+        ...
+
+    @property
     def tracer(self) -> Any:
         """Optional tracer for observability; when set, loop creates LLM/tool spans."""
         ...
@@ -177,6 +187,14 @@ class DefaultAgentRunContext:
             if getattr(self._agent, "_model", None) is not None
             else None
         )
+
+    @property
+    def approval_gate(self) -> Any:
+        return getattr(self._agent, "_approval_gate", None)
+
+    @property
+    def hitl_timeout(self) -> int:
+        return getattr(self._agent, "_hitl_timeout", 300)
 
     @property
     def tracer(self) -> Any:

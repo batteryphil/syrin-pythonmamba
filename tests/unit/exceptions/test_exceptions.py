@@ -5,6 +5,7 @@ from __future__ import annotations
 from syrin.exceptions import (
     BudgetExceededError,
     BudgetThresholdError,
+    CircuitBreakerOpenError,
     CodegenError,
     ModelNotFoundError,
     ProviderError,
@@ -43,6 +44,7 @@ def test_exception_hierarchy() -> None:
     assert issubclass(ProviderError, SyrinError)
     assert issubclass(CodegenError, SyrinError)
     assert issubclass(ValidationError, SyrinError)
+    assert issubclass(CircuitBreakerOpenError, SyrinError)
 
 
 # =============================================================================
@@ -99,6 +101,19 @@ def test_codegen_error_basic() -> None:
     """CodegenError basic functionality."""
     e = CodegenError("codegen error")
     assert "codegen" in str(e).lower()
+
+
+def test_circuit_breaker_open_error_attrs() -> None:
+    """CircuitBreakerOpenError has required attributes."""
+    e = CircuitBreakerOpenError(
+        "Circuit open",
+        agent_name="TestAgent",
+        recovery_at=123.0,
+        fallback_model="ollama/llama3",
+    )
+    assert e.agent_name == "TestAgent"
+    assert e.recovery_at == 123.0
+    assert e.fallback_model == "ollama/llama3"
 
 
 def test_all_exceptions_are_picklable() -> None:
