@@ -210,6 +210,7 @@ class Hook(StrEnum):
 
     HANDOFF_START = "handoff.start"
     HANDOFF_END = "handoff.end"
+    HANDOFF_BLOCKED = "handoff.blocked"
     SPAWN_START = "spawn.start"
     SPAWN_END = "spawn.end"
 

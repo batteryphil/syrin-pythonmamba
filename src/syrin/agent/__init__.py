@@ -48,7 +48,14 @@ from syrin.enums import (
     MemoryType,
 )
 from syrin.events import EventContext, Events
-from syrin.exceptions import BudgetExceededError, BudgetThresholdError, ToolExecutionError
+from syrin.exceptions import (
+    BudgetExceededError,
+    BudgetThresholdError,
+    HandoffBlockedError,
+    HandoffRetryRequested,
+    ToolExecutionError,
+    ValidationError,
+)
 from syrin.guardrails import Guardrail, GuardrailChain, GuardrailResult
 from syrin.loop import Loop, LoopStrategyMapping, ReactLoop
 from syrin.memory import ConversationMemory, Memory
@@ -1292,6 +1299,10 @@ class Agent:
         transfer_context: Copy persistent memories to target so it knows what
         this agent knew. transfer_budget: Share remaining budget with target.
 
+        Emits HANDOFF_START (before work), HANDOFF_END (after), HANDOFF_BLOCKED
+        when blocked by a before-handler raising HandoffBlockedError.
+        HandoffRetryRequested from target propagates to caller for retry logic.
+
         Args:
             target_agent: Agent class (e.g. ResearchAgent). Instantiated internally.
             task: Task description for the target.
@@ -1301,10 +1312,55 @@ class Agent:
         Returns:
             Response from target_agent.response(task).
 
+        Raises:
+            ValidationError: task is None or empty.
+            HandoffBlockedError: Before-handler blocks handoff.
+            HandoffRetryRequested: Target signals invalid data, retry with format_hint.
+
         Example:
             >>> r = agent.handoff(SupportAgent, "User needs refund help")
             >>> print(r.content)
         """
+        if target_agent is None or not isinstance(target_agent, type):
+            raise ValidationError(
+                "handoff target_agent must be Agent class, not None or instance",
+                last_error=None,
+            )
+        if task is None or (isinstance(task, str) and not task.strip()):
+            raise ValidationError("handoff task must be non-empty str", last_error=None)
+
+        mem_count = 0
+        if transfer_context and self._memory_backend is not None:
+            mem_count = len(self._memory_backend.list())
+
+        src_name = type(self).__name__
+        tgt_name = target_agent.__name__
+
+        start_ctx = EventContext(
+            {
+                "source_agent": src_name,
+                "target_agent": tgt_name,
+                "task": task,
+                "mem_count": mem_count,
+                "transfer_context": transfer_context,
+                "transfer_budget": transfer_budget,
+            }
+        )
+
+        try:
+            self._emit_event(Hook.HANDOFF_START, start_ctx)
+        except HandoffBlockedError as e:
+            blocked_ctx = EventContext(
+                {
+                    "source_agent": src_name,
+                    "target_agent": tgt_name,
+                    "task": task,
+                    "reason": str(e),
+                }
+            )
+            self._emit_event(Hook.HANDOFF_BLOCKED, blocked_ctx)
+            raise
+
         target = target_agent()
 
         if transfer_budget and self._budget:
@@ -1331,7 +1387,33 @@ class Agent:
                         )
                     _log.debug("handoff: transferred %d memories to target agent", len(memories))
 
-        return target.response(task)
+        import time
+
+        t0 = time.perf_counter()
+        try:
+            resp = target.response(task)
+        except HandoffRetryRequested:
+            raise
+        duration = time.perf_counter() - t0
+
+        preview_len = 200
+        preview = (resp.content or "")[:preview_len]
+        if len(resp.content or "") > preview_len:
+            preview = preview + "..."
+
+        end_ctx = EventContext(
+            {
+                "source_agent": src_name,
+                "target_agent": tgt_name,
+                "task": task,
+                "cost": resp.cost,
+                "duration": duration,
+                "response_preview": preview,
+            }
+        )
+        self._emit_event(Hook.HANDOFF_END, end_ctx)
+
+        return resp
 
     def spawn(
         self,
@@ -1348,6 +1430,8 @@ class Agent:
         - Child gets budget: "pocket money" up to parent's remaining.
         - Child spend is deducted from parent.
 
+        Emits SPAWN_START (before creation), SPAWN_END (after child completes if task given).
+
         Args:
             agent_class: Agent class to spawn (e.g. ResearchAgent).
             task: If set, run task and return Response. Else return agent instance.
@@ -1362,6 +1446,8 @@ class Agent:
             >>> child = agent.spawn(ResearchAgent)  # No task
             >>> child.response("Another task")
         """
+        import time
+
         use_instance_limit = max_children is None
         _max_children = getattr(self, "_max_children", 10) if use_instance_limit else max_children
 
@@ -1369,6 +1455,20 @@ class Agent:
 
         if _max_children and current_children >= _max_children:
             raise RuntimeError(f"Cannot spawn: max children ({_max_children}) reached")
+
+        child_name = agent_class.__name__
+        child_task = task or ""
+        child_budget = budget
+
+        start_ctx = EventContext(
+            {
+                "source_agent": type(self).__name__,
+                "child_agent": child_name,
+                "child_task": child_task,
+                "child_budget": child_budget,
+            }
+        )
+        self._emit_event(Hook.SPAWN_START, start_ctx)
 
         if not hasattr(self, "_child_count"):
             self._child_count = 0
@@ -1417,9 +1517,21 @@ class Agent:
             child_agent._budget_tracker_shared = True
 
         if task:
+            t0 = time.perf_counter()
             result = child_agent.response(task)
+            duration = time.perf_counter() - t0
             if not getattr(child_agent, "_budget_tracker_shared", False):
                 self._update_parent_budget(result.cost)
+            end_ctx = EventContext(
+                {
+                    "source_agent": type(self).__name__,
+                    "child_agent": child_name,
+                    "child_task": task,
+                    "cost": result.cost,
+                    "duration": duration,
+                }
+            )
+            self._emit_event(Hook.SPAWN_END, end_ctx)
             return result
 
         return child_agent
@@ -1442,10 +1554,15 @@ class Agent:
         self,
         agents: list[tuple[type[Agent], str]],
     ) -> list[Response[str]]:
-        """Run multiple agents in parallel, each with its own task.
+        """Run multiple agents via spawn(), each with its own task.
 
-        Why: Fan-out work (e.g. research + summarization + fact-check in parallel).
-        Uses asyncio.gather. Each agent runs independently.
+        Why: Fan-out work (e.g. research + summarization + fact-check).
+        Runs sequentially via spawn() to respect parent budget and max_children.
+        Emits SPAWN_START/SPAWN_END per child.
+
+        Note: Uses sequential execution to avoid event-loop conflicts with
+        sync response() in threaded/async environments. For parallelism,
+        use asyncio with agent.arun() directly.
 
         Args:
             agents: [(AgentClass, task), ...] e.g. [(ResearchAgent, "X"), (Summarizer, "Y")].
@@ -1459,21 +1576,10 @@ class Agent:
             ...     (ResearchAgent, "Topic B"),
             ... ])
         """
-        import asyncio
-
-        async def spawn_one(
-            agent_class: type[Agent],
-            task: str,
-        ) -> Response[str]:
-            child = agent_class()
-            return await child.arun(task)
-
-        async def run_all() -> list[Response[str]]:
-            tasks = [spawn_one(ac, t) for ac, t in agents]
-            return await asyncio.gather(*tasks)
-
-        loop = _get_agent_loop()
-        return loop.run_until_complete(run_all())
+        return cast(
+            list[Response[str]],
+            [self.spawn(ac, task=t) for ac, t in agents],  # task given → Response
+        )
 
     def _build_messages(self, user_input: str) -> list[Message]:
         def get_budget() -> Any:

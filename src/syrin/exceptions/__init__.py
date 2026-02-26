@@ -105,3 +105,43 @@ class ValidationError(SyrinError):
         super().__init__(message)
         self.attempts = attempts or []
         self.last_error = last_error
+
+
+class HandoffBlockedError(SyrinError):
+    """Raised when handoff is blocked by a before-handler or validation.
+
+    Emitted as Hook.HANDOFF_BLOCKED when a handler blocks the transfer.
+
+    Attributes:
+        message: Reason for blocking
+        source_agent: Source agent class or name
+        target_agent: Target agent class or name
+        task: Task that would have been passed
+    """
+
+    def __init__(
+        self,
+        message: str,
+        source_agent: str = "",
+        target_agent: str = "",
+        task: str = "",
+    ) -> None:
+        super().__init__(message)
+        self.source_agent = source_agent
+        self.target_agent = target_agent
+        self.task = task
+
+
+class HandoffRetryRequested(SyrinError):
+    """Target agent signals: data invalid, please retry with this hint.
+
+    Raise this from the target (or a wrapper) to ask the caller to reformat
+    and retry handoff. The caller implements the retry loop.
+
+    Attributes:
+        format_hint: Instructions for correct format (e.g. JSON schema, required fields)
+    """
+
+    def __init__(self, message: str, format_hint: str = "") -> None:
+        super().__init__(message)
+        self.format_hint = format_hint or message

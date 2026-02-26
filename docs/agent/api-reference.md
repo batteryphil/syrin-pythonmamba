@@ -149,6 +149,9 @@ See [Constructor Reference](constructor.md) for full parameter details.
 | Exception | When |
 |-----------|------|
 | `TypeError` | Model not provided |
+| `ValidationError` | Invalid input (e.g. `handoff` with empty `task`, wrong `target_agent` type) |
 | `BudgetExceededError` | Budget exceeded (e.g. when using `raise_on_exceeded`) |
 | `BudgetThresholdError` | Threshold action (e.g. STOP) |
 | `ToolExecutionError` | Tool failed or unknown tool |
+| `HandoffBlockedError` | Handoff blocked by before-handler; see [Handoff & Spawn](handoff-spawn.md) |
+| `HandoffRetryRequested` | Target signals invalid data; caller should retry with `format_hint` |

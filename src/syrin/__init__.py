@@ -153,7 +153,11 @@ from syrin.enums import (
     TracingBackend,
 )
 from syrin.events import EventContext, Events
-from syrin.exceptions import ValidationError
+from syrin.exceptions import (
+    HandoffBlockedError,
+    HandoffRetryRequested,
+    ValidationError,
+)
 from syrin.guardrails import (
     ContentFilter,
     Guardrail,
@@ -426,6 +430,8 @@ __all__ = [
     "ValidationPipeline",
     "validate_output",
     "ValidationError",
+    "HandoffBlockedError",
+    "HandoffRetryRequested",
     "Pipeline",
     "PipelineRun",
     "AgentTeam",

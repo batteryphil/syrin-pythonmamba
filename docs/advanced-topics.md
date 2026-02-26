@@ -17,7 +17,7 @@ Syrin guarantees that **Agent**, **Model**, **Loop**, **Budget**, **Memory**, an
 - **Response:** Every `Response` has `cost`, `tokens`, `tool_calls`, and `stop_reason` set correctly; guardrail or budget-exit paths still return a valid Response with the appropriate `stop_reason`.
 - **Structured output:** When `output=Output(MyModel)` is set, validation runs and retries are applied; see [Structured output](agent/structured-output.md).
 
-The test suite in `tests/core_stability/` encodes these guarantees with TDD tests (lifecycle, loop strategies, model resolution, budget, memory, response contract, structured output).
+The test suite in `tests/unit/` and `tests/integration/` encodes these guarantees (lifecycle, loop strategies, model resolution, budget, memory, response contract, structured output). See `tests/README.md` for layout.
 
 ---
 
@@ -49,6 +49,8 @@ Syrin emits events at key moments:
 - `agent.run.end` - Agent finished
 - `budget.check` - Budget is being checked
 - `tool.error` - An error occurred
+- `handoff.start` / `handoff.end` / `handoff.blocked` - Agent handoff (see [Handoff & Spawn](agent/handoff-spawn.md))
+- `spawn.start` / `spawn.end` - Sub-agent spawn
 
 ### Basic Hook Usage
 
@@ -137,6 +139,26 @@ def handle_all(hook: Hook, ctx):
 
 agent.events.on_all(handle_all)
 ```
+
+### Handoff & Spawn Hooks
+
+When using `handoff()` or `spawn()`, additional hooks are emitted for observability and interception:
+
+- **HANDOFF_START** — Before transfer. Context: `source_agent`, `target_agent`, `task`, `mem_count`. Use `before(Hook.HANDOFF_START, fn)` to validate; raise `HandoffBlockedError` to block.
+- **HANDOFF_END** — After target completes. Context: `cost`, `duration`, `response_preview` (first ~200 chars for debugging).
+- **HANDOFF_BLOCKED** — When a before-handler blocks handoff. Context: `reason`, `task`, etc.
+- **SPAWN_START** / **SPAWN_END** — Before/after child runs (when `task` given).
+
+Example: observe what is passed on handoff:
+
+```python
+from syrin import Agent, Hook
+
+source.events.on(Hook.HANDOFF_START, lambda ctx: print(f"Handoff: {ctx.source_agent} → {ctx.target_agent}, task={ctx.task[:50]}..."))
+source.events.on(Hook.HANDOFF_END, lambda ctx: print(f"Cost: ${ctx.cost:.4f}, preview: {ctx.response_preview[:60]}..."))
+```
+
+See [Handoff & Spawn](agent/handoff-spawn.md) for full documentation, blocking, retry, and `examples/07_multi_agent/handoff_intercept.py`.
 
 ---
 

@@ -305,6 +305,7 @@ pipeline.events.after(Hook.DYNAMIC_PIPELINE_AGENT_COMPLETE, track_cost)
 
 ## See Also
 
-- `examples/master_dynamic_pipeline.py` - Complex demo with 10 agents and full debugging
-- `tests/agent/test_multi_agent.py` - Comprehensive test suite
+- `examples/07_multi_agent/dynamic_pipeline_basic.py` - Minimal dynamic pipeline
+- `examples/07_multi_agent/dynamic_pipeline_full.py` - Full demo with multiple agents
+- `tests/unit/agent/test_multi_agent.py` - Comprehensive test suite
 - `Syrin.enums.Hook` - All available hooks

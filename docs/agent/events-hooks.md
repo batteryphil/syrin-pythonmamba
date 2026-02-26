@@ -113,8 +113,20 @@ agent.events.on_all(log_all)
 ### Other
 
 - `MODEL_SWITCH` — Model changed
-- `HANDOFF_START` / `HANDOFF_END` — Handoff
-- `SPAWN_START` / `SPAWN_END` — Spawn
+- `HANDOFF_START` / `HANDOFF_END` / `HANDOFF_BLOCKED` — Handoff (see below)
+- `SPAWN_START` / `SPAWN_END` — Spawn (see below)
+
+### Handoff & Spawn Hooks (context fields)
+
+| Hook | Context fields |
+|------|----------------|
+| `HANDOFF_START` | `source_agent`, `target_agent`, `task`, `mem_count`, `transfer_context`, `transfer_budget` |
+| `HANDOFF_END` | `source_agent`, `target_agent`, `task`, `cost`, `duration`, `response_preview` |
+| `HANDOFF_BLOCKED` | `source_agent`, `target_agent`, `task`, `reason` |
+| `SPAWN_START` | `source_agent`, `child_agent`, `child_task`, `child_budget` |
+| `SPAWN_END` | `source_agent`, `child_agent`, `child_task`, `cost`, `duration` |
+
+See [Handoff & Spawn](handoff-spawn.md) for full documentation, blocking (`HandoffBlockedError`), retry (`HandoffRetryRequested`), and examples.
 - `GUARDRAIL_INPUT` / `GUARDRAIL_OUTPUT` / `GUARDRAIL_BLOCKED` — Guardrails
 - `MEMORY_RECALL` / `MEMORY_STORE` / `MEMORY_FORGET` — Memory
 - `CHECKPOINT_SAVE` / `CHECKPOINT_LOAD` — Checkpoints
