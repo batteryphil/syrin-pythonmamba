@@ -116,6 +116,13 @@ agent.events.on_all(log_all)
 - `HANDOFF_START` / `HANDOFF_END` / `HANDOFF_BLOCKED` — Handoff (see below)
 - `SPAWN_START` / `SPAWN_END` — Spawn (see below)
 
+### Pipeline Hooks (static Pipeline)
+
+- `PIPELINE_START` — Pipeline run started
+- `PIPELINE_END` — Pipeline run finished
+- `PIPELINE_AGENT_START` — Agent about to run
+- `PIPELINE_AGENT_COMPLETE` — Agent finished
+
 ### Handoff & Spawn Hooks (context fields)
 
 | Hook | Context fields |
@@ -145,5 +152,6 @@ agent = Agent(model=model, debug=True)
 ## See Also
 
 - [Event Bus](../event-bus.md) — Typed domain events for metrics and observability
+- [Audit Logging](../audit.md) — Compliance logging via AuditLog
 - [Advanced Topics: Lifecycle Hooks](../advanced-topics.md)
 - [Observability](../observability.md)

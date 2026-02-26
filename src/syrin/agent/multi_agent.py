@@ -8,6 +8,7 @@ import time
 from typing import Any, TypeVar, cast
 
 from syrin.agent import Agent
+from syrin.audit import AuditHookHandler, AuditLog
 from syrin.budget import Budget
 from syrin.enums import DocFormat, Hook, StopReason
 from syrin.events import EventContext, Events
@@ -115,15 +116,30 @@ class PipelineRun:
                 trace=[],
             )
 
-        result: Response[str] | None = None
-        budget = self._pipeline._budget
+        pipeline = self._pipeline
+        if hasattr(pipeline, "_emit_pipeline_hook"):
+            pipeline._emit_pipeline_hook(
+                Hook.PIPELINE_START,
+                EventContext(agents=len(self._agents)),
+            )
 
-        for item in self._agents:
+        result: Response[str] | None = None
+        budget = pipeline._budget
+        total_cost = 0.0
+
+        for idx, item in enumerate(self._agents):
             if isinstance(item, tuple):
                 agent_class, task = item
             else:
                 agent_class = item
                 task = ""
+
+            agent_name = agent_class.__name__
+            if hasattr(pipeline, "_emit_pipeline_hook"):
+                pipeline._emit_pipeline_hook(
+                    Hook.PIPELINE_AGENT_START,
+                    EventContext(agent_type=agent_name, task=task, index=idx),
+                )
 
             agent = agent_class(budget=budget) if budget else agent_class()
 
@@ -132,6 +148,24 @@ class PipelineRun:
                 result = agent.response(combined_input)
             elif task:
                 result = agent.response(task)
+
+            if result:
+                total_cost += result.cost
+            if hasattr(pipeline, "_emit_pipeline_hook"):
+                pipeline._emit_pipeline_hook(
+                    Hook.PIPELINE_AGENT_COMPLETE,
+                    EventContext(
+                        agent_type=agent_name,
+                        cost=result.cost if result else 0.0,
+                        content_preview=(result.content[:200] if result and result.content else ""),
+                    ),
+                )
+
+        if hasattr(pipeline, "_emit_pipeline_hook"):
+            pipeline._emit_pipeline_hook(
+                Hook.PIPELINE_END,
+                EventContext(total_cost=total_cost),
+            )
 
         return result or Response(
             content="",
@@ -152,15 +186,29 @@ class PipelineRun:
         if not self._agents:
             return []
 
-        results: list[Response[str]] = []
-        budget = self._pipeline._budget
+        pipeline = self._pipeline
+        if hasattr(pipeline, "_emit_pipeline_hook"):
+            pipeline._emit_pipeline_hook(
+                Hook.PIPELINE_START,
+                EventContext(agents=len(self._agents)),
+            )
 
-        for item in self._agents:
+        results: list[Response[str]] = []
+        budget = pipeline._budget
+
+        for idx, item in enumerate(self._agents):
             if isinstance(item, tuple):
                 agent_class, task = item
             else:
                 agent_class = item
                 task = ""
+
+            agent_name = agent_class.__name__
+            if hasattr(pipeline, "_emit_pipeline_hook"):
+                pipeline._emit_pipeline_hook(
+                    Hook.PIPELINE_AGENT_START,
+                    EventContext(agent_type=agent_name, task=task, index=idx),
+                )
 
             agent = agent_class(budget=budget) if budget else agent_class()
 
@@ -178,6 +226,22 @@ class PipelineRun:
                 )
 
             results.append(result)
+            if hasattr(pipeline, "_emit_pipeline_hook"):
+                pipeline._emit_pipeline_hook(
+                    Hook.PIPELINE_AGENT_COMPLETE,
+                    EventContext(
+                        agent_type=agent_name,
+                        cost=result.cost,
+                        content_preview=(result.content[:200] if result.content else ""),
+                    ),
+                )
+
+        if hasattr(pipeline, "_emit_pipeline_hook"):
+            total_cost = sum(r.cost for r in results)
+            pipeline._emit_pipeline_hook(
+                Hook.PIPELINE_END,
+                EventContext(total_cost=total_cost),
+            )
 
         return results
 
@@ -194,15 +258,30 @@ class PipelineRun:
                 trace=[],
             )
 
-        result: Response[str] | None = None
-        budget = self._pipeline._budget
+        pipeline = self._pipeline
+        if hasattr(pipeline, "_emit_pipeline_hook"):
+            pipeline._emit_pipeline_hook(
+                Hook.PIPELINE_START,
+                EventContext(agents=len(self._agents)),
+            )
 
-        for item in self._agents:
+        result: Response[str] | None = None
+        budget = pipeline._budget
+        total_cost = 0.0
+
+        for idx, item in enumerate(self._agents):
             if isinstance(item, tuple):
                 agent_class, task = item
             else:
                 agent_class = item
                 task = ""
+
+            agent_name = agent_class.__name__
+            if hasattr(pipeline, "_emit_pipeline_hook"):
+                pipeline._emit_pipeline_hook(
+                    Hook.PIPELINE_AGENT_START,
+                    EventContext(agent_type=agent_name, task=task, index=idx),
+                )
 
             agent = agent_class(budget=budget) if budget else agent_class()
 
@@ -211,6 +290,24 @@ class PipelineRun:
                 result = await agent.arun(combined_input)
             elif task:
                 result = await agent.arun(task)
+
+            if result:
+                total_cost += result.cost
+            if hasattr(pipeline, "_emit_pipeline_hook"):
+                pipeline._emit_pipeline_hook(
+                    Hook.PIPELINE_AGENT_COMPLETE,
+                    EventContext(
+                        agent_type=agent_name,
+                        cost=result.cost if result else 0.0,
+                        content_preview=(result.content[:200] if result and result.content else ""),
+                    ),
+                )
+
+        if hasattr(pipeline, "_emit_pipeline_hook"):
+            pipeline._emit_pipeline_hook(
+                Hook.PIPELINE_END,
+                EventContext(total_cost=total_cost),
+            )
 
         return result or Response(
             content="",
@@ -227,32 +324,69 @@ class PipelineRun:
         if not self._agents:
             return []
 
+        pipeline = self._pipeline
+        if hasattr(pipeline, "_emit_pipeline_hook"):
+            pipeline._emit_pipeline_hook(
+                Hook.PIPELINE_START,
+                EventContext(agents=len(self._agents)),
+            )
+
         async def run_one(
             item: type[Agent] | tuple[type[Agent], str],
-        ) -> Response[str]:
+            idx: int,
+        ) -> tuple[Response[str], str]:
             if isinstance(item, tuple):
                 agent_class, task = item
             else:
                 agent_class = item
                 task = ""
 
-            budget = self._pipeline._budget
+            agent_name = agent_class.__name__
+            if hasattr(pipeline, "_emit_pipeline_hook"):
+                pipeline._emit_pipeline_hook(
+                    Hook.PIPELINE_AGENT_START,
+                    EventContext(agent_type=agent_name, task=task, index=idx),
+                )
+
+            budget = pipeline._budget
             agent = agent_class(budget=budget) if budget else agent_class()
 
             if task:
-                return await agent.arun(task)
-            return Response(
-                content="",
-                raw="",
-                cost=0.0,
-                tokens=TokenUsage(),
-                model="",
-                stop_reason=StopReason.END_TURN,
-                trace=[],
+                result = await agent.arun(task)
+            else:
+                result = Response(
+                    content="",
+                    raw="",
+                    cost=0.0,
+                    tokens=TokenUsage(),
+                    model="",
+                    stop_reason=StopReason.END_TURN,
+                    trace=[],
+                )
+
+            if hasattr(pipeline, "_emit_pipeline_hook"):
+                pipeline._emit_pipeline_hook(
+                    Hook.PIPELINE_AGENT_COMPLETE,
+                    EventContext(
+                        agent_type=agent_name,
+                        cost=result.cost,
+                        content_preview=(result.content[:200] if result.content else ""),
+                    ),
+                )
+            return (result, agent_name)
+
+        tasks = [run_one(item, idx) for idx, item in enumerate(self._agents)]
+        gathered = await asyncio.gather(*tasks)
+        results = [r[0] for r in gathered]
+
+        if hasattr(pipeline, "_emit_pipeline_hook"):
+            total_cost = sum(r.cost for r in results)
+            pipeline._emit_pipeline_hook(
+                Hook.PIPELINE_END,
+                EventContext(total_cost=total_cost),
             )
 
-        tasks = [run_one(item) for item in self._agents]
-        return await asyncio.gather(*tasks)
+        return results
 
 
 class Pipeline:
@@ -275,6 +409,7 @@ class Pipeline:
         agents: list[type[Agent] | tuple[type[Agent], str]] | None = None,
         sequential: bool = True,
         debug: bool = False,  # Enable debug logging
+        audit: AuditLog | None = None,
     ) -> None:
         """Initialize pipeline.
 
@@ -284,12 +419,32 @@ class Pipeline:
             agents: Optional list of agents to run immediately
             sequential: Whether to run agents sequentially (default True) or in parallel
             debug: Enable debug logging to console
+            audit: Optional AuditLog for pipeline-level audit
         """
         self._budget = budget
         self._timeout = timeout
         self._agents = agents
         self._sequential = sequential
         self._debug = debug
+        self._audit = audit
+        self._events = Events(self._emit_pipeline_hook)
+        if audit is not None:
+            if not isinstance(audit, AuditLog):
+                raise TypeError(f"audit must be AuditLog or None, got {type(audit).__name__}.")
+            audit_handler = AuditHookHandler(source="Pipeline", config=audit)
+            self._events.on_all(audit_handler)
+
+    def _emit_pipeline_hook(self, hook: Hook, ctx: EventContext) -> None:
+        """Emit pipeline hook for observability and audit."""
+        ctx["timestamp"] = time.time()
+        self._events._trigger_before(hook, ctx)
+        self._events._trigger(hook, ctx)
+        self._events._trigger_after(hook, ctx)
+
+    @property
+    def events(self) -> Events:
+        """Pipeline events for hooks (PIPELINE_START, PIPELINE_END, etc.)."""
+        return self._events
 
     @property
     def agents(self) -> list[type[Agent] | tuple[type[Agent], str]] | None:
@@ -540,6 +695,7 @@ class DynamicPipeline:
         format: DocFormat = DocFormat.TOON,  # Default to TOON
         max_parallel: int = 10,  # Max agents to spawn in parallel
         debug: bool = False,  # Enable debug logging
+        audit: AuditLog | None = None,
     ):
         """Initialize DynamicPipeline.
 
@@ -557,6 +713,7 @@ class DynamicPipeline:
             max_parallel: Maximum number of agents to spawn in parallel.
                 This is a limit, not a guarantee - LLM decides how many to actually use.
             debug: Enable debug logging to console
+            audit: Optional AuditLog for dynamic pipeline audit
         """
         if model is None:
             raise ValueError(
@@ -581,6 +738,13 @@ class DynamicPipeline:
 
         # Events system for observability
         self._events = Events(self._emit_hook)
+
+        # Audit logging
+        if audit is not None:
+            if not isinstance(audit, AuditLog):
+                raise TypeError(f"audit must be AuditLog or None, got {type(audit).__name__}.")
+            audit_handler = AuditHookHandler(source="DynamicPipeline", config=audit)
+            self._events.on_all(audit_handler)
 
     @property
     def events(self) -> Events:

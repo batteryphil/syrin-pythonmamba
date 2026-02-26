@@ -146,11 +146,71 @@ class BudgetLimitType(StrEnum):
 
 
 class AuditBackend(StrEnum):
-    """Built-in audit log destinations."""
+    """Built-in audit log destinations.
 
-    FILE = "file"
+    FILE and JSONL are equivalent (both write JSONL to file).
+    OTLP for tracing backends (future).
+    """
+
+    FILE = "file"  # Same as JSONL
     JSONL = "jsonl"
     OTLP = "otlp"
+
+
+class AuditEventType(StrEnum):
+    """Canonical audit event types. Maps from Hook to audit event."""
+
+    # Agent
+    AGENT_RUN_START = "agent_run_start"
+    AGENT_RUN_END = "agent_run_end"
+    AGENT_INIT = "agent_init"
+    AGENT_RESET = "agent_reset"
+
+    # LLM
+    LLM_CALL = "llm_call"
+    LLM_RETRY = "llm_retry"
+    LLM_FALLBACK = "llm_fallback"
+
+    # Tools
+    TOOL_CALL = "tool_call"
+    TOOL_ERROR = "tool_error"
+
+    # Handoff & Spawn
+    HANDOFF_START = "handoff_start"
+    HANDOFF_END = "handoff_end"
+    HANDOFF_BLOCKED = "handoff_blocked"
+    SPAWN_START = "spawn_start"
+    SPAWN_END = "spawn_end"
+
+    # Budget
+    BUDGET_CHECK = "budget_check"
+    BUDGET_THRESHOLD = "budget_threshold"
+    BUDGET_EXCEEDED = "budget_exceeded"
+
+    # Guardrails
+    GUARDRAIL_INPUT = "guardrail_input"
+    GUARDRAIL_OUTPUT = "guardrail_output"
+    GUARDRAIL_BLOCKED = "guardrail_blocked"
+
+    # Memory
+    MEMORY_STORE = "memory_store"
+    MEMORY_RECALL = "memory_recall"
+    MEMORY_FORGET = "memory_forget"
+
+    # Pipeline (static)
+    PIPELINE_START = "pipeline_start"
+    PIPELINE_END = "pipeline_end"
+    PIPELINE_AGENT_START = "pipeline_agent_start"
+    PIPELINE_AGENT_COMPLETE = "pipeline_agent_complete"
+
+    # Dynamic Pipeline
+    DYNAMIC_PIPELINE_START = "dynamic_pipeline_start"
+    DYNAMIC_PIPELINE_PLAN = "dynamic_pipeline_plan"
+    DYNAMIC_PIPELINE_EXECUTE = "dynamic_pipeline_execute"
+    DYNAMIC_PIPELINE_AGENT_SPAWN = "dynamic_pipeline_agent_spawn"
+    DYNAMIC_PIPELINE_AGENT_COMPLETE = "dynamic_pipeline_agent_complete"
+    DYNAMIC_PIPELINE_END = "dynamic_pipeline_end"
+    DYNAMIC_PIPELINE_ERROR = "dynamic_pipeline_error"
 
 
 class AlmockPricing(StrEnum):
@@ -257,6 +317,12 @@ class Hook(StrEnum):
     DYNAMIC_PIPELINE_END = "dynamic.pipeline.end"
     DYNAMIC_PIPELINE_ERROR = "dynamic.pipeline.error"
     HARNESS_RETRY = "harness.retry"
+
+    # Static Pipeline (audit)
+    PIPELINE_START = "pipeline.start"
+    PIPELINE_END = "pipeline.end"
+    PIPELINE_AGENT_START = "pipeline.agent.start"
+    PIPELINE_AGENT_COMPLETE = "pipeline.agent.complete"
 
 
 class DocFormat(StrEnum):

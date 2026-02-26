@@ -39,6 +39,7 @@ class _ContextFacade:
 
 from syrin.agent._context_builder import build_messages as build_messages_for_llm
 from syrin.agent._run_context import DefaultAgentRunContext
+from syrin.audit import AuditHookHandler, AuditLog
 from syrin.cost import calculate_cost, estimate_cost_for_call
 from syrin.enums import (
     GuardrailStage,
@@ -258,6 +259,7 @@ class Agent:
         debug: bool = False,
         tracer: Any = None,
         bus: Any = None,
+        audit: Any = None,
     ) -> None:
         """Create an agent with model, prompt, tools, and optional config.
 
@@ -296,6 +298,8 @@ class Agent:
             bus: Optional EventBus for typed domain events (BudgetThresholdReached,
                 ContextCompacted). Use when you need structured event handling for
                 metrics, observability, or custom pipelines.
+            audit: Optional AuditLog for compliance logging. Writes LLM calls, tool
+                calls, handoffs, spawns to JSONL or custom backend.
 
         Example:
             >>> agent = Agent(
@@ -513,6 +517,17 @@ class Agent:
             self._rate_limit_manager.set_tracer(self._tracer)
 
         self.events = Events(self._emit_event)
+
+        # Audit logging (compliance)
+        self._audit = audit
+        if audit is not None:
+            if not isinstance(audit, AuditLog):
+                raise TypeError(
+                    f"audit must be AuditLog or None, got {type(audit).__name__}. "
+                    "Use AuditLog(path='./audit.jsonl') for JSONL logging."
+                )
+            audit_handler = AuditHookHandler(source=self._agent_name, config=audit)
+            self.events.on_all(audit_handler)
 
         # Initialize run report for tracking metrics across a response() call
         self._run_report: AgentReport = AgentReport()

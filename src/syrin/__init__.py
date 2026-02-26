@@ -77,6 +77,13 @@ from syrin.agent.multi_agent import (
     parallel,
     sequential,
 )
+from syrin.audit import (
+    AuditBackendProtocol,
+    AuditEntry,
+    AuditFilters,
+    AuditLog,
+    JsonlAuditBackend,
+)
 from syrin.budget import (
     Budget,
     BudgetExceededContext,
@@ -124,6 +131,7 @@ from syrin.domain_events import (
 from syrin.enums import (
     AlmockPricing,
     AuditBackend,
+    AuditEventType,
     CheckpointBackend,
     CheckpointStrategy,
     CircuitState,
@@ -471,7 +479,13 @@ __all__ = [
     "RateWindow",
     "AlmockPricing",
     "AuditBackend",
+    "AuditBackendProtocol",
+    "AuditEntry",
+    "AuditEventType",
+    "AuditFilters",
+    "AuditLog",
     "ContentType",
+    "JsonlAuditBackend",
     "SandboxRuntime",
     "Hook",
     "DocFormat",
