@@ -58,4 +58,4 @@ agent = Agent(
 )
 result = agent.response("What is AI in one paragraph?")
 print(f"Cost: ${result.cost:.6f}, Tokens: {result.tokens.total_tokens}")
-print(f"Budget summary: {agent.budget_summary}")
+print(f"Budget state: {agent.budget_state}")

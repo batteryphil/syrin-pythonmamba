@@ -42,7 +42,7 @@ agent = PersistentAgent(
 )
 result = agent.response("Summarize Python in two sentences.")
 print(f"Cost: ${result.cost:.6f}")
-print(f"Budget summary: {agent.budget_summary}")
+print(f"Budget state: {agent.budget_state}")
 
 # 2. Per-user isolation via budget_store_key
 agent_alice = PersistentAgent(
@@ -55,5 +55,5 @@ agent_bob = PersistentAgent(
 )
 agent_alice.response("Hello from Alice")
 agent_bob.response("Hello from Bob")
-print(f"Alice budget: {agent_alice.budget_summary}")
-print(f"Bob budget: {agent_bob.budget_summary}")
+print(f"Alice budget: {agent_alice.budget_state}")
+print(f"Bob budget: {agent_bob.budget_state}")

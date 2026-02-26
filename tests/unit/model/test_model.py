@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from syrin.cost import ModelPricing
 from syrin.exceptions import ModelNotFoundError
 from syrin.model import Model, ModelRegistry
 from syrin.types import ModelConfig
@@ -84,6 +85,26 @@ def test_registry_get_missing_raises() -> None:
     reg._models.clear()
     with pytest.raises(ModelNotFoundError):
         reg.get("nonexistent")
+
+
+def test_model_estimate_cost_returns_float() -> None:
+    """estimate_cost(input_tokens, output_tokens) returns USD cost."""
+    m = Model("openai/gpt-4o-mini", pricing=ModelPricing(input_per_1m=0.15, output_per_1m=0.60))
+    cost = m.estimate_cost(1000, 500)
+    assert isinstance(cost, float)
+    assert cost >= 0.0
+
+
+def test_model_estimate_cost_zero_tokens() -> None:
+    """estimate_cost(0, 0) returns 0.0."""
+    m = Model("openai/gpt-4", pricing=ModelPricing(input_per_1m=1.0, output_per_1m=2.0))
+    assert m.estimate_cost(0, 0) == 0.0
+
+
+def test_model_estimate_cost_no_pricing_returns_zero() -> None:
+    """estimate_cost when pricing unknown returns 0.0."""
+    m = Model("unknown/foo-model-no-pricing")
+    assert m.estimate_cost(1000, 500) == 0.0
 
 
 # =============================================================================

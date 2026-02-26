@@ -15,7 +15,7 @@ agent = Agent(
 )
 
 response = agent.response("Hello")
-print(agent.budget_summary)
+print(agent.budget_state)
 print(response.budget_remaining)
 ```
 

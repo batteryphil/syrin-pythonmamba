@@ -81,6 +81,7 @@ from syrin.budget import (
     Budget,
     BudgetExceededContext,
     BudgetLimitType,
+    BudgetState,
     BudgetThreshold,
     RateLimit,
     TokenLimits,
@@ -377,6 +378,7 @@ __all__ = [
     # =============================================================================
     "Budget",
     "BudgetExceededContext",
+    "BudgetState",
     "RateLimit",
     "TokenLimits",
     "TokenRateLimit",

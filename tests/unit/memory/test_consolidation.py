@@ -68,3 +68,26 @@ class TestMemoryConsolidate:
         assert removed == 1
         recalled = mem.recall(count=10)
         assert len(recalled) == 1
+
+
+class TestMemoryEntries:
+    """Memory.entries() returns entries from store."""
+
+    def test_memory_entries_returns_list(self) -> None:
+        """entries() returns list of MemoryEntry, empty when no memories."""
+        mem = Memory()
+        out = mem.entries(limit=10)
+        assert isinstance(out, list)
+        assert len(out) == 0
+        mem.remember("one", memory_type=MemoryType.EPISODIC)
+        mem.remember("two", memory_type=MemoryType.EPISODIC)
+        out = mem.entries(limit=10)
+        assert len(out) == 2
+
+    def test_memory_entries_respects_limit(self) -> None:
+        """entries(limit=N) returns at most N entries."""
+        mem = Memory()
+        for i in range(5):
+            mem.remember(f"item{i}", memory_type=MemoryType.EPISODIC)
+        out = mem.entries(limit=2)
+        assert len(out) == 2

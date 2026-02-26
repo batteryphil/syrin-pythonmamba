@@ -2,7 +2,7 @@
 
 Demonstrates:
 - Creating an Agent with a Budget
-- Budget tracking via response.budget and agent.budget_summary
+- Budget tracking via response.cost and agent.budget_state
 - Budget limits and exceeded handling
 
 Run: python ./examples/01_minimal/agent_with_budget.py
@@ -37,4 +37,7 @@ print(f"Budget: ${assistant.budget.run}")
 result = assistant.response("Explain quantum computing briefly")
 print(f"Response: {result.content[:80]}...")
 print(f"Cost: ${result.cost:.6f}")
-print(f"Budget summary: {assistant.budget_summary}")
+state = assistant.budget_state
+print(
+    f"Budget: spent=${state.spent:.4f}, remaining=${state.remaining:.4f}" if state else "No budget"
+)

@@ -169,7 +169,7 @@ class TestSpawn:
         result = parent.spawn(Child, task="Shared budget task")
         assert result.content is not None
         # Parent's budget should reflect child's spend
-        assert parent.budget_summary["current_run_cost"] > 0
+        assert parent.budget_state is not None and parent.budget_state.spent > 0
 
     def test_spawn_parallel(self) -> None:
         class Worker(Agent):

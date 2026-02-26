@@ -2,6 +2,11 @@
 
 You can create agents in two ways: **instance-based** (pass arguments to `Agent()`) or **class-based** (declare defaults on a subclass). Both approaches are supported.
 
+## Class-based vs direct instantiation
+
+- **Class-based:** Subclass `Agent`, set `model`, `system_prompt`, `tools`, etc. on the class; instantiate with `MyAgent()`. Use when you have named agent types (e.g. `Researcher`, `Writer`).
+- **Direct instantiation:** Call `Agent(model=..., system_prompt=..., tools=[...])` with no subclass. Use for one-off agents or scripts.
+
 ## Instance-Based (No Class)
 
 ```python

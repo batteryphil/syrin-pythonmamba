@@ -89,7 +89,9 @@ See [Constructor Reference](constructor.md) for full parameter details.
 
 | Property | Type |
 |----------|------|
-| `budget_summary` | `dict[str, Any]` |
+| `budget_state` | `BudgetState \| None` |
+| `tools` | `list[ToolSpec]` |
+| `model_config` | `ModelConfig \| None` |
 | `memory` | `ConversationMemory | Memory | None` |
 | `conversation_memory` | `ConversationMemory | None` |
 | `persistent_memory` | `Memory | None` |

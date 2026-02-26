@@ -4,13 +4,14 @@ Properties and state exposed on the agent after configuration and runs.
 
 ## Properties
 
-### budget_summary
+### budget_state
 
-Current budget state.
+Current budget state (limit, remaining, spent, percent_used). None when agent has no run budget.
 
 ```python
-summary = agent.budget_summary
-# {"run_cost": 0.05, "run_remaining": 0.95, ...}
+state = agent.budget_state
+if state:
+    print(f"Spent ${state.spent:.4f}, {state.percent_used:.1f}% used")
 ```
 
 ### memory

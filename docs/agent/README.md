@@ -54,7 +54,7 @@ print(response.content)
 
 ### Reference
 
-- **[Properties & State](properties.md)** — All agent properties (`budget_summary`, `memory`, `report`, etc.)
+- **[Properties & State](properties.md)** — All agent properties (`budget_state`, `tools`, `model_config`, `memory`, `report`, etc.)
 - **[Complete API Reference](api-reference.md)** — Full method and parameter reference
 
 ## Documentation by Use Case

@@ -175,9 +175,12 @@ class TestAgentWithBudget:
     def test_budget_tracks_cost(self) -> None:
         agent = Agent(model=_almock(), budget=Budget(run=10.0))
         agent.response("Hello")
-        summary = agent.budget_summary
-        assert summary["current_run_cost"] > 0
-        assert summary["entries_count"] >= 1
+        state = agent.budget_state
+        assert state is not None
+        assert state.spent > 0
+        tracker = agent.get_budget_tracker()
+        assert tracker is not None
+        assert len(tracker.get_state().get("cost_history", [])) >= 1
 
     def test_budget_remaining_decreases(self) -> None:
         budget = Budget(run=10.0)
@@ -227,8 +230,9 @@ class TestAgentWithBudget:
         )
         r = agent.response("Hello")
         assert r.content is not None
-        summary = agent.budget_summary
-        assert summary["hourly_cost"] >= 0
+        tracker = agent.get_budget_tracker()
+        assert tracker is not None
+        assert tracker.get_summary().hourly_cost >= 0
 
     def test_budget_threshold_fires(self) -> None:
         fired = []
@@ -396,8 +400,8 @@ class TestAgentWithHooks:
     def test_on_start_and_complete_hooks(self) -> None:
         events = []
         agent = Agent(model=_almock())
-        agent.events.on(Hook.AGENT_RUN_START, lambda _: events.append(("start", ctx)))
-        agent.events.on(Hook.AGENT_RUN_END, lambda _: events.append(("end", ctx)))
+        agent.events.on(Hook.AGENT_RUN_START, lambda ctx: events.append(("start", ctx)))
+        agent.events.on(Hook.AGENT_RUN_END, lambda ctx: events.append(("end", ctx)))
         agent.response("Hello")
         assert len(events) == 2
         assert events[0][0] == "start"
@@ -406,7 +410,7 @@ class TestAgentWithHooks:
     def test_hook_receives_context_data(self) -> None:
         contexts = []
         agent = Agent(model=_almock())
-        agent.events.on(Hook.AGENT_RUN_END, lambda _: contexts.append(ctx))
+        agent.events.on(Hook.AGENT_RUN_END, lambda ctx: contexts.append(ctx))
         agent.response("Hello")
         assert len(contexts) == 1
         ctx = contexts[0]
@@ -420,7 +424,7 @@ class TestAgentWithHooks:
         agent = Agent(model=_almock())
         agent.events.before(
             Hook.AGENT_RUN_START,
-            lambda _: (ctx.update({"custom_field": True}), modified.append(True)),
+            lambda ctx: (ctx.update({"custom_field": True}), modified.append(True)),
         )
         agent.response("Hello")
         assert len(modified) >= 1
@@ -573,7 +577,7 @@ class TestAgentWithEverything:
         assert r.tokens.total_tokens >= 0
         assert "start" in events_log
         assert "end" in events_log
-        assert agent.budget_summary["current_run_cost"] > 0
+        assert agent.budget_state is not None and agent.budget_state.spent > 0
 
         # Memory recall
         memories = agent.recall("Python")
@@ -756,22 +760,21 @@ class TestEdgeCasesAndErrors:
             r = agent.response("Hello")
             costs.append(r.cost)
         # Hourly cost accumulates across calls
-        assert agent.budget_summary["hourly_cost"] > 0
-        # Current run cost is just the last call
-        assert agent.budget_summary["current_run_cost"] >= 0
+        tracker = agent.get_budget_tracker()
+        assert tracker is not None
+        assert tracker.get_summary().hourly_cost > 0
+        # Current run cost
+        assert agent.budget_state is not None
+        assert agent.budget_state.spent >= 0
 
-    def test_budget_summary_keys(self) -> None:
+    def test_budget_state_keys(self) -> None:
         agent = Agent(model=_almock(), budget=Budget(run=10.0))
         agent.response("Hello")
-        summary = agent.budget_summary
-        expected_keys = [
-            "current_run_cost",
-            "current_run_tokens",
-            "hourly_cost",
-            "daily_cost",
-            "weekly_cost",
-            "monthly_cost",
-            "entries_count",
-        ]
-        for key in expected_keys:
-            assert key in summary, f"Missing key: {key}"
+        state = agent.budget_state
+        assert state is not None
+        for key in ("limit", "remaining", "spent", "percent_used"):
+            assert hasattr(state, key), f"Missing key: {key}"
+        d = state.to_dict()
+        assert d["limit"] >= 0
+        assert d["remaining"] >= 0
+        assert d["spent"] >= 0

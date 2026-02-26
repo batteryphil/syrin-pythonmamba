@@ -1,7 +1,7 @@
 """Context configuration and stats."""
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from syrin.threshold import ContextThreshold
 
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from syrin.model import Model
 
 from syrin.budget import TokenLimits
-from syrin.context.compactors import ContextCompactorProtocol
+from syrin.context.compactors import ContextCompactor, ContextCompactorProtocol
 
 
 @dataclass
@@ -170,6 +170,47 @@ class Context:
                     reserve_val = default_reserve
 
         return ContextWindowBudget(max_tokens=max_tokens, reserve=reserve_val)
+
+    def apply(
+        self,
+        messages: list[Any],
+        model: "Model | None" = None,
+        max_tokens: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Apply compaction to messages so they fit within the context budget.
+
+        Uses the context compactor (or default). Use before sending to the LLM
+        when you need to trim context manually.
+
+        Args:
+            messages: List of Message or dict with "role" and "content".
+            model: Optional model to resolve max_tokens from.
+            max_tokens: Override available tokens; if None, uses context limit.
+
+        Returns:
+            List of message dicts (role, content) after compaction.
+
+        Example:
+            >>> compacted = context.apply(messages, max_tokens=4000)
+        """
+        budget = self.get_budget(model)
+        available = max_tokens if max_tokens is not None else budget.available
+        if available <= 0:
+            return []
+        msgs: list[dict[str, Any]] = []
+        for m in messages:
+            if hasattr(m, "model_dump"):
+                d = m.model_dump()
+                msgs.append({"role": d.get("role"), "content": d.get("content", "")})
+            elif isinstance(m, dict):
+                msgs.append({"role": m.get("role"), "content": m.get("content", "")})
+            else:
+                msgs.append(
+                    {"role": getattr(m, "role", "user"), "content": str(getattr(m, "content", ""))}
+                )
+        compactor = self.compactor if self.compactor is not None else ContextCompactor()
+        result = compactor.compact(msgs, available)
+        return result.messages
 
 
 __all__ = [

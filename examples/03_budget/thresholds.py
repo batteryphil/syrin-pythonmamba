@@ -92,4 +92,4 @@ class MonitoredAgent(Agent):
 
 agent = MonitoredAgent()
 agent.response("Hello!")
-print(f"Budget summary: {agent.budget_summary}")
+print(f"Budget state: {agent.budget_state}")

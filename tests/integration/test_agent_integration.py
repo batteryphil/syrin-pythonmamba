@@ -31,7 +31,8 @@ class TestAgentWithWithoutBudget:
 
         assert response.content is not None
         assert response.cost >= 0
-        assert agent.budget_summary.get("current_run_cost", 0) >= 0
+        if agent.budget_state is not None:
+            assert agent.budget_state.spent >= 0
 
     def test_agent_without_budget_almock(self) -> None:
         """Agent without budget — runs successfully, no budget tracking."""

@@ -1227,6 +1227,30 @@ class Model:
             return ModelPricing(input_per_1m=inp, output_per_1m=out)
         return None
 
+    def estimate_cost(self, input_tokens: int, output_tokens: int) -> float:
+        """Estimate cost in USD for a call with given token counts.
+
+        Use before calling the LLM to check affordability. Uses model pricing.
+
+        Args:
+            input_tokens: Number of input tokens.
+            output_tokens: Number of output (completion) tokens.
+
+        Returns:
+            Estimated cost in USD. 0.0 if pricing unknown.
+
+        Example:
+            >>> cost = model.estimate_cost(1000, 500)
+        """
+        pricing = self.get_pricing()
+        if pricing is None:
+            return 0.0
+        return round(
+            (input_tokens / 1_000_000) * pricing.input_per_1m
+            + (output_tokens / 1_000_000) * pricing.output_per_1m,
+            6,
+        )
+
     @overload
     def _apply_transformer(
         self,

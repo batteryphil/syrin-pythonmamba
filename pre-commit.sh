@@ -1,6 +1,6 @@
 #!/bin/bash
 # Pre-commit hook script
-# Runs linting, formatting, type checking, and dead code detection
+# Runs linting, formatting, type checking, and tests
 
 set -e
 
@@ -42,6 +42,13 @@ run_mypy() {
     echo -e "${GREEN}✓ Mypy check passed${NC}"
 }
 
+# Run pytest (all tests must pass)
+run_pytest() {
+    echo -e "${YELLOW}Running pytest (tests)...${NC}"
+    python -m pytest tests/ -q --tb=short
+    echo -e "${GREEN}✓ All tests passed${NC}"
+}
+
 # Main execution
 echo ""
 echo "========================================="
@@ -53,6 +60,7 @@ echo ""
 run_ruff_check
 run_ruff_format
 run_mypy
+run_pytest
 
 echo ""
 echo "========================================="

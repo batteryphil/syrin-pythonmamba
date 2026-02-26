@@ -228,8 +228,10 @@ class TestMemoryEdgeCases:
 
     def test_persistent_memory_empty_content(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
-        _ = agent.remember("", memory_type=MemoryType.EPISODIC)
-        assert isinstance(mid, str)
+        agent.remember("", memory_type=MemoryType.EPISODIC)
+        entries = agent.recall()
+        assert len(entries) == 1
+        assert isinstance(entries[0].id, str)
 
     def test_persistent_memory_very_long_content(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
@@ -351,7 +353,7 @@ class TestHookEdgeCases:
     def test_hook_context_is_event_context(self) -> None:
         contexts = []
         agent = Agent(model=_almock())
-        agent.events.on(Hook.AGENT_RUN_END, lambda _: contexts.append(ctx))
+        agent.events.on(Hook.AGENT_RUN_END, lambda ctx: contexts.append(ctx))
         agent.response("Hello")
         assert len(contexts) == 1
         assert isinstance(contexts[0], EventContext)
@@ -417,7 +419,7 @@ class TestConcurrentUsage:
             results.append(r)
         assert len(results) == 20
         assert all(r.content is not None for r in results)
-        assert agent.budget_summary["current_run_cost"] > 0
+        assert agent.budget_state is not None and agent.budget_state.spent > 0
 
     def test_budget_tracker_thread_safety(self) -> None:
         """BudgetTracker handles concurrent access."""
@@ -590,7 +592,7 @@ class TestAgentInheritance:
         agent = BudgetAgent()
         r = agent.response("Hello")
         assert r.content is not None
-        assert agent.budget_summary["current_run_cost"] > 0
+        assert agent.budget_state is not None and agent.budget_state.spent > 0
 
     def test_subclass_with_memory(self) -> None:
         class MemoryAgent(Agent):

@@ -314,6 +314,33 @@ class Memory(BaseModel):
             consolidation_budget=budget,
         )
 
+    def entries(
+        self,
+        memory_type: MemoryType | None = None,
+        scope: MemoryScope | None = None,
+        limit: int = 100,
+    ) -> list[MemoryEntry]:
+        """Return memories, optionally filtered by type or scope.
+
+        Args:
+            memory_type: Filter by memory type.
+            scope: Filter by scope.
+            limit: Max results (default 100).
+
+        Returns:
+            List of MemoryEntry. Empty if store not initialized.
+
+        Example:
+            >>> entries = memory.entries(limit=20)
+        """
+        if self._store is None:
+            return []
+        return self._store.list(
+            memory_type=memory_type,
+            scope=scope,
+            limit=limit,
+        )
+
     model_config = {"arbitrary_types_allowed": True}
 
 

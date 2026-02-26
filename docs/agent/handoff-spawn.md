@@ -37,6 +37,8 @@ response = researcher.handoff(
 
 **Returns:** `Response[str]`
 
+Handoff interception (e.g. `syrin.on(Hook.HANDOFF_START, fn)`) is supported; see [Events & Hooks](events-hooks.md). Step 4 extends this with richer handoff context.
+
 ---
 
 ## spawn()

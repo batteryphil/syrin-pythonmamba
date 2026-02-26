@@ -129,12 +129,26 @@ def test_agent_switch_model() -> None:
     assert "haiku" in agent._model_config.model_id
 
 
-def test_agent_budget_summary() -> None:
+def test_agent_budget_state_none_without_budget() -> None:
+    """Agent without run budget has budget_state None."""
     model = Model("openai/gpt-4")
     agent = Agent(model=model)
-    summary = agent.budget_summary
-    assert "current_run_cost" in summary
-    assert summary["current_run_cost"] == 0.0
+    assert agent.budget_state is None
+
+
+def test_agent_budget_state_returns_state_with_budget() -> None:
+    """Agent with run budget has budget_state with limit, remaining, spent, percent_used."""
+    from syrin.budget import Budget
+
+    model = Model("openai/gpt-4")
+    agent = Agent(model=model, budget=Budget(run=10.0))
+    state = agent.budget_state
+    assert state is not None
+    assert state.limit == 10.0
+    assert state.remaining == 10.0
+    assert state.spent == 0.0
+    assert state.percent_used == 0.0
+    assert state.to_dict()["limit"] == 10.0
 
 
 def test_agent_budget_exceeded_raises() -> None:
@@ -527,16 +541,58 @@ def test_agent_pre_call_budget_blocks_when_estimate_exceeds_run_limit() -> None:
     assert len(complete_calls) == 0
 
 
-def test_agent_estimate_call_cost_returns_float() -> None:
-    """estimate_call_cost returns a non-negative float."""
+def test_agent_estimate_cost_returns_float() -> None:
+    """estimate_cost returns a non-negative float."""
     from syrin.types import Message
 
     model = Model("openai/gpt-4o-mini", pricing=ModelPricing(input_per_1m=0.15, output_per_1m=0.60))
     agent = Agent(model=model)
     messages = [Message(role=MessageRole.USER, content="Hi")]
-    est = agent.estimate_call_cost(messages, max_output_tokens=100)
+    est = agent.estimate_cost(messages, max_output_tokens=100)
     assert isinstance(est, float)
     assert est >= 0.0
+
+
+def test_agent_estimate_cost_empty_messages() -> None:
+    """estimate_cost with empty messages returns zero or small non-negative float."""
+    model = Model("openai/gpt-4o-mini", pricing=ModelPricing(input_per_1m=0.15, output_per_1m=0.60))
+    agent = Agent(model=model)
+    est = agent.estimate_cost([], max_output_tokens=100)
+    assert isinstance(est, float)
+    assert est >= 0.0
+
+
+def test_agent_tools_returns_list() -> None:
+    """tools property returns list of ToolSpec (read-only)."""
+    from syrin.tool import tool
+
+    @tool
+    def search(q: str) -> str:
+        return q
+
+    model = Model("openai/gpt-4")
+    agent = Agent(model=model, tools=[search])
+    tools = agent.tools
+    assert isinstance(tools, list)
+    assert len(tools) == 1
+    assert tools[0].name == "search"
+
+
+def test_agent_tools_empty_when_none() -> None:
+    """tools property returns empty list when no tools."""
+    model = Model("openai/gpt-4")
+    agent = Agent(model=model)
+    assert agent.tools == []
+
+
+def test_agent_model_config_returns_config() -> None:
+    """model_config property returns ModelConfig when model set."""
+    model = Model("openai/gpt-4")
+    agent = Agent(model=model)
+    cfg = agent.model_config
+    assert cfg is not None
+    assert cfg.model_id == "openai/gpt-4"
+    assert cfg.provider == "openai"
 
 
 def test_agent_response_with_tool_execution_error() -> None:
@@ -653,8 +709,9 @@ def test_agent_budget_tracking_with_mocked_api() -> None:
     ):
         agent.response("Hello")
 
-    summary = agent.budget_summary
-    assert summary["current_run_cost"] >= 0
+    state = agent.budget_state
+    assert state is not None
+    assert state.spent >= 0
 
 
 def test_agent_stream_records_cost_to_budget_when_done() -> None:

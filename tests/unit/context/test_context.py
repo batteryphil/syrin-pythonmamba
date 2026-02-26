@@ -49,6 +49,27 @@ class TestContext:
         budget = ctx.get_budget()
         assert budget.max_tokens == 128000
 
+    def test_apply_returns_compacted_messages(self) -> None:
+        """apply(messages, max_tokens) returns list of message dicts."""
+        ctx = Context(max_tokens=8000, reserve=500)
+        messages = [{"role": "user", "content": "Hi"}, {"role": "assistant", "content": "Hello"}]
+        out = ctx.apply(messages, max_tokens=4000)
+        assert isinstance(out, list)
+        assert len(out) >= 1
+        assert all(isinstance(m, dict) and "role" in m and "content" in m for m in out)
+
+    def test_apply_empty_messages(self) -> None:
+        """apply([]) returns empty list."""
+        ctx = Context(max_tokens=8000)
+        assert ctx.apply([], max_tokens=4000) == []
+
+    def test_apply_respects_max_tokens_override(self) -> None:
+        """apply with max_tokens=0 returns empty list (no room)."""
+        ctx = Context(max_tokens=8000)
+        messages = [{"role": "user", "content": "Hi"}]
+        out = ctx.apply(messages, max_tokens=0)
+        assert out == []
+
 
 class TestContextBudget:
     """Tests for ContextWindowBudget (internal window budget)."""

@@ -21,13 +21,42 @@ from syrin.types import CostInfo, TokenUsage
 
 _log = logging.getLogger(__name__)
 
+
+@dataclass(frozen=True)
+class BudgetState:
+    """Current budget state: limit, remaining, spent, and percent used.
+
+    Returned by agent.budget_state when the agent has a run budget.
+    """
+
+    limit: float
+    """Effective run limit in USD (run - reserve)."""
+    remaining: float
+    """Remaining budget in USD (never negative)."""
+    spent: float
+    """Spent this run in USD."""
+    percent_used: float
+    """Percentage of limit used (0–100)."""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Dict suitable for logging or serialization."""
+        return {
+            "limit": self.limit,
+            "remaining": self.remaining,
+            "spent": self.spent,
+            "percent_used": self.percent_used,
+        }
+
+
 __all__ = [
     "Budget",
     "BudgetExceededContext",
+    "BudgetState",
     "BudgetLimitType",
     "BudgetReservationToken",
     "BudgetStatus",
     "BudgetSummary",
+    "BudgetTracker",
     "CheckBudgetResult",
     "CostEntry",
     "ModelPricing",

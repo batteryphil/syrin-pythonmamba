@@ -1,6 +1,6 @@
 # Use Case 4: Budget Control & Cost Management
 
-> **Agent integration:** For the agent `budget=` constructor param and `budget_summary`, see [Agent: Budget](agent/budget.md).
+> **Agent integration:** For the agent `budget=` constructor param and `budget_state`, see [Agent: Budget](agent/budget.md).
 
 ## What You'll Learn
 
@@ -625,7 +625,7 @@ When you use `agent.stream()` or `agent.astream()`, cost is recorded **per chunk
 
 ## Pre-call estimate and reservation
 
-**Pre-call estimate:** Before each LLM call, the built-in loops call a **best-effort** estimate of the next call's cost (from message token counts and model pricing). If `current_run_cost + reserved + estimate` would exceed the run limit, `on_exceeded` is invoked and the call is skipped (no API request). Use `agent.estimate_call_cost(messages, max_output_tokens=1024)` yourself for custom loops. Accuracy depends on tokenizer and pricing; actual cost may differ.
+**Pre-call estimate:** Before each LLM call, the built-in loops call a **best-effort** estimate of the next call's cost (from message token counts and model pricing). If `current_run_cost + reserved + estimate` would exceed the run limit, `on_exceeded` is invoked and the call is skipped (no API request). Use `agent.estimate_cost(messages, max_output_tokens=1024)` yourself for custom loops. Accuracy depends on tokenizer and pricing; actual cost may differ.
 
 **Reservation and rollback:** When the agent has a budget or token_limits, use the tracker to reserve before a call and commit actual cost or roll back on failure:
 
@@ -684,10 +684,10 @@ Example: `Agent(..., budget_store=FileBudgetStore("/data/budget.json"), budget_s
 | **Thresholds** | `Budget(thresholds=[...])` | `BudgetThreshold(at=..., action=..., window=..., metric=...)`; optional `at_range=(lo, hi)`. |
 | **ThresholdWindow** | `syrin.enums` | `RUN`, `HOUR`, `DAY`, `WEEK`, `MONTH` — use for `window=` (no free strings). |
 | **ThresholdMetric** | `syrin.enums` | `COST` (default) or `TOKENS` for threshold metric. |
-| **BudgetSummary** | `agent.budget_summary` | `current_run_cost`, `current_run_tokens`, `hourly_cost`, `daily_cost`, `weekly_cost`, `monthly_cost`, `hourly_tokens`, `daily_tokens`, `weekly_tokens`, `monthly_tokens`, `entries_count`. |
+| **BudgetState** | `agent.budget_state` | `limit`, `remaining`, `spent`, `percent_used`. Use `agent.get_budget_tracker().get_summary()` for full rolling-window stats. |
 | **get_budget_tracker()** | `agent.get_budget_tracker()` | Returns the tracker when the agent has a budget or context.budget; otherwise `None`. Use for reservation or inspection. |
 | **Reservation** | `tracker.reserve(amount)` | Returns a token; call `token.commit(actual_cost, token_usage)` or `token.rollback()`. |
-| **Pre-call estimate** | `agent.estimate_call_cost(messages, max_output_tokens=...)` | Best-effort cost estimate; used by built-in loops to skip calls that would exceed run limit. |
+| **Pre-call estimate** | `agent.estimate_cost(messages, max_output_tokens=...)` | Best-effort cost estimate; used by built-in loops to skip calls that would exceed run limit. |
 | **State** | `tracker.get_state()` / `tracker.load_state(state)` | State includes `version`, `cost_history`, `run_start`, `month_days`, `use_calendar_month`. State without `version` is accepted for loading. |
 | **BudgetStore** | `Agent(..., budget_store=..., budget_store_key=...)` | Persist tracker across restarts (e.g. `FileBudgetStore`). |
 | **Thread safety** | BudgetTracker | All public tracker methods are thread-safe (internal lock). |

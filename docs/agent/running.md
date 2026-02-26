@@ -1,6 +1,6 @@
 # Running Agents
 
-Four entry points control how you run an agent: sync, async, and streaming.
+Four entry points control how you run an agent: sync, async, and streaming. **Parity:** `response` and `arun` behave the same (sync vs async); use `stream` / `astream` for token-by-token output.
 
 ## `response(user_input)` — Sync
 

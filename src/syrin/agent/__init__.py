@@ -11,6 +11,7 @@ from syrin.budget import (
     Budget,
     BudgetExceededContext,
     BudgetLimitType,
+    BudgetState,
     BudgetStatus,
     BudgetTracker,
     CheckBudgetResult,
@@ -103,8 +104,15 @@ def _merge_class_attrs(mro: tuple[type, ...], name: str, merge: bool) -> Any:
             if cls is object:
                 continue
             val = cls.__dict__.get(name, _UNSET)
-            if val is not _UNSET and val is not None:
-                out.extend(val) if isinstance(val, list) else out.append(val)
+            if val is _UNSET or val is None:
+                continue
+            # Skip descriptors (e.g. @property) so we don't merge the property object
+            if hasattr(val, "__get__"):
+                continue
+            if isinstance(val, list):
+                out.extend(val)
+            else:
+                out.append(val)
         return out
     for cls in mro:
         if cls is object:
@@ -164,6 +172,14 @@ class Agent:
     An Agent is the main interface for talking to an LLM, executing tools, remembering
     facts, and controlling costs. You provide a model (LLM) and optionally tools,
     budget, memory, guardrails, and more.
+
+    Main methods:
+        response(user_input) — Sync run; returns Response.
+        arun(user_input) — Async run; returns Response.
+        stream(user_input) / astream(user_input) — Streaming.
+        estimate_cost(messages, max_output_tokens=...) — Estimate USD before calling.
+        budget_state — Current budget (limit, remaining, spent, percent_used) or None.
+        tools — List of ToolSpec (read-only). model_config — Current ModelConfig or None.
 
     Why use an Agent?
         - Run multi-turn conversations with automatic tool-call loops (REACT by default).
@@ -814,21 +830,33 @@ class Agent:
         self._provider = _resolve_provider(self._model, self._model_config)
 
     @property
-    def budget_summary(self) -> dict[str, Any]:
-        """Current budget usage across run and rolling windows.
+    def budget_state(self) -> BudgetState | None:
+        """Current budget state (limit, remaining, spent, percent_used).
 
-        Why: Monitor spend before/after runs, log for auditing, or show users.
-
-        Returns:
-            Dict with current_run_cost, hourly_cost, daily_cost, weekly_cost,
-            monthly_cost, entries_count. All costs in USD.
+        None when agent has no run budget. Use to show users or gate behavior.
 
         Example:
             >>> agent.response("Hello")
-            >>> print(agent.budget_summary)
-            {'current_run_cost': 0.0012, 'hourly_cost': 0.05, ...}
+            >>> state = agent.budget_state
+            >>> if state:
+            ...     print(f"Used {state.percent_used:.1f}%, ${state.remaining:.4f} left")
         """
-        return self._budget_tracker.get_summary().to_dict()
+        if self._budget is None or self._budget.run is None:
+            return None
+        effective = (
+            (self._budget.run - self._budget.reserve)
+            if self._budget.run > self._budget.reserve
+            else self._budget.run
+        )
+        spent = self._budget_tracker.current_run_cost
+        remaining = max(0.0, effective - spent)
+        percent = (spent / effective * 100.0) if effective > 0 else 0.0
+        return BudgetState(
+            limit=effective,
+            remaining=remaining,
+            spent=spent,
+            percent_used=round(percent, 2),
+        )
 
     def get_budget_tracker(self) -> BudgetTracker | None:
         """Return the budget tracker when this agent has a budget or token_limits.
@@ -851,6 +879,16 @@ class Agent:
             if (self._budget is not None or self._token_limits is not None)
             else None
         )
+
+    @property
+    def tools(self) -> list[ToolSpec]:
+        """Tool specs attached to this agent (read-only)."""
+        return list(self._tools) if self._tools else []
+
+    @property
+    def model_config(self) -> ModelConfig | None:
+        """Current model config (read-only). None if agent has no model."""
+        return self._model_config
 
     @property
     def memory(self) -> ConversationMemory | Memory | None:
@@ -1568,15 +1606,15 @@ class Agent:
         """
         return self._execute_tool(name, arguments)
 
-    def estimate_call_cost(
+    def estimate_cost(
         self,
         messages: list[Any],
         max_output_tokens: int = 1024,
     ) -> float:
         """Estimate cost in USD for the next LLM call (best-effort).
 
-        Uses model pricing and token counts from message contents. Actual cost may
-        differ. Useful for pre-call budget checks.
+        Use before calling the LLM to check affordability. Uses model pricing and
+        token counts from message contents. Actual cost may differ.
 
         Args:
             messages: List of Message (role, content) to be sent.
@@ -1584,6 +1622,11 @@ class Agent:
 
         Returns:
             Estimated cost in USD.
+
+        Example:
+            >>> cost = agent.estimate_cost(messages)
+            >>> if cost > 0.01:
+            ...     print("Call may exceed threshold")
         """
         if self._model_config is None:
             return 0.0
@@ -1616,7 +1659,7 @@ class Agent:
         )
         if effective_run is not None and effective_run <= 0:
             return
-        estimate = self.estimate_call_cost(messages, max_output_tokens=max_output_tokens)
+        estimate = self.estimate_cost(messages, max_output_tokens=max_output_tokens)
         run_usage = self._budget_tracker.run_usage_with_reserved
         if run_usage + estimate < effective_run:
             return

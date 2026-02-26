@@ -306,7 +306,7 @@ agent = Agent(
 )
 result = agent.response("Explain quantum computing briefly.")
 print(result.context_stats.total_tokens)  # e.g. 412
-print(agent.budget_summary.current_run_tokens)  # same run's token count
+print(agent.budget_state.spent)  # same run's cost; use get_budget_tracker().get_summary() for token counts
 # If run or per limit is exceeded, on_exceeded is called (here: raises).
 ```
 

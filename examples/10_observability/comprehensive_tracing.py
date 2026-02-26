@@ -39,7 +39,7 @@ for q in ["What is AI?", "What is ML?", "What is DL?"]:
         total_latency += step.latency_ms
         total_steps += 1
 print(f"Total steps: {total_steps}, latency: {total_latency:.1f}ms")
-print(f"Budget summary: {agent.budget_summary}")
+print(f"Budget state: {agent.budget_state}")
 
 
 # 3. Debug mode

@@ -36,7 +36,7 @@ agent = Agent(
 )
 result = agent.response("What is AI?")
 print(f"Cost: ${result.cost:.6f}")
-print(f"Budget summary: {agent.budget_summary}")
+print(f"Budget state: {agent.budget_state}")
 
 # 2. Configurable month window (month_days)
 r7 = RateLimit(month=20.00, month_days=7)
