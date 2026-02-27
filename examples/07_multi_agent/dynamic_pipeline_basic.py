@@ -5,7 +5,7 @@ Demonstrates:
 - run(task, mode="parallel")
 - Basic orchestration without full debugging
 
-Run: python -m examples.03_multi_agent.dynamic_pipeline_basic
+Run: python -m examples.07_multi_agent.dynamic_pipeline_basic
 """
 
 from pathlib import Path

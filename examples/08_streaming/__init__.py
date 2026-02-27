@@ -1,1 +1,1 @@
-"""05_streaming — Streaming output examples."""
+"""08_streaming — Streaming output examples."""

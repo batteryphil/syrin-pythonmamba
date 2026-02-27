@@ -5,7 +5,7 @@ Demonstrates:
 - spawn(task="...") returns Response
 - spawn() without task returns child Agent instance
 
-Run: python -m examples.03_multi_agent.spawn
+Run: python -m examples.07_multi_agent.spawn
 """
 
 from __future__ import annotations

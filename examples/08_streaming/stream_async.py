@@ -4,7 +4,7 @@ Demonstrates:
 - agent.astream(input) for async token-by-token output
 - async for chunk in agent.astream(...)
 
-Run: python -m examples.05_streaming.stream_async
+Run: python -m examples.08_streaming.stream_async
 """
 
 import asyncio

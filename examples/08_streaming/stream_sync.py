@@ -5,7 +5,7 @@ Demonstrates:
 - Collecting chunks into full text
 - StreamChunk properties (index, text, is_final)
 
-Run: python -m examples.05_streaming.stream_sync
+Run: python -m examples.08_streaming.stream_sync
 """
 
 from pathlib import Path

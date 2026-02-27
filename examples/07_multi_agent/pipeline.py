@@ -5,7 +5,7 @@ Demonstrates:
 - Parallel pipeline execution
 - Pipeline with budget
 
-Run: python -m examples.03_multi_agent.pipeline
+Run: python -m examples.07_multi_agent.pipeline
 """
 
 from __future__ import annotations

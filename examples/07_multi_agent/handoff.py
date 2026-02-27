@@ -5,7 +5,7 @@ Demonstrates:
 - Context transfer via memory
 - Budget transfer between agents
 
-Run: python -m examples.03_multi_agent.handoff
+Run: python -m examples.07_multi_agent.handoff
 """
 
 from __future__ import annotations

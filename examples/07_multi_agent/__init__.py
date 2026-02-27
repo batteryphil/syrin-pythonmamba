@@ -1,1 +1,1 @@
-"""03_multi_agent — Multi-agent orchestration examples."""
+"""07_multi_agent — Multi-agent orchestration examples."""

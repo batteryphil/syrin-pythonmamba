@@ -1,6 +1,6 @@
 [project]
 name = "syrin"
-version = "0.2.0"
+version = "0.3.0"
 description = "Python library for building AI agents with budget management, declarative definitions, and production-ready observability."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -72,14 +72,7 @@ select = [
 # E501: line length (handled by formatter); E402: module level import after code;
 # ARG002: self/cls in methods; ARG001: unused function args (e.g. pytest fixtures);
 # F821: undefined name (dynamic); F811: reimport (conditional provider imports).
-ignore = [
-    "E501",
-    "E402",
-    "ARG002",
-    "ARG001",
-    "F821",
-    "F811",
-]
+ignore = ["E501", "E402", "ARG002", "ARG001", "F821", "F811"]
 
 [tool.ruff.format]
 quote-style = "double"

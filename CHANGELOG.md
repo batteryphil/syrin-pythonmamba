@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-02-27
+
+### Added
+
+- **Sub-agents & handoff** — `spawn(task=...)`, `handoff(AgentClass, task)` with optional memory transfer and budget inheritance.
+- **Handoff interception** — `events.before(Hook.HANDOFF_START, fn)`; raise `HandoffBlockedError` to block; `HandoffRetryRequested` for retry.
+- **Audit logging** — `AuditLog`, `JsonlAuditBackend`; `Agent(audit=...)`, `Pipeline(audit=...)`, `DynamicPipeline(audit=...)`.
+- **HITL** — `@syrin.tool(requires_approval=True)`; `ApprovalGate` protocol; hooks: HITL_PENDING, HITL_APPROVED, HITL_REJECTED.
+- **Circuit breaker** — `CircuitBreaker` for LLM/provider failures; CLOSED → OPEN → HALF_OPEN; configurable fallback.
+- **Budget-aware context** — Context tier selection by budget percent remaining.
+- **Dependency Injection** — `Agent(deps=...)`, `RunContext[Deps]`; tools receive `ctx.deps` (excluded from LLM schema).
+- **Dynamic Pipeline** — Improved hooks and events API; flow diagram in docs/dynamic-pipeline.md.
+- **Manual validation** — `docs/MANUAL_VALIDATION.md` with run commands for examples.
+
+### Changed
+
+- **API validation** — Agent, Model, Memory, Loop validate inputs at construction; clear errors for wrong types.
+- **agent.response(user_input)** — Validates `user_input` is `str`; friendly error for `None`/`int`/`dict`.
+- **Example paths** — Fixed run instructions (`08_streaming`, `07_multi_agent`).
+
+### Fixed
+
+- Chaos stress test fixes: Agent/Loop validation; Loop `max_iterations < 1` no longer causes UnboundLocalError. Model `_provider_kwargs` passed to provider.
+
+---
+
 ## [0.2.0] - 2026-02-26
 
 ### Added

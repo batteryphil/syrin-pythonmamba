@@ -39,6 +39,8 @@
 
 Syrin gives you budgeting, thresholds, hooks, observability, context, memory, guardrails, and checkpoints in one lightweight library—so you can answer these questions instead of wondering.
 
+> **Jupyter / cookbook user?** Run [examples/getting_started.ipynb](examples/getting_started.ipynb) to see Syrin in action—install, run each cell, and explore.
+
 ---
 
 ## Comparison: Syrin vs. LangChain, LangGraph, AutoGen
@@ -85,7 +87,8 @@ print(f"Cost: ${result.cost:.4f}  |  Budget used: ${result.budget_used:.4f}")
 
 Pass your API key explicitly. The run is capped at $0.50; when the budget is exceeded, the agent stops.
 
-**No API key?** Examples and docs use `Model.Almock()` by default; comment it out and uncomment the real model when you have an API key.
+**No API key?** Examples and docs use `Model.Almock()` by default; swap to a real model when you have an API key.
+
 
 ---
 

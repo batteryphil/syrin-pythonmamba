@@ -1,4 +1,4 @@
-# 03_multi_agent — Multi-agent orchestration
+# 07_multi_agent — Multi-agent orchestration
 
 - **handoff.py** — Agent handoff between specialized agents
 - **spawn.py** — Parent spawns child agent (task vs no-task)

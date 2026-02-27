@@ -10,8 +10,8 @@ and agents are spawned. Set OPENAI_API_KEY in examples/.env.
 For key-less runs: set USE_ALMOCK=1 in .env (agents may not spawn; mock returns no plan).
 
 Run from repo root:
-  python -m examples.03_multi_agent.dynamic_pipeline_full
-  python examples/03_multi_agent/dynamic_pipeline_full.py
+  python -m examples.07_multi_agent.dynamic_pipeline_full
+  python examples/07_multi_agent/dynamic_pipeline_full.py
 """
 
 import os
