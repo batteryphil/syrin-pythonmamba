@@ -32,7 +32,7 @@ Visit `http://localhost:8000/health`, POST to `/chat` with `{"message": "Hi"}`.
 
 ## HTTP Routes
 
-When using `agent.serve()` or `agent.as_app()`:
+When using `agent.serve()` or `agent.as_router()`:
 
 | Route | Method | Description |
 |-------|--------|-------------|
@@ -59,7 +59,7 @@ class Assistant(Agent):
 
 app = FastAPI(title="My API")
 agent = Assistant()
-app.include_router(agent.as_app(), prefix="/agent")
+app.include_router(agent.as_router(), prefix="/agent")
 ```
 
 Then run: `uvicorn my_app:app --reload`
@@ -100,47 +100,47 @@ app.include_router(router.fastapi_router(), prefix="/api/v1")
 
 ## ServeConfig
 
-Configure host, port, route prefix, auth, CORS:
+Configure host, port, route prefix:
 
 ```python
-from syrin.serve import ServeConfig, BearerTokenAuth, CORSConfig
+from syrin.serve import ServeConfig
 
 config = ServeConfig(
     host="0.0.0.0",
     port=8000,
     route_prefix="/api/v1",
-    auth=BearerTokenAuth(token="secret"),
-    cors=CORSConfig(origins=["https://myapp.com"]),
 )
 agent.serve(config=config)
 ```
 
-## Auth
+## CORS and Auth — Use Your Own Middlewares
 
-Use `BearerTokenAuth` for token-based auth:
-
-```python
-from syrin.serve import ServeConfig, BearerTokenAuth
-
-agent.serve(config=ServeConfig(auth=BearerTokenAuth(token="my-secret")))
-```
-
-Clients must send: `Authorization: Bearer my-secret`
-
-## CORS
+Syrin does not handle CORS or auth. Mount agent routes on your own FastAPI app and add middlewares from Starlette or other libraries:
 
 ```python
-from syrin.serve import ServeConfig, CORSConfig
+from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
-config = ServeConfig(
-    cors=CORSConfig(
-        origins=["https://myapp.com"],
-        allow_credentials=True,
-        allow_methods=["GET", "POST"],
-    )
+from syrin import Agent
+from syrin.model import Model
+
+class Assistant(Agent):
+    name = "assistant"
+    model = Model.Almock()
+    system_prompt = "You are helpful."
+
+agent = Assistant()
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    origins=["https://myapp.com"],
+    allow_credentials=True,
 )
-agent.serve(config=config)
+# Add your auth middleware (OAuth2, JWT, etc.) here
+app.include_router(agent.as_router(), prefix="/agent")
 ```
+
+Then run: `uvicorn my_app:app` — your CORS and auth apply to all routes including agent routes.
 
 ## CLI REPL
 

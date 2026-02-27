@@ -41,7 +41,7 @@ def build_router(
     """Build a FastAPI APIRouter for the given agent and config.
 
     Routes: POST /chat, POST /stream, GET /health, GET /ready, GET /budget, GET /describe.
-    Use agent.as_app() or mount the router on an existing FastAPI app.
+    Use agent.as_router() or mount the router on an existing FastAPI app.
 
     Requires syrin[serve] (fastapi, uvicorn).
     """

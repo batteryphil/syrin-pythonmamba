@@ -2470,11 +2470,11 @@ class Agent(metaclass=_AgentMeta):
         finally:
             self._call_context = None
 
-    def as_app(self, config: Any | None = None, **config_kwargs: Any) -> Any:
+    def as_router(self, config: Any | None = None, **config_kwargs: Any) -> Any:
         """Return a FastAPI APIRouter for this agent. Mount on your app.
 
         Use when you want to serve this agent over HTTP. Mount the router on an
-        existing FastAPI app, e.g. app.include_router(agent.as_app(), prefix="/agent").
+        existing FastAPI app, e.g. app.include_router(agent.as_router(), prefix="/agent").
 
         Requires syrin[serve] (fastapi, uvicorn).
 
@@ -2488,7 +2488,7 @@ class Agent(metaclass=_AgentMeta):
         Example:
             >>> from fastapi import FastAPI
             >>> app = FastAPI()
-            >>> app.include_router(agent.as_app(), prefix="/agent")
+            >>> app.include_router(agent.as_router(), prefix="/agent")
         """
         from syrin.serve.config import ServeConfig
         from syrin.serve.http import build_router

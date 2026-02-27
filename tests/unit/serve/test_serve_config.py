@@ -13,8 +13,6 @@ def test_serve_config_defaults() -> None:
     assert config.host == "0.0.0.0"
     assert config.port == 8000
     assert config.route_prefix == ""
-    assert config.auth is None
-    assert config.cors is None
     assert config.stream is True
     assert config.include_metadata is True
     assert config.debug is False

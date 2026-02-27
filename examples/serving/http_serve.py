@@ -1,7 +1,7 @@
 """HTTP Serving Example.
 
 Demonstrates:
-- agent.as_app() — mount on existing FastAPI app
+- agent.as_router() — mount on existing FastAPI app
 - agent.serve() — run uvicorn with one agent
 - Routes: /chat, /stream, /health, /ready, /budget, /describe
 

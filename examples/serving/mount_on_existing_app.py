@@ -1,7 +1,7 @@
 """Mount Agent on Existing FastAPI App Example.
 
 Demonstrates:
-- agent.as_app() — returns APIRouter for mounting
+- agent.as_router() — returns APIRouter for mounting
 - Mount on your own FastAPI app with custom prefix
 
 Requires: uv pip install syrin[serve]
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     agent = Assistant()
     app = FastAPI(title="My API", description="Custom API with Syrin agent")
-    app.include_router(agent.as_app(), prefix="/agent")
+    app.include_router(agent.as_router(), prefix="/agent")
     # Run: uvicorn examples.serving.mount_on_existing_app:app --reload
     # Visit /agent/health, POST /agent/chat with {"message": "Hi"}
     import uvicorn

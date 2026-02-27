@@ -73,8 +73,6 @@ class AgentRouter:
                 host=cfg.host,
                 port=cfg.port,
                 route_prefix=f"{self._agent_prefix}/{agent.name}",
-                auth=cfg.auth,
-                cors=cfg.cors,
                 stream=cfg.stream,
                 include_metadata=cfg.include_metadata,
                 debug=cfg.debug,

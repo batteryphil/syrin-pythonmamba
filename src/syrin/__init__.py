@@ -272,7 +272,7 @@ from syrin.response import (
     TokenReport,
 )
 from syrin.run_context import RunContext
-from syrin.serve import BearerTokenAuth, ServeConfig
+from syrin.serve import ServeConfig
 from syrin.task import task
 from syrin.threshold import (
     ContextThreshold,
@@ -474,7 +474,6 @@ __all__ = [
     "tool",
     "ToolSpec",
     "task",
-    "BearerTokenAuth",
     "RunContext",
     "ServeConfig",
     # =============================================================================
