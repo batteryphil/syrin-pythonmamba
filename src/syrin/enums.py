@@ -361,18 +361,31 @@ class MemoryType(StrEnum):
 
     Based on cognitive science: different types for different use cases.
     Use with Memory.types, remember(), and recall(memory_type=...).
-
-    Attributes:
-        CORE: Identity, preferences, persistent facts about the agent/user.
-        EPISODIC: Past events, conversations, "what happened when".
-        SEMANTIC: General knowledge, facts, concepts (extracted or stored).
-        PROCEDURAL: How-to knowledge, skills, workflows.
     """
 
     CORE = "core"
     EPISODIC = "episodic"
     SEMANTIC = "semantic"
     PROCEDURAL = "procedural"
+
+
+# Per-member docstrings for IDE hover (StrEnum doesn't support inline docstrings)
+MemoryType.CORE.__doc__ = (
+    "Identity and preferences. Use for: user name, role, language, persistent "
+    "facts that rarely change. Survives across sessions."
+)
+MemoryType.EPISODIC.__doc__ = (
+    "Past events and conversations. Use for: 'last discussed X', 'user asked about Y', "
+    "'we talked about Z yesterday'. Chronological, context-dependent."
+)
+MemoryType.SEMANTIC.__doc__ = (
+    "General knowledge and concepts. Use for: facts, definitions, extracted insights "
+    "from turns. Ideal for vector/semantic search (Qdrant, Chroma)."
+)
+MemoryType.PROCEDURAL.__doc__ = (
+    "How-to knowledge and skills. Use for: workflows, steps, preferences on how "
+    "to do things (e.g. 'user prefers async over sync')."
+)
 
 
 class ServeProtocol(StrEnum):
@@ -390,6 +403,13 @@ class ServeProtocol(StrEnum):
     CLI = "cli"
     HTTP = "http"
     STDIO = "stdio"
+
+
+class WriteMode(StrEnum):
+    """How remember/forget ops behave: SYNC blocks until complete; ASYNC fire-and-forget."""
+
+    SYNC = "sync"
+    ASYNC = "async"
 
 
 class MemoryBackend(StrEnum):

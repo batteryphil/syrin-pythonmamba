@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from syrin.enums import MemoryType
+from syrin.enums import MemoryType, WriteMode
 from syrin.memory import Memory, MemoryStore
 
 
@@ -61,7 +61,7 @@ class TestMemoryConsolidate:
 
     def test_memory_consolidate_delegates(self) -> None:
         """Memory with store: consolidate() returns count from store."""
-        mem = Memory()
+        mem = Memory(write_mode=WriteMode.SYNC)
         mem.remember("dupe", memory_type=MemoryType.EPISODIC)
         mem.remember("dupe", memory_type=MemoryType.EPISODIC)
         removed = mem.consolidate()
@@ -75,7 +75,7 @@ class TestMemoryEntries:
 
     def test_memory_entries_returns_list(self) -> None:
         """entries() returns list of MemoryEntry, empty when no memories."""
-        mem = Memory()
+        mem = Memory(write_mode=WriteMode.SYNC)
         out = mem.entries(limit=10)
         assert isinstance(out, list)
         assert len(out) == 0
@@ -86,7 +86,7 @@ class TestMemoryEntries:
 
     def test_memory_entries_respects_limit(self) -> None:
         """entries(limit=N) returns at most N entries."""
-        mem = Memory()
+        mem = Memory(write_mode=WriteMode.SYNC)
         for i in range(5):
             mem.remember(f"item{i}", memory_type=MemoryType.EPISODIC)
         out = mem.entries(limit=2)

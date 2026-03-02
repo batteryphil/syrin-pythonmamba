@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **C5 fix** — Memory.remember/recall/forget use configured backend (SQLite, Qdrant, Chroma) instead of in-memory dict when backend != MEMORY.
+- **QdrantConfig** — `Memory(qdrant=QdrantConfig(url=..., api_key=..., collection=..., namespace=...))` for Qdrant Cloud or local.
+- **ChromaConfig** — `Memory(chroma=ChromaConfig(path=..., collection=...))` for Chroma vector backend.
+- **Namespace isolation** — `QdrantConfig.namespace` scopes all operations; payload filter on search/list.
+- **WriteMode** — `WriteMode.SYNC` (block until complete) vs `WriteMode.ASYNC` (fire-and-forget, default).
+- **Memory export/import** — `Memory.export()` returns `MemorySnapshot`; `Memory.import_from(snapshot)` appends memories. JSON-serializable for GDPR export.
+- **Examples** — `examples/04_memory/qdrant_memory.py`, `chroma_memory.py`, `async_memory.py`, `export_import_memory.py`.
+
+### Changed
+
+- Agent and Memory handoff now use `memory._backend_kwargs()` for backend config.
+- `syrin[qdrant]` and `syrin[chroma]` optional dependencies added to pyproject.toml.
+
+---
+
 ## [0.4.1] - 2026-03-01
 
 ### Added

@@ -23,6 +23,8 @@ from .config import (
     MemoryEntry,
 )
 from .conversation import BufferMemory, ConversationMemory, WindowMemory
+from .embedding import EmbeddingConfig
+from .snapshot import MemorySnapshot, MemorySnapshotEntry
 from .store import MemoryStore
 from .types import (
     CoreMemory,
@@ -31,8 +33,13 @@ from .types import (
     SemanticMemory,
     create_memory,
 )
+from .vector_configs import ChromaConfig, PostgresConfig, QdrantConfig, RedisConfig
 
 __all__ = [
+    "ChromaConfig",
+    "EmbeddingConfig",
+    "MemorySnapshot",
+    "MemorySnapshotEntry",
     "Memory",
     "Decay",
     "MemoryBudget",
@@ -58,4 +65,7 @@ __all__ = [
     "SemanticMemory",
     "ProceduralMemory",
     "create_memory",
+    "PostgresConfig",
+    "QdrantConfig",
+    "RedisConfig",
 ]

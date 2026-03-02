@@ -39,6 +39,10 @@ litellm = ["litellm"]
 anthropic = ["anthropic"]
 openai = ["openai"]
 serve = ["fastapi", "uvicorn"]
+qdrant = ["qdrant-client"]
+chroma = ["chromadb"]
+redis = ["redis"]
+postgres = ["psycopg2-binary"]
 dev = [
     "pytest",
     "pytest-asyncio",
@@ -48,6 +52,8 @@ dev = [
     "python-dotenv",
     "fastapi",
     "uvicorn",
+    "chromadb",
+    "qdrant-client",
 ]
 
 [project.scripts]
@@ -175,7 +181,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -W ignore::ResourceWarning"
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.coverage.run]

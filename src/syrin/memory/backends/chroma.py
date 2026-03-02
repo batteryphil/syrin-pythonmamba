@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from syrin.enums import MemoryScope, MemoryType
+from syrin.memory.config import MemoryEntry
+from syrin.memory.embedding import EmbeddingConfig
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +20,14 @@ try:
     import chromadb
     from chromadb.config import Settings
 
-    CHROMA_AVAILABLE = True
+    chroma_available = True
 except ImportError:
-    CHROMA_AVAILABLE = False
-    Settings = None
-    chromadb = None
+    chroma_available = False
+    chromadb = None  # type: ignore[assignment]
+    Settings = None  # type: ignore[misc,assignment]
 
-from syrin.memory.config import MemoryEntry
+_chroma = chromadb
+_Settings = Settings
 
 
 class ChromaBackend:
@@ -47,32 +50,32 @@ class ChromaBackend:
         self,
         path: str | None = None,
         collection_name: str = "syrin_memory",
+        namespace: str | None = None,
+        embedding_config: EmbeddingConfig | None = None,
     ) -> None:
         """Initialize Chroma backend.
 
         Args:
             path: Directory for persistent storage; None for ephemeral.
             collection_name: Collection name for memories.
+            namespace: Per-tenant isolation; all ops scoped to this namespace.
+            embedding_config: Optional EmbeddingConfig with custom_fn for embeddings.
         """
-        if not CHROMA_AVAILABLE:
+        if not chroma_available or _chroma is None or _Settings is None:
             raise ImportError("chromadb is not installed. Install with: pip install chromadb")
 
         self._collection_name = collection_name
+        self._namespace = namespace
+        self._embedding_config: EmbeddingConfig | None = embedding_config
 
-        # Initialize Chroma client
+        # Initialize Chroma client. Use PersistentClient when path is set to avoid
+        # "An instance of Chroma already exists for ephemeral" when multiple clients
+        # are created in the same process (e.g. across tests).
+        settings = _Settings(anonymized_telemetry=False)
         if path:
-            self._client = chromadb.Client(
-                Settings(
-                    persist_directory=path,
-                    anonymized_telemetry=False,
-                )
-            )
+            self._client = _chroma.PersistentClient(path=path, settings=settings)
         else:
-            self._client = chromadb.Client(
-                Settings(
-                    anonymized_telemetry=False,
-                )
-            )
+            self._client = _chroma.Client(settings)
 
         # Get or create collection
         try:
@@ -84,21 +87,20 @@ class ChromaBackend:
             )
 
     def _get_embedding(self, text: str) -> list[float]:
-        """Get embedding for text. Override for custom embeddings."""
+        """Get embedding for text. Uses EmbeddingConfig if set, else MD5 fallback."""
+        if self._embedding_config is not None and self._embedding_config.custom_fn is not None:
+            emb = self._embedding_config.embed(text)
+            return list(emb) if not isinstance(emb, list) else emb
         import hashlib
 
-        # Simple hash-based pseudo-embedding for demo
-        # In production, use actual embeddings (sentence-transformers, etc.)
         hash_val = hashlib.md5(text.encode()).digest()
-        # Pad to typical embedding size
         embedding = [float(b) / 255.0 for b in hash_val]
-        # Pad to 384 dimensions
         embedding.extend([0.0] * (384 - len(embedding)))
         return embedding
 
     def _entry_to_metadata(self, entry: MemoryEntry) -> dict[str, Any]:
         """Convert MemoryEntry to Chroma metadata."""
-        return {
+        metadata: dict[str, Any] = {
             "id": entry.id,
             "content": entry.content,
             "type": entry.type.value,
@@ -108,6 +110,9 @@ class ChromaBackend:
             "created_at": entry.created_at.isoformat() if entry.created_at else None,
             "keywords": ",".join(entry.keywords),
         }
+        if self._namespace is not None:
+            metadata["namespace"] = self._namespace
+        return metadata
 
     def add(self, memory: MemoryEntry) -> None:
         """Add a memory to Chroma."""
@@ -116,7 +121,7 @@ class ChromaBackend:
 
         self._collection.upsert(
             ids=[memory.id],
-            embeddings=[embedding],
+            embeddings=[embedding],  # type: ignore[arg-type]
             documents=[memory.content],
             metadatas=[metadata],
         )
@@ -124,27 +129,57 @@ class ChromaBackend:
     def get(self, memory_id: str) -> MemoryEntry | None:
         """Get a memory by ID."""
         try:
-            result = self._collection.get(ids=[memory_id])
-            if not result["ids"]:
+            raw = self._collection.get(ids=[memory_id])
+            result: dict[str, Any] = dict(raw) if isinstance(raw, dict) else {}
+            ids_list: list[str] = result.get("ids") or []
+            metas: list[dict[str, Any]] | None = result.get("metadatas")
+            docs: list[str] | None = result.get("documents")
+            if not ids_list or metas is None or docs is None or not metas or not docs:
                 return None
-            return self._metadata_to_entry(result["metadatas"][0], result["documents"][0])
+            meta: dict[str, Any] = dict(metas[0]) if metas[0] is not None else {}
+            doc_str: str = str(docs[0]) if docs[0] is not None else ""
+            return self._metadata_to_entry(meta, doc_str)
         except Exception:
             return None
 
     def _metadata_to_entry(self, metadata: dict[str, Any], content: str) -> MemoryEntry:
         """Convert Chroma metadata to MemoryEntry."""
+        raw_id = metadata.get("id", "")
+        raw_type = metadata.get("type", "core")
+        raw_importance = metadata.get("importance", 1.0)
+        raw_scope = metadata.get("scope", "user")
+        raw_source = metadata.get("source")
+        raw_created = metadata.get("created_at")
+        raw_keywords = metadata.get("keywords", "")
         return MemoryEntry(
-            id=metadata["id"],
+            id=str(raw_id),
             content=content,
-            type=MemoryType(metadata["type"]),
-            importance=metadata.get("importance", 1.0),
-            scope=MemoryScope(metadata.get("scope", "user")),
-            source=metadata.get("source"),
-            created_at=datetime.fromisoformat(metadata["created_at"])
-            if metadata.get("created_at")
-            else datetime.now(),
-            keywords=metadata.get("keywords", "").split(",") if metadata.get("keywords") else [],
+            type=MemoryType(str(raw_type)),
+            importance=float(raw_importance) if raw_importance is not None else 1.0,
+            scope=MemoryScope(str(raw_scope)),
+            source=str(raw_source) if raw_source is not None else None,
+            created_at=datetime.fromisoformat(str(raw_created)) if raw_created else datetime.now(),
+            keywords=str(raw_keywords).split(",") if raw_keywords else [],
         )
+
+    def _build_where(
+        self,
+        memory_type: MemoryType | None = None,
+        scope: MemoryScope | None = None,
+    ) -> dict[str, Any] | None:
+        """Build Chroma where filter for memory_type, scope, and namespace."""
+        conditions: list[dict[str, Any]] = []
+        if memory_type is not None:
+            conditions.append({"type": memory_type.value})
+        if scope is not None:
+            conditions.append({"scope": scope.value})
+        if self._namespace is not None:
+            conditions.append({"namespace": self._namespace})
+        if not conditions:
+            return None
+        if len(conditions) == 1:
+            return conditions[0]
+        return {"$and": conditions}
 
     def search(
         self,
@@ -155,23 +190,24 @@ class ChromaBackend:
         """Search memories by semantic similarity."""
         query_embedding = self._get_embedding(query)
 
-        where = None
-        if memory_type:
-            where = {"type": memory_type.value}
+        where = self._build_where(memory_type=memory_type)
 
-        results = self._collection.query(
-            query_embeddings=[query_embedding],
+        raw_query = self._collection.query(
+            query_embeddings=[query_embedding],  # type: ignore[arg-type]
             n_results=top_k,
             where=where,
         )
-
-        if not results["documents"] or not results["documents"][0]:
+        query_result: dict[str, Any] = dict(raw_query) if isinstance(raw_query, dict) else {}
+        docs_list: list[list[str]] | None = query_result.get("documents")
+        metas_list: list[list[dict[str, Any]]] | None = query_result.get("metadatas")
+        if not docs_list or not docs_list[0] or metas_list is None or not metas_list:
             return []
 
-        entries = []
-        for i, doc in enumerate(results["documents"][0]):
-            metadata = results["metadatas"][0][i]
-            entries.append(self._metadata_to_entry(metadata, doc))
+        entries: list[MemoryEntry] = []
+        for i, doc in enumerate(docs_list[0]):
+            meta_row = metas_list[0][i] if i < len(metas_list[0]) else {}
+            meta_dict: dict[str, Any] = dict(meta_row) if meta_row is not None else {}
+            entries.append(self._metadata_to_entry(meta_dict, str(doc)))
 
         return entries
 
@@ -182,25 +218,23 @@ class ChromaBackend:
         limit: int = 100,
     ) -> list[MemoryEntry]:
         """List all memories."""
-        where = None
-        if memory_type:
-            where = {"type": memory_type.value}
-        elif scope:
-            where = {"scope": scope.value}
+        where = self._build_where(memory_type=memory_type, scope=scope)
 
         try:
-            results = self._collection.get(
-                where=where,
-                limit=limit,
-            )
-
-            if not results["ids"]:
+            raw = self._collection.get(where=where, limit=limit)
+            list_result: dict[str, Any] = dict(raw) if isinstance(raw, dict) else {}
+            ids_list: list[str] = list_result.get("ids") or []
+            docs: list[str] = list_result.get("documents") or []
+            metas: list[dict[str, Any]] = list_result.get("metadatas") or []
+            if not ids_list:
                 return []
 
-            entries = []
-            for i, doc in enumerate(results["documents"]):
-                metadata = results["metadatas"][i]
-                entries.append(self._metadata_to_entry(metadata, doc))
+            entries: list[MemoryEntry] = []
+            for i, doc in enumerate(docs):
+                meta_row = metas[i] if i < len(metas) else {}
+                meta_dict: dict[str, Any] = dict(meta_row) if meta_row is not None else {}
+                doc_str = str(doc) if doc is not None else ""
+                entries.append(self._metadata_to_entry(meta_dict, doc_str))
 
             return entries
         except Exception:
@@ -216,11 +250,14 @@ class ChromaBackend:
 
     def clear(self) -> None:
         """Clear all memories."""
-        self._collection.delete(where={"type": {"$exists": True}})
+        # Chroma where: $exists matches all (our memories have type). Chroma Where type is strict.
+        self._collection.delete(where=cast(Any, {"type": {"$exists": True}}))
 
     def close(self) -> None:
-        """Close the client connection."""
-        # Chroma client doesn't need explicit close
+        """Close the client connection. Chroma PersistentClient uses SQLite internally."""
+        close_fn = getattr(self._client, "close", None)
+        if callable(close_fn):
+            close_fn()
 
 
 __all__ = ["ChromaBackend"]

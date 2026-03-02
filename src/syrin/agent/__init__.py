@@ -701,7 +701,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             self._conversation_memory = None
         elif isinstance(memory, Memory):
             self._persistent_memory = memory
-            self._memory_backend = get_backend(memory.backend, path=memory.path)
+            self._memory_backend = get_backend(memory.backend, **memory._backend_kwargs())
         else:
             self._conversation_memory = memory
         if (budget is not None or self._token_limits is not None) and budget_store and budget:
@@ -1703,9 +1703,10 @@ class Agent(Servable, metaclass=_AgentMeta):
                 memories = self._memory_backend.list()
                 if memories:
                     if target._memory_backend is None:
-                        target._persistent_memory = Memory(top_k=10, relevance_threshold=0.7)
+                        mem_config = Memory(top_k=10, relevance_threshold=0.7)
+                        target._persistent_memory = mem_config
                         target._memory_backend = get_backend(
-                            Memory(top_k=10, relevance_threshold=0.7).backend
+                            mem_config.backend, **mem_config._backend_kwargs()
                         )
                     for mem in memories:
                         target.remember(

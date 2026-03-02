@@ -351,7 +351,7 @@ agent.forget(memory_type=MemoryType.EPISODIC)
 
 ```python
 from Syrin.memory import Memory
-from Syrin.enums import MemoryType, MemoryBackend, InjectionStrategy
+from Syrin.enums import MemoryType, MemoryBackend, InjectionStrategy, WriteMode
 
 memory = Memory(
     # Which memory types to store
@@ -384,7 +384,58 @@ memory = Memory(
     
     # Scope (session, agent, user, global)
     scope=MemoryScope.USER,
+    
+    # Write mode: SYNC blocks until complete; ASYNC fire-and-forget (default)
+    write_mode=WriteMode.ASYNC,
 )
+```
+
+---
+
+## Write Mode
+
+Memory writes (`remember`, `forget`) can run synchronously or asynchronously:
+
+```python
+from syrin.enums import WriteMode
+
+# ASYNC (default): Fire-and-forget. Returns immediately; never blocks response.
+memory = Memory(write_mode=WriteMode.ASYNC)
+
+# SYNC: Blocks until complete. Use when you need the actual count or immediate persistence.
+memory = Memory(write_mode=WriteMode.SYNC)
+```
+
+| Mode | remember() | forget() | Use Case |
+|------|------------|----------|----------|
+| ASYNC | Returns True immediately | Returns 0/1 placeholder | Latency-sensitive, real-time agents |
+| SYNC | Blocks until stored | Returns actual count | Export/import, tests, batch ops |
+
+---
+
+## Export / Import
+
+Export memories as a snapshot for backup, GDPR export, or migration:
+
+```python
+from syrin.memory import Memory, MemorySnapshot
+
+memory = Memory(backend=MemoryBackend.SQLITE, path="./memory.db")
+
+# Export to snapshot (JSON-serializable)
+snapshot = memory.export()
+print(snapshot.version)  # 1
+print(len(snapshot.memories))
+
+# Serialize to JSON
+import json
+js = snapshot.to_json()
+data = json.loads(js)
+
+# Import from snapshot (append mode; does not clear existing)
+snapshot = MemorySnapshot.from_dict(data)
+count = memory.import_from(snapshot)
+print(f"Imported {count} memories")
 ```
 
 ---
@@ -423,89 +474,131 @@ memory = Memory(
 ### Qdrant (Vector/Semantic Search)
 
 ```bash
-pip install qdrant-client
+pip install syrin[qdrant]  # or pip install qdrant-client
 ```
 
 ```python
-from Syrin.enums import MemoryBackend
+from syrin.enums import MemoryBackend
+from syrin.memory import Memory, QdrantConfig
 
+# Local embedded Qdrant
 memory = Memory(
     backend=MemoryBackend.QDRANT,
-    host="localhost",
-    port=6333,
-    collection="syrin_memory",
-    vector_size=384,
+    qdrant=QdrantConfig(
+        path="./qdrant_data",       # Local path for embedded
+        collection="syrin_memories",
+        namespace="tenant_123",     # Per-tenant isolation
+    ),
 )
+
+# Qdrant Cloud or remote server
+memory = Memory(
+    backend=MemoryBackend.QDRANT,
+    qdrant=QdrantConfig(
+        url="https://xxx.qdrant.tech",
+        api_key="your-api-key",    # For Qdrant Cloud
+        collection="syrin_memories",
+        namespace="user_alice",
+    ),
+)
+
+# Legacy: path-only (embedded, no config)
+memory = Memory(backend=MemoryBackend.QDRANT, path="./qdrant_data")
 ```
-- **Pros:** Semantic search with embeddings, persistent
-- **Cons:** Requires Qdrant server
-- **Use case:** Production with semantic search needs
+- **Pros:** Semantic search with embeddings, persistent, namespace isolation
+- **Cons:** Requires Qdrant (embedded or server)
+- **Use case:** Production with semantic search, multi-tenant apps
 
 ### Chroma (Lightweight Vector DB)
 
 ```bash
-pip install chromadb
+pip install syrin[chroma]  # or pip install chromadb
 ```
 
 ```python
-from Syrin.enums import MemoryBackend
+from syrin.enums import MemoryBackend
+from syrin.memory import Memory, ChromaConfig
 
 memory = Memory(
     backend=MemoryBackend.CHROMA,
-    path="./chroma_db",  # Optional: persistence path
-    collection_name="syrin",
+    chroma=ChromaConfig(
+        path="./chroma_db",         # Local persistent; None = ephemeral
+        collection="syrin_memories",
+    ),
 )
 ```
-- **Pros:** Lightweight, embedded, easy setup
-- **Cons:** Less features than Qdrant
+- **Pros:** Lightweight, embedded, zero-config local
+- **Cons:** Fewer features than Qdrant
 - **Use case:** Prototyping, local development
 
 ### Redis (Fast Cache)
 
 ```bash
-pip install redis
+pip install syrin[redis]  # or pip install redis
 ```
 
 ```python
-from Syrin.enums import MemoryBackend
+from syrin.enums import MemoryBackend
+from syrin.memory import Memory, RedisConfig
 
 memory = Memory(
     backend=MemoryBackend.REDIS,
-    host="localhost",
-    port=6379,
-    db=0,
-    ttl=86400,  # Optional: TTL in seconds (1 day)
+    redis=RedisConfig(
+        host="localhost",
+        port=6379,
+        db=0,
+        prefix="syrin:memory:",  # Key prefix for isolation
+        ttl=86400,  # Optional: TTL in seconds (1 day)
+    ),
 )
 ```
 - **Pros:** Ultra-fast, distributed, TTL support
-- **Cons:** Requires Redis server
+- **Cons:** Requires Redis server; no vector search (substring match only)
 - **Use case:** High-performance applications, distributed systems
+- **Example:** `examples/04_memory/redis_memory.py`
 
 ### PostgreSQL (Production)
 
 ```bash
-pip install psycopg2-binary numpy
+pip install syrin[postgres]  # or pip install psycopg2-binary
 ```
 
 ```python
-from Syrin.enums import MemoryBackend
+from syrin.enums import MemoryBackend
+from syrin.memory import Memory, PostgresConfig
 
 memory = Memory(
     backend=MemoryBackend.POSTGRES,
-    host="localhost",
-    port=5432,
-    database="syrin",
-    user="postgres",
-    password="your_password",
+    postgres=PostgresConfig(
+        host="localhost",
+        port=5432,
+        database="syrin",
+        user="postgres",
+        password="",
+        table="memories",
+    ),
 )
 ```
-- **Pros:** Enterprise-grade, SQL support, connection pooling
-- **Cons:** Requires PostgreSQL server
+- **Pros:** Enterprise-grade, SQL support, persistent
+- **Cons:** Requires PostgreSQL server; vector search needs pgvector
 - **Use case:** Production applications, team usage
+- **Example:** `examples/04_memory/postgres_memory.py`
 
-**Note:** For vector search with PostgreSQL, install pgvector extension:
+**Note:** For vector search with PostgreSQL, install pgvector and set `vector_size`:
+
 ```bash
 pip install pgvector
+```
+
+```python
+memory = Memory(
+    backend=MemoryBackend.POSTGRES,
+    postgres=PostgresConfig(
+        host="localhost",
+        database="syrin",
+        vector_size=384,  # Enable pgvector
+    ),
+)
 ```
 
 ---
@@ -664,16 +757,21 @@ from Syrin.memory import (
 )
 
 # Backends
-from Syrin.memory import (
+from syrin.memory import (
+    ChromaConfig,        # Chroma config (path, collection)
+    QdrantConfig,        # Qdrant config (url, path, namespace)
     InMemoryBackend,     # In-memory (default)
     SQLiteBackend,       # File-based SQLite
-    QdrantBackend,      # Vector database (semantic search)
-    ChromaBackend,      # Lightweight vector DB
-    RedisBackend,       # Fast cache
-    PostgresBackend,    # PostgreSQL
-    get_backend,        # Factory function
-    BACKENDS,          # Registry of all backends
+    QdrantBackend,       # Vector database (semantic search)
+    ChromaBackend,       # Lightweight vector DB
+    RedisBackend,        # Fast cache
+    PostgresBackend,     # PostgreSQL
+    get_backend,         # Factory function
+    BACKENDS,            # Registry of all backends
 )
+
+# Snapshot (export/import)
+from syrin.memory import MemorySnapshot, MemorySnapshotEntry
 
 # Enums
 from Syrin.enums import (
@@ -681,6 +779,7 @@ from Syrin.enums import (
     MemoryScope,       # SESSION, AGENT, USER, GLOBAL
     DecayStrategy,     # EXPONENTIAL, LINEAR, LOGARITHMIC, STEP, NONE
     MemoryBackend,    # MEMORY, SQLITE, QDRANT, etc.
+    WriteMode,        # SYNC, ASYNC
     InjectionStrategy,# CHRONOLOGICAL, ATTENTION_OPTIMIZED, etc.
 )
 ```

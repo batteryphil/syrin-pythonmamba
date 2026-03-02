@@ -128,7 +128,15 @@ class PostgresBackend:
         """)
 
     def _row_to_entry(self, row: tuple[Any, ...]) -> MemoryEntry:
-        """Convert a database row to a MemoryEntry."""
+        """Convert a database row to a MemoryEntry.
+
+        Column order: id, content, type, importance, scope, source, created_at,
+        last_accessed, access_count, valid_from, valid_until, keywords, related_ids,
+        supersedes, metadata, [embedding if vector_size>0], importance_idx (generated).
+        """
+        n = len(row)
+        meta = row[14] if n > 14 else "{}"
+        meta_val = json.loads(meta) if isinstance(meta, (str, bytes)) else {}
         return MemoryEntry(
             id=row[0],
             content=row[1],
@@ -136,13 +144,13 @@ class PostgresBackend:
             importance=row[3],
             scope=MemoryScope(row[4]),
             source=row[5],
-            created_at=row[6] if len(row) > 6 else datetime.now(),
-            last_accessed=row[7] if len(row) > 7 and row[7] else None,
-            access_count=row[8] if len(row) > 8 else 0,
-            keywords=json.loads(row[12]) if len(row) > 12 and row[12] else [],
-            related_ids=json.loads(row[13]) if len(row) > 13 and row[13] else [],
-            supersedes=row[14] if len(row) > 14 else None,
-            metadata=json.loads(row[15]) if len(row) > 15 and row[15] else {},
+            created_at=row[6] if n > 6 else datetime.now(),
+            last_accessed=row[7] if n > 7 and row[7] else None,
+            access_count=row[8] if n > 8 else 0,
+            keywords=json.loads(row[11]) if n > 11 and row[11] else [],
+            related_ids=json.loads(row[12]) if n > 12 and row[12] else [],
+            supersedes=row[13] if n > 13 else None,
+            metadata=meta_val,
         )
 
     def add(self, memory: MemoryEntry) -> None:
