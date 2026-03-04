@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING, Any, cast
+
+from starlette.requests import Request
 
 from syrin.mcp.schema import tool_spec_to_mcp, validate_tool_arguments
 
@@ -51,7 +54,7 @@ def build_mcp_router(mcp: MCP) -> Any:
 
     @router.post("")
     @router.post("/")
-    async def mcp_handler(body: dict[str, Any] | None = None) -> Any:
+    async def mcp_handler(request: Request, body: dict[str, Any] | None = None) -> Any:
         """JSON-RPC 2.0: tools/list, tools/call."""
         body = body or _empty
         req_id = body.get("id")
@@ -81,11 +84,85 @@ def build_mcp_router(mcp: MCP) -> Any:
                 from syrin.enums import Hook
 
                 emit(Hook.MCP_TOOL_CALL_START, {"tool_name": name, "arguments": arguments})
+
+            # Guardrails: input validation before tool execution
+            guardrails = getattr(mcp, "guardrails", None)
+            if guardrails is not None:
+                from syrin.guardrails.enums import GuardrailStage
+
+                input_check = guardrails.check(str(arguments), GuardrailStage.INPUT)
+                if not input_check.passed:
+                    if emit:
+                        emit(
+                            Hook.MCP_TOOL_CALL_END,
+                            {
+                                "tool_name": name,
+                                "arguments": arguments,
+                                "error": input_check.reason,
+                            },
+                        )
+                    return JSONResponse(
+                        status_code=403,
+                        content={
+                            "jsonrpc": "2.0",
+                            "id": req_id,
+                            "error": {
+                                "code": -32003,
+                                "message": f"Guardrail blocked: {input_check.reason}",
+                            },
+                        },
+                    )
+
             for spec in mcp.tools():
                 if spec.name == name:
                     try:
                         validate_tool_arguments(spec, arguments)
                         result = spec.func(**arguments)
+
+                        # Guardrails: output validation after tool execution
+                        if guardrails is not None and result is not None:
+                            output_check = guardrails.check(str(result), GuardrailStage.OUTPUT)
+                            if not output_check.passed:
+                                if emit:
+                                    emit(
+                                        Hook.MCP_TOOL_CALL_END,
+                                        {
+                                            "tool_name": name,
+                                            "arguments": arguments,
+                                            "error": output_check.reason,
+                                        },
+                                    )
+                                return JSONResponse(
+                                    status_code=403,
+                                    content={
+                                        "jsonrpc": "2.0",
+                                        "id": req_id,
+                                        "error": {
+                                            "code": -32003,
+                                            "message": f"Guardrail blocked output: {output_check.reason}",
+                                        },
+                                    },
+                                )
+
+                        # Audit: log tool call when audit enabled
+                        audit_log = getattr(mcp, "audit_log", None)
+                        if audit_log is not None and getattr(mcp, "audit", False):
+                            from syrin.audit.models import AuditEntry
+
+                            backend = audit_log.get_backend("./mcp_audit.jsonl")
+                            entry = AuditEntry(
+                                source=getattr(mcp, "name", "mcp"),
+                                event="mcp_tool_call",
+                                tool_name=name,
+                                duration_ms=0,
+                                extra={
+                                    "arguments": str(arguments)[:500],
+                                    "result_preview": str(result)[:200] if result else None,
+                                },
+                            )
+                            with contextlib.suppress(Exception):
+                                backend.write(entry)
+
                         content = (
                             [{"type": "text", "text": str(result)}] if result is not None else []
                         )

@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import httpx
 
 from syrin.mcp.schema import mcp_tool_to_tool_spec
 from syrin.tool import ToolSpec
-
-if TYPE_CHECKING:
-    pass
 
 
 class MCPClient:
@@ -29,6 +26,7 @@ class MCPClient:
         *,
         tools: list[str] | None = None,
         timeout: float = 30.0,
+        headers: dict[str, str] | None = None,
     ) -> None:
         """Create MCP client. On first tools()/select(), discovers remote tools.
 
@@ -36,11 +34,17 @@ class MCPClient:
             url: MCP server URL (e.g. http://localhost:3000, https://mcp.example.com).
             tools: Whitelist of tool names; None = all tools.
             timeout: HTTP timeout in seconds.
+            headers: Optional headers to send with every request.
         """
         self._url = url.rstrip("/")
         self._tool_whitelist = tools
         self._timeout = timeout
+        self._headers = dict(headers) if headers else {}
         self._tools_cache: list[ToolSpec] | None = None
+
+    def get_headers(self) -> dict[str, str]:
+        """Headers added to every request."""
+        return dict(self._headers)
 
     def _request(self, method: str, params: dict[str, Any] | None = None) -> Any:
         """Send JSON-RPC 2.0 request to MCP server."""
@@ -50,8 +54,9 @@ class MCPClient:
             "method": method,
             "params": params or {},
         }
+        headers = self.get_headers()
         with httpx.Client(timeout=self._timeout) as client:
-            resp = client.post(self._url, json=payload)
+            resp = client.post(self._url, json=payload, headers=headers or None)
             resp.raise_for_status()
             data = resp.json()
         if "error" in data:
@@ -70,6 +75,7 @@ class MCPClient:
 
             def make_call(n: str, u: str, to: float) -> Any:
                 def call(**kwargs: Any) -> Any:
+                    headers = self.get_headers()
                     with httpx.Client(timeout=to) as c:
                         payload = {
                             "jsonrpc": "2.0",
@@ -77,7 +83,7 @@ class MCPClient:
                             "method": "tools/call",
                             "params": {"name": n, "arguments": kwargs},
                         }
-                        r = c.post(u, json=payload)
+                        r = c.post(u, json=payload, headers=headers or None)
                         r.raise_for_status()
                         data = r.json()
                     if "error" in data:

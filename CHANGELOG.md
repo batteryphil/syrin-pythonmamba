@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Nothing yet.
+
+---
+
+## [0.5.0] - 2026-03-04
+
 ### Added
 
 - **C5 fix** — Memory.remember/recall/forget use configured backend (SQLite, Qdrant, Chroma) instead of in-memory dict when backend != MEMORY.

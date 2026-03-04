@@ -43,9 +43,28 @@ class MCP:
     name: str = "mcp"
     description: str = ""
 
-    def __init__(self) -> None:
-        """Collect @tool methods from class. Tools must be defined in-class."""
+    def __init__(
+        self,
+        *,
+        audit: bool | object = False,
+        audit_log: object | None = None,
+        guardrails: object | None = None,
+    ) -> None:
+        """Collect @tool methods from class. Tools must be defined in-class.
+
+        Args:
+            audit: If True, log tool calls. Use audit_log to pass AuditLog; else default path.
+            audit_log: AuditLog instance for tool call logging when audit is True.
+            guardrails: Optional GuardrailChain for tool input/output validation.
+        """
         self.events = Events(self._emit_mcp_event)
+        self._audit = bool(audit)
+        self._audit_log = audit_log
+        self._guardrails = guardrails
+        if self._audit and self._audit_log is None:
+            from syrin.audit import AuditLog
+
+            self._audit_log = AuditLog(path="./mcp_audit.jsonl")
         self._tool_specs = _collect_mcp_class_tools(self.__class__)
         # Bind instance methods to self
         bound: list[ToolSpec] = []
@@ -69,6 +88,21 @@ class MCP:
             else:
                 bound.append(spec)
         self._tool_specs = bound
+
+    @property
+    def audit(self) -> bool:
+        """Whether to log tool calls to agent's AuditLog when co-located."""
+        return self._audit
+
+    @property
+    def audit_log(self) -> object | None:
+        """AuditLog for tool call logging; None if not configured."""
+        return self._audit_log
+
+    @property
+    def guardrails(self) -> object | None:
+        """GuardrailChain for tool input/output; None if not configured."""
+        return self._guardrails
 
     def tools(self) -> list[ToolSpec]:
         """Return all tools as ToolSpec list. Use in Agent(tools=[*mcp.tools()])."""
@@ -141,7 +175,6 @@ class MCP:
             use_color = getattr(sys.stdout, "isatty", lambda: False)()
             print(_syrin_cli_message(use_color=use_color), flush=True)
 
-            router = build_mcp_router(self)
             app = FastAPI(title=f"MCP: {self.name}", description=self.description or "MCP server")
-            app.include_router(router, prefix="/mcp")
+            app.include_router(build_mcp_router(self), prefix="/mcp")
             uvicorn.run(app, host=host, port=port)

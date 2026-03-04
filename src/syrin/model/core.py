@@ -54,8 +54,8 @@ def _resolve_env_var(value: str) -> str:
     return os.environ.get(name, value)
 
 
-def _detect_provider(model_id: str) -> str:
-    """Detect provider from model_id prefix or pattern."""
+def detect_provider(model_id: str) -> str:
+    """Detect provider from model_id prefix or pattern. Public API."""
     resolved = _resolve_env_var(model_id)
     for prefix, provider in _PROVIDER_PREFIXES:
         if resolved.lower().startswith(prefix):
@@ -64,6 +64,9 @@ def _detect_provider(model_id: str) -> str:
         if pattern.match(resolved):
             return provider
     return "litellm"
+
+
+_detect_provider = detect_provider  # Internal alias for backward compatibility
 
 
 class ModelVersion:

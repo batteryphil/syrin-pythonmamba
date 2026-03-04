@@ -3,6 +3,7 @@
 
 plan/
 openmemory.md
+.credentials/
 .pypirc
 
 # Python

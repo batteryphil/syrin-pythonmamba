@@ -1,6 +1,6 @@
 [project]
 name = "syrin"
-version = "0.4.1"
+version = "0.5.0"
 description = "Python library for building AI agents with budget management, declarative definitions, and production-ready observability."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -26,6 +26,7 @@ dependencies = [
     "jsonschema>=4.0",
     "uvicorn>=0.41.0",
     "fastapi>=0.133.1",
+    "python-multipart>=0.0.22",
 ]
 
 [project.urls]
@@ -38,7 +39,7 @@ Homepage = "https://syrin.ai/"
 litellm = ["litellm"]
 anthropic = ["anthropic"]
 openai = ["openai"]
-serve = ["fastapi", "uvicorn"]
+serve = ["fastapi", "uvicorn", "python-multipart"]
 qdrant = ["qdrant-client"]
 chroma = ["chromadb"]
 redis = ["redis"]

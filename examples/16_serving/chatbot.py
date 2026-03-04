@@ -98,7 +98,9 @@ class Chatbot(Agent):
     """Full-featured chatbot with persistent memory, remember tool, guardrails, and checkpoints."""
 
     _agent_name = "chatbot"
-    _agent_description = "Conversational chatbot with persistent memory, guardrails, and checkpoints"
+    _agent_description = (
+        "Conversational chatbot with persistent memory, guardrails, and checkpoints"
+    )
     # Use gpt4_mini for real LLM (memory recall visible); almock for no-API-key demos
     model = gpt4_mini if os.getenv("OPENAI_API_KEY") else almock
     system_prompt = (

@@ -108,7 +108,9 @@ print(f"In-memory: {results[0].content if results else 'none'}")
 # 7. Agent class for serving
 class MemoryDemoAgent(Agent):
     _agent_name = "memory-demo"
-    _agent_description = "Agent with 4 memory types (Core, Episodic, Semantic, Procedural) and decay"
+    _agent_description = (
+        "Agent with 4 memory types (Core, Episodic, Semantic, Procedural) and decay"
+    )
     model = almock
     system_prompt = "You are a helpful assistant with persistent memory."
     memory = Memory(

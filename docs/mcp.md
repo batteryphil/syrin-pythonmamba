@@ -69,6 +69,12 @@ class ShopAgent(Agent):
     ]
 ```
 
+Optional `headers=` — pass headers (e.g. custom or API key) for every request:
+
+```python
+mcp = MCPClient("https://mcp.example.com", headers={"X-Custom-Header": "value"})
+```
+
 ## Agent Consuming MCP — Patterns
 
 **1. Direct inclusion** — Agent gets all MCP tools:
@@ -138,6 +144,23 @@ mcp.events.on(Hook.MCP_DISCONNECTED, lambda ctx: print("Client disconnected"))
 | `MCP_TOOL_CALL_START` | Before `tools/call` execution | `tool_name`, `arguments` |
 | `MCP_TOOL_CALL_END` | After `tools/call` | `tool_name`, `arguments`, `result` or `error` |
 | `MCP_DISCONNECTED` | STDIO EOF (STDIO only) | `transport` |
+
+**Audit logging** — Log MCP tool calls when `audit=True`:
+
+```python
+from syrin import AuditLog
+
+mcp = ProductMCP(audit=True, audit_log=AuditLog(path="./mcp_audit.jsonl"))
+```
+
+**Guardrails** — Validate tool input and output with `GuardrailChain`:
+
+```python
+from syrin import ContentFilter, GuardrailChain
+
+chain = GuardrailChain([ContentFilter(blocked_words=["spam", "forbidden"])])
+mcp = ProductMCP(guardrails=chain)
+```
 
 ## Examples
 

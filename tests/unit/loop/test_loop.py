@@ -546,7 +546,7 @@ class TestCustomLoop:
         """Any class with run() works."""
 
         class MyLoop:
-            _agent_name = "mine"
+            name = "mine"
 
             async def run(self, _agent, _user_input):
                 return LoopResult(content="custom", stop_reason="done", iterations=1)

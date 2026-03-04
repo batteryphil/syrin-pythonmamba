@@ -3,4 +3,7 @@
 from syrin.mcp.client import MCPClient
 from syrin.mcp.server import MCP
 
-__all__ = ["MCP", "MCPClient"]
+__all__ = [
+    "MCP",
+    "MCPClient",
+]

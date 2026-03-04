@@ -729,7 +729,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         else:
             self._budget_tracker = BudgetTracker()
         self._provider = _resolve_provider(self._model, self._model_config)
-        self._agent_name = name
+        object.__setattr__(self, "_agent_name", name)
         self._description = description
         self._deps: Any = deps
         if self._budget is not None:
@@ -826,7 +826,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                     f"audit must be AuditLog or None, got {type(audit).__name__}. "
                     "Use AuditLog(path='./audit.jsonl') for JSONL logging."
                 )
-            audit_handler = AuditHookHandler(source=self._agent_name, config=audit)
+            audit_handler = AuditHookHandler(source=cast(str, self._agent_name), config=audit)
             self.events.on_all(audit_handler)
 
         # Initialize run report for tracking metrics across a response() call
@@ -877,7 +877,7 @@ class Agent(Servable, metaclass=_AgentMeta):
     @property
     def name(self) -> str:
         """Agent name for discovery, routing, and Agent Card. Defaults to lowercase class name."""
-        return self._agent_name
+        return cast(str, self._agent_name)
 
     @property
     def description(self) -> str:
@@ -922,7 +922,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         if self._checkpointer is None:
             return None
 
-        agent_name = name or self._agent_name
+        agent_name = cast(str, name or self._agent_name)
         state = {
             "iteration": self.iteration,
             "messages": [],  # Could include conversation history
@@ -1017,7 +1017,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         if self._checkpointer is None:
             return []
 
-        agent_name = name or self._agent_name
+        agent_name = cast(str, name or self._agent_name)
         return self._checkpointer.list_checkpoints(agent_name)
 
     def get_checkpoint_report(self) -> AgentReport:
@@ -2159,7 +2159,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                             )
                         ctx = RunContext(
                             deps=self._deps,
-                            agent_name=self._agent_name,
+                            agent_name=cast(str, self._agent_name),
                             thread_id=getattr(self, "_thread_id", None),
                             budget_state=self.budget_state,
                             retry_count=0,
@@ -2515,7 +2515,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             raise CircuitBreakerOpenError(
                 f"Circuit breaker open for agent {self._agent_name!r}. "
                 f"Recovery in {cb.recovery_timeout}s.",
-                agent_name=self._agent_name,
+                agent_name=cast(str, self._agent_name),
                 circuit_state=state,
                 recovery_at=recovery_at,
                 fallback_model=fallback_str,
@@ -2541,7 +2541,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                         EventContext(
                             error=str(e),
                             failures=cb.get_state().failures,
-                            agent_name=self._agent_name,
+                            agent_name=cast(str, self._agent_name),
                         ),
                     )
             raise

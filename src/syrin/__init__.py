@@ -19,32 +19,40 @@ See docs/ and examples/ for full guides.
 
 import atexit
 import sys
-from typing import Any
+from typing import Any, cast
 
-_TRACE_ENABLED = False
+_trace_enabled = False
 
 
 def _trace_summary_on_exit() -> None:
     """Print trace summary at process exit when --trace was used (built-in)."""
-    if not _TRACE_ENABLED:
+    if not _trace_enabled:
         return
     try:
         from syrin.observability.metrics import get_metrics
 
         metrics = get_metrics()
-        summary = metrics.get_summary()
-        agent_cost = summary.get("agent", {}).get("cost") or 0.0
-        llm_cost = summary.get("llm", {}).get("cost") or 0.0
-        total_cost = float(agent_cost or llm_cost or 0)
-        runs = summary.get("agent", {}).get("runs") or 0
-        errors = summary.get("agent", {}).get("errors") or 0
-        tokens = summary.get("llm", {}).get("tokens_total") or 0
+        summary = cast(dict[str, object], metrics.get_summary())
+        agent_raw = summary.get("agent")
+        agent_data: dict[str, object] = (
+            cast(dict[str, object], agent_raw) if isinstance(agent_raw, dict) else {}
+        )
+        llm_raw = summary.get("llm")
+        llm_data: dict[str, object] = (
+            cast(dict[str, object], llm_raw) if isinstance(llm_raw, dict) else {}
+        )
+        agent_cost = agent_data.get("cost")
+        llm_cost = llm_data.get("cost")
+        total_cost = float(cast(float | int, agent_cost or llm_cost or 0))
+        runs = agent_data.get("runs")
+        errors = agent_data.get("errors")
+        tokens = llm_data.get("tokens_total")
         cost_str = f"${total_cost:.6f}".rstrip("0").rstrip(".")
         if cost_str == "$":
             cost_str = "$0"
-        runs_int = int(runs) if runs is not None else 0
-        errors_int = int(errors) if errors is not None else 0
-        tokens_int = int(tokens) if tokens is not None else 0
+        runs_int = int(cast(float | int, runs)) if runs is not None else 0
+        errors_int = int(cast(float | int, errors)) if errors is not None else 0
+        tokens_int = int(cast(float | int, tokens)) if tokens is not None else 0
         print("\n" + "=" * 60)
         print(" TRACE SUMMARY (--trace)")
         print("=" * 60)
@@ -59,11 +67,11 @@ def _trace_summary_on_exit() -> None:
 
 def _auto_trace_check() -> None:
     """Check for --trace flag and auto-enable observability."""
-    global _TRACE_ENABLED
-    if _TRACE_ENABLED or "--trace" not in sys.argv:
+    global _trace_enabled
+    if _trace_enabled or "--trace" not in sys.argv:
         return
 
-    _TRACE_ENABLED = True
+    _trace_enabled = True
     sys.argv.remove("--trace")
 
     try:
@@ -316,7 +324,7 @@ from syrin.threshold import (
 from syrin.tool import ToolSpec, tool
 from syrin.validation import ValidationPipeline, validate_output
 
-__version__ = "0.1.0"
+__version__ = "0.5.0"
 
 
 def run(
@@ -327,7 +335,7 @@ def run(
     tools: list[ToolSpec] | None = None,
     budget: Budget | None = None,
     prompt_vars: dict[str, Any] | None = None,
-    **kwargs: Any,
+    **kwargs: Any,  # pyright: ignore[reportAny]
 ) -> Response[str]:
     """Run a one-shot completion with an agent.
 
@@ -355,7 +363,7 @@ def run(
         >>> result = syrin.run("Summarize this", model=syrin.Model.Anthropic("claude-sonnet"))
     """
     from syrin.model.core import Model as ModelClass
-    from syrin.model.core import _detect_provider
+    from syrin.model.core import detect_provider
 
     # Resolve model to Model instance
     if model is None:
@@ -368,7 +376,7 @@ def run(
     elif isinstance(model, str):
         import os
 
-        provider = _detect_provider(model)
+        provider = detect_provider(model)
         api_key = None
         if provider == "openai":
             api_key = os.getenv("OPENAI_API_KEY") or get_config().default_api_key
@@ -387,7 +395,7 @@ def run(
         system_prompt=system_prompt or "",
         tools=tools or [],
         budget=budget,
-        **kwargs,
+        **kwargs,  # pyright: ignore[reportAny]
     )
     return agent.response(input, prompt_vars=prompt_vars)
 
