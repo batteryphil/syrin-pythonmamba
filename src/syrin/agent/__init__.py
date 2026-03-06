@@ -576,7 +576,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             guardrails: List of Guardrail or GuardrailChain. Validate input/output.
                 Why: Block harmful content, PII, or policy violations.
             context: Context config (max_tokens, thresholds, budget). Token caps
-                go in context.budget (TokenLimits).
+                go in context.token_limits (TokenLimits).
             rate_limit: APIRateLimit to enforce RPM/TPM.
                 Why: Avoid 429 errors from provider rate limits.
             checkpoint: CheckpointConfig for save/restore state.
@@ -772,7 +772,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         else:
             self._context = context
         ctx_config = getattr(self._context, "context", None)
-        self._token_limits = getattr(ctx_config, "budget", None) if ctx_config else None
+        self._token_limits = getattr(ctx_config, "token_limits", None) if ctx_config else None
 
         if (
             memory is not None
@@ -2118,14 +2118,14 @@ class Agent(Servable, metaclass=_AgentMeta):
         return ""
 
     def _build_messages(self, user_input: str) -> list[Message]:
-        def get_budget() -> Any:
+        def get_capacity() -> Any:
             model_for_context = self._model if self._model is not None else None
             call_ctx = getattr(self, "_call_context", None)
             if call_ctx is not None:
-                return call_ctx.get_budget(model_for_context)
+                return call_ctx.get_capacity(model_for_context)
             if hasattr(self._context, "context"):
-                return self._context.context.get_budget(model_for_context)
-            return Context().get_budget(model_for_context)
+                return self._context.context.get_capacity(model_for_context)
+            return Context().get_capacity(model_for_context)
 
         call_pv = getattr(self, "_call_prompt_vars", None) or {}
         effective_vars = self.effective_prompt_vars(call_vars=call_pv)
@@ -2156,7 +2156,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             memory_backend=self._memory_backend,
             persistent_memory=self._persistent_memory,
             context_manager=self._context,
-            get_budget=get_budget,
+            get_capacity=get_capacity,
             call_context=getattr(self, "_call_context", None),
             tracer=self._tracer,
         )

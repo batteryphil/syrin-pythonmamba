@@ -7,7 +7,7 @@ Quick reference to avoid confusion between similar names.
 | Concept | Type | Where | Meaning |
 |---------|------|-------|---------|
 | **Budget** | `Budget` | `Agent.budget` | Cost limits in **USD** (run, per hour/day/month). Prevents overspend. |
-| **TokenLimits** | `TokenLimits` | `Context.budget` | Token caps (run, per hour/day/month). Caps token usage. |
+| **TokenLimits** | `TokenLimits` | `Context.token_limits` | Token caps (run, per hour/day/month). Caps token usage. |
 
 Both use the same field names (`run`, `per`, `on_exceeded`) for consistency, but they track different units: **Budget** = dollars, **TokenLimits** = tokens.
 
@@ -17,7 +17,7 @@ from syrin import Agent, Budget, Context, TokenLimits, TokenRateLimit
 agent = Agent(
     model=...,
     budget=Budget(run=0.50),  # USD: max $0.50 per run
-    context=Context(budget=TokenLimits(run=50_000, per=TokenRateLimit(hour=100_000))),  # tokens
+    context=Context(token_limits=TokenLimits(run=50_000, per=TokenRateLimit(hour=100_000))),  # tokens
 )
 ```
 
@@ -45,14 +45,14 @@ agent = Agent(model=..., memory=BufferMemory())
 
 | Concept | Type | Use | Meaning |
 |---------|------|-----|---------|
-| **ContextWindowBudget** | Internal | During `prepare()` | max_tokens, reserve, utilization. Internal window capacity. |
-| **TokenLimits** | User-facing | `Context.budget` | User-configured token caps. Same shape as Budget. |
+| **ContextWindowCapacity** | Internal | During `prepare()` | max_tokens, reserve, utilization. Internal window capacity. |
+| **TokenLimits** | User-facing | `Context.token_limits` | User-configured token caps. Same shape as Budget. |
 
-You configure **TokenLimits** on `Context.budget`. The context manager uses it to enforce caps and builds an internal **ContextWindowBudget** for each prepare call.
+You configure **TokenLimits** on `Context.token_limits`. The context manager uses it to enforce caps and builds an internal **ContextWindowCapacity** for each prepare call.
 
 ## Summary
 
 - **Budget** = USD limits on Agent
-- **TokenLimits** = token caps on Context.budget
+- **TokenLimits** = token caps on Context.token_limits
 - **Memory** = persistent recall (Memory) or session history (BufferMemory/WindowMemory)
-- **ContextWindowBudget** = internal; you don't construct it
+- **ContextWindowCapacity** = internal; you don't construct it

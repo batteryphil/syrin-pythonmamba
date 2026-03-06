@@ -37,8 +37,8 @@ class ContextStats:
 
 
 @dataclass
-class ContextWindowBudget:
-    """Internal window capacity used during context prepare (max tokens, reserve, utilization).
+class ContextWindowCapacity:
+    """Internal context window capacity used during prepare (max tokens, reserve, utilization).
 
     Not for end users: use Context and TokenLimits (token caps) instead.
     Compaction is not automatic; use ctx.compact() in a ContextThreshold action
@@ -67,7 +67,7 @@ class ContextWindowBudget:
 
     @property
     def utilization(self) -> float:
-        """Current utilization as a fraction (0-1). Capped at 1.0 when over budget."""
+        """Current utilization as a fraction (0-1). Capped at 1.0 when at or over capacity."""
         if self.available <= 0:
             return 1.0 if self._used_tokens > 0 else 0.0
         return min(1.0, self._used_tokens / self.available)
@@ -89,7 +89,7 @@ class Context:
     Provides context window management. Compaction is on-demand: call
     ctx.compact() from a ContextThreshold action (e.g. at 75% to compact).
 
-    **Budget vs token caps:** ``Budget`` = cost limits (USD). ``budget`` (TokenLimits) =
+    **Cost vs tokens:** ``Budget`` = cost limits (USD). ``token_limits`` (TokenLimits) =
     context's token caps (run and/or per period). Same field names (run, per, on_exceeded) for consistency.
 
     Example:
@@ -112,8 +112,8 @@ class Context:
     """Tokens reserved for model output; subtracted from max_tokens to get available. ≥ 0."""
     thresholds: list[ContextThreshold] = field(default_factory=list)
     """When utilization hits these percentages, actions run (e.g. compact at 75%)."""
-    budget: TokenLimits | None = None
-    """Context's token caps (run and/or per period). Same names as Budget: run, per, on_exceeded."""
+    token_limits: TokenLimits | None = None
+    """Token caps for this context (run and/or per period). Same names as Budget: run, per, on_exceeded."""
     encoding: str = "cl100k_base"
     """TokenCounter encoding. Default context manager uses it for counting."""
     compactor: ContextCompactorProtocol | None = None
@@ -134,14 +134,14 @@ class Context:
                     f"Context thresholds only accept ContextThreshold, got {type(th).__name__}"
                 )
 
-    def get_budget(self, model: "Model | None" = None) -> ContextWindowBudget:
-        """Get a ContextWindowBudget for this configuration.
+    def get_capacity(self, model: "Model | None" = None) -> ContextWindowCapacity:
+        """Get a ContextWindowCapacity for this configuration.
 
         Args:
             model: Optional model to auto-detect context window from.
 
         Returns:
-            ContextWindowBudget configured for this context.
+            ContextWindowCapacity configured for this context.
         """
         max_tokens = self.max_tokens
 
@@ -170,7 +170,7 @@ class Context:
                 if default_reserve is not None:
                     reserve_val = default_reserve
 
-        return ContextWindowBudget(max_tokens=max_tokens, reserve=reserve_val)
+        return ContextWindowCapacity(max_tokens=max_tokens, reserve=reserve_val)
 
     def apply(
         self,
@@ -194,8 +194,8 @@ class Context:
         Example:
             >>> compacted = context.apply(messages, max_tokens=4000)
         """
-        budget = self.get_budget(model)
-        available = max_tokens if max_tokens is not None else budget.available
+        capacity = self.get_capacity(model)
+        available = max_tokens if max_tokens is not None else capacity.available
         if available <= 0:
             return []
         msgs: list[dict[str, Any]] = []
@@ -248,5 +248,5 @@ class Context:
 __all__ = [
     "Context",
     "ContextStats",
-    "ContextWindowBudget",
+    "ContextWindowCapacity",
 ]

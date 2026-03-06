@@ -14,7 +14,7 @@ from collections.abc import Callable
 from typing import Any
 
 from syrin.context import Context
-from syrin.context.config import ContextWindowBudget
+from syrin.context.config import ContextWindowCapacity
 from syrin.enums import MessageRole
 from syrin.types import Message
 
@@ -28,7 +28,7 @@ def build_messages(
     memory_backend: Any = None,
     persistent_memory: Any = None,
     context_manager: Any = None,
-    get_budget: Callable[[], ContextWindowBudget],
+    get_capacity: Callable[[], ContextWindowCapacity],
     call_context: Context | None = None,
     tracer: Any = None,
 ) -> list[Message]:
@@ -45,8 +45,8 @@ def build_messages(
         conversation_memory: Optional conversation memory (get_messages()).
         memory_backend: Optional persistent memory backend (search).
         persistent_memory: Optional Memory (top_k for recall).
-        context_manager: Context manager with prepare(messages, system_prompt, tools, memory_context, budget, context).
-        get_budget: Callable that returns ContextWindowBudget for this call.
+        context_manager: Context manager with prepare(messages, system_prompt, tools, memory_context, capacity, context).
+        get_capacity: Callable that returns ContextWindowCapacity for this call.
         call_context: Optional per-call Context override.
         tracer: Optional tracer for spans (memory.recall).
 
@@ -113,13 +113,13 @@ def build_messages(
     if context_manager is None:
         return messages
 
-    budget = get_budget()
+    capacity = get_capacity()
     payload = context_manager.prepare(
         messages=msg_dicts,
         system_prompt=system_content,
         tools=tool_dicts,
         memory_context=memory_context,
-        budget=budget,
+        capacity=capacity,
         context=call_context,
     )
 

@@ -75,7 +75,7 @@ Implement the protocol for custom context handling.
 
 ```python
 from syrin.context import ContextManager, ContextPayload
-from syrin.context.config import Context, ContextWindowBudget
+from syrin.context.config import Context, ContextWindowCapacity
 
 class MyContextManager(ContextManager):
     def prepare(
@@ -84,7 +84,7 @@ class MyContextManager(ContextManager):
         system_prompt: str,
         tools: list[dict],
         memory_context: str,
-        budget: ContextWindowBudget,
+        capacity: ContextWindowCapacity,
         context: Context | None = None,
     ) -> ContextPayload:
         ...

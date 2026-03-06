@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from syrin.context.compactors import CompactionResult, ContextCompactor, ContextCompactorProtocol
-from syrin.context.config import Context, ContextStats, ContextWindowBudget
+from syrin.context.config import Context, ContextStats, ContextWindowCapacity
 from syrin.context.counter import TokenCounter, get_counter
 from syrin.enums import Hook, ThresholdMetric
 from syrin.threshold import ThresholdContext
@@ -82,7 +82,7 @@ class ContextManager(Protocol):
         system_prompt: str,
         tools: list[dict[str, Any]],
         memory_context: str,
-        budget: ContextWindowBudget,
+        capacity: ContextWindowCapacity,
         context: Context | None = None,
     ) -> ContextPayload:
         """Prepare context for LLM call."""
@@ -152,7 +152,7 @@ class DefaultContextManager:
         system_prompt: str,
         tools: list[dict[str, Any]],
         memory_context: str = "",
-        budget: ContextWindowBudget | None = None,
+        capacity: ContextWindowCapacity | None = None,
         context: Context | None = None,
     ) -> ContextPayload:
         """Prepare context for LLM call with automatic management.
@@ -162,20 +162,20 @@ class DefaultContextManager:
             system_prompt: System prompt
             tools: Tool definitions
             memory_context: Injected memory context
-            budget: Context budget (auto-created if not provided)
-            context: Optional Context for this call only (overrides agent's context; budget and thresholds).
-                When set, use its get_budget() if budget not provided, and its thresholds.
+            capacity: Context window capacity (auto-created if not provided)
+            context: Optional Context for this call only (overrides agent's context; capacity and thresholds).
+                When set, use its get_capacity() if capacity not provided, and its thresholds.
 
         Returns:
             ContextPayload ready for LLM call
         """
         effective_context = context if context is not None else self.context
-        budget = budget or effective_context.get_budget()
+        capacity = capacity or effective_context.get_capacity()
 
         with self._span("context.prepare") as span:
             if span:
-                span.set_attribute("context.max_tokens", budget.max_tokens)
-                span.set_attribute("context.available", budget.available)
+                span.set_attribute("context.max_tokens", capacity.max_tokens)
+                span.set_attribute("context.available", capacity.available)
 
             memory_msg: dict[str, Any] | None = None
             if memory_context:
@@ -203,10 +203,10 @@ class DefaultContextManager:
 
             tokens_before = self._counter.count_messages(all_messages).total
             tools_tokens = self._counter.count_tools(tools)
-            available_for_messages = max(0, budget.available - tools_tokens)
+            available_for_messages = max(0, capacity.available - tools_tokens)
 
-            # Always run thresholds and set stats (no early return when over budget)
-            budget.used_tokens = tokens_before + tools_tokens
+            # Always run thresholds and set stats (no early return when over capacity)
+            capacity.used_tokens = tokens_before + tools_tokens
             self._current_messages = all_messages
             self._current_available = available_for_messages
             self._did_compact = False
@@ -243,7 +243,7 @@ class DefaultContextManager:
             self._current_compact_fn = _compact_fn
             try:
                 thresholds_triggered = self._check_thresholds(
-                    budget, _compact_fn, thresholds=effective_context.thresholds
+                    capacity, _compact_fn, thresholds=effective_context.thresholds
                 )
                 final_msgs = all_messages
                 if system_msg and system_msg not in final_msgs:
@@ -257,12 +257,12 @@ class DefaultContextManager:
                     + tools_tokens
                 )
 
-                budget.used_tokens = tokens_used
+                capacity.used_tokens = tokens_used
 
                 self._stats = ContextStats(
                     total_tokens=tokens_used,
-                    max_tokens=budget.max_tokens,
-                    utilization=budget.utilization,
+                    max_tokens=capacity.max_tokens,
+                    utilization=capacity.utilization,
                     compacted=self._did_compact,
                     compact_count=self._run_compaction_count,
                     compact_method=self._last_compaction_method if self._did_compact else None,
@@ -271,7 +271,7 @@ class DefaultContextManager:
 
                 if span:
                     span.set_attribute("context.tokens", tokens_used)
-                    span.set_attribute("context.utilization", budget.utilization)
+                    span.set_attribute("context.utilization", capacity.utilization)
                     if thresholds_triggered:
                         span.set_attribute("context.thresholds_triggered", thresholds_triggered)
 
@@ -290,7 +290,7 @@ class DefaultContextManager:
 
     def _check_thresholds(
         self,
-        budget: ContextWindowBudget,
+        capacity: ContextWindowCapacity,
         compact_fn: Callable[[], None] | None = None,
         thresholds: list[Any] | None = None,
     ) -> list[str]:
@@ -299,7 +299,7 @@ class DefaultContextManager:
         Returns list of triggered threshold metrics.
         """
         triggered: list[str] = []
-        percent = budget.percent
+        percent = capacity.percent
         metric = ThresholdMetric.TOKENS
         th_list = thresholds if thresholds is not None else self.context.thresholds
 
@@ -316,16 +316,16 @@ class DefaultContextManager:
                 "at_range": getattr(threshold, "at_range", None),
                 "percent": percent,
                 "metric": threshold.metric,
-                "tokens": budget.used_tokens,
-                "max_tokens": budget.max_tokens,
+                "tokens": capacity.used_tokens,
+                "max_tokens": capacity.max_tokens,
             }
             self._emit("context.threshold", threshold_event)
             compact = compact_fn if compact_fn is not None else (lambda: None)
             ctx = ThresholdContext(
                 percentage=percent,
                 metric=threshold.metric,
-                current_value=float(budget.used_tokens),
-                limit_value=float(budget.max_tokens),
+                current_value=float(capacity.used_tokens),
+                limit_value=float(capacity.max_tokens),
                 compact=compact,
             )
             threshold.execute(ctx)

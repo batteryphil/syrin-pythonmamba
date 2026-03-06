@@ -8,7 +8,7 @@ from syrin.context import (
     Context,
     ContextCompactor,
     ContextStats,
-    ContextWindowBudget,
+    ContextWindowCapacity,
     DefaultContextManager,
     MiddleOutTruncator,
     TokenCounter,
@@ -44,10 +44,29 @@ class TestContext:
         with pytest.raises(ValueError, match="Threshold 'at' must be between"):
             ContextThreshold(at=150, action=lambda _: None)
 
-    def test_get_budget_default(self) -> None:
+    def test_get_capacity_default(self) -> None:
         ctx = Context()
-        budget = ctx.get_budget()
-        assert budget.max_tokens == 128000
+        capacity = ctx.get_capacity()
+        assert capacity.max_tokens == 128000
+
+    def test_context_with_token_limits(self) -> None:
+        """Context.token_limits accepts TokenLimits; token_limits is the primary field."""
+        from syrin.budget import TokenLimits
+
+        limits = TokenLimits(run=50_000)
+        ctx = Context(max_tokens=80000, token_limits=limits)
+        assert ctx.token_limits is limits
+        assert ctx.token_limits.run == 50_000
+
+    def test_context_token_limits_none_by_default(self) -> None:
+        ctx = Context()
+        assert ctx.token_limits is None
+
+    def test_context_has_no_budget_attribute(self) -> None:
+        """Context does not have a 'budget' attribute (removed in favor of token_limits)."""
+        ctx = Context()
+        assert hasattr(ctx, "token_limits")
+        assert not hasattr(ctx, "budget")
 
     def test_apply_returns_compacted_messages(self) -> None:
         """apply(messages, max_tokens) returns list of message dicts."""
@@ -71,22 +90,22 @@ class TestContext:
         assert out == []
 
 
-class TestContextBudget:
-    """Tests for ContextWindowBudget (internal window budget)."""
+class TestContextWindowCapacity:
+    """Tests for ContextWindowCapacity (internal window capacity)."""
 
     def test_available_tokens(self) -> None:
-        budget = ContextWindowBudget(max_tokens=10000, reserve=2000)
-        assert budget.available == 8000
+        capacity = ContextWindowCapacity(max_tokens=10000, reserve=2000)
+        assert capacity.available == 8000
 
     def test_utilization(self) -> None:
-        budget = ContextWindowBudget(max_tokens=10000, reserve=2000)
-        budget.used_tokens = 4000
-        assert budget.utilization == 0.5
+        capacity = ContextWindowCapacity(max_tokens=10000, reserve=2000)
+        capacity.used_tokens = 4000
+        assert capacity.utilization == 0.5
 
     def test_utilization_percent(self) -> None:
-        budget = ContextWindowBudget(max_tokens=10000, reserve=2000)
-        budget.used_tokens = 4000
-        assert budget.percent == 50
+        capacity = ContextWindowCapacity(max_tokens=10000, reserve=2000)
+        capacity.used_tokens = 4000
+        assert capacity.percent == 50
 
 
 class TestTokenCounter:
@@ -309,21 +328,21 @@ class TestContextEdgeCases:
         with pytest.raises(ValueError, match="max_tokens must be > 0 when set"):
             Context(max_tokens=0)
 
-    def test_context_budget_with_zero_max(self):
-        """ContextWindowBudget with zero max tokens."""
-        budget = ContextWindowBudget(max_tokens=0, reserve=0)
-        assert budget.available == 0
+    def test_context_capacity_with_zero_max(self):
+        """ContextWindowCapacity with zero max tokens."""
+        capacity = ContextWindowCapacity(max_tokens=0, reserve=0)
+        assert capacity.available == 0
 
-    def test_context_budget_utilization_zero(self):
-        """ContextWindowBudget utilization at zero."""
-        budget = ContextWindowBudget(max_tokens=1000, reserve=0)
-        assert budget.utilization == 0.0
+    def test_context_capacity_utilization_zero(self):
+        """ContextWindowCapacity utilization at zero."""
+        capacity = ContextWindowCapacity(max_tokens=1000, reserve=0)
+        assert capacity.utilization == 0.0
 
-    def test_context_budget_utilization_100_percent(self):
-        """ContextWindowBudget at 100% utilization."""
-        budget = ContextWindowBudget(max_tokens=1000, reserve=0)
-        budget.used_tokens = 1000
-        assert budget.percent == 100
+    def test_context_capacity_utilization_100_percent(self):
+        """ContextWindowCapacity at 100% utilization."""
+        capacity = ContextWindowCapacity(max_tokens=1000, reserve=0)
+        capacity.used_tokens = 1000
+        assert capacity.percent == 100
 
     def test_token_counter_empty_string(self):
         """TokenCounter with empty string."""

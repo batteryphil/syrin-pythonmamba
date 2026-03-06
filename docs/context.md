@@ -12,7 +12,7 @@ Syrin’s context system manages **token limits**, **on-demand compaction**, and
 - [Configuration](#configuration)
 - [ContextThreshold and ThresholdContext](#contextthreshold-and-thresholdcontext)
 - [Compaction](#compaction)
-- [TokenLimits (token caps)](#contextbudget-token-caps)
+- [TokenLimits (token caps)](#tokenlimits-token-caps)
 - [Agent API](#agent-api)
 - [Events](#events)
 - [Token counting](#token-counting)
@@ -35,7 +35,7 @@ Syrin’s context system manages **token limits**, **on-demand compaction**, and
 - **Counts tokens** for messages, system prompt, and tools on each request.
 - **Applies a context budget** from `Context` (max tokens, optional reserve for response). Utilization is computed as used tokens vs. available budget.
 - **Evaluates thresholds** (e.g. at 50%, 75%, 100% utilization) and runs your **action** callables. No automatic compaction; you trigger it by calling **`ctx.compact()`** (or **`agent.context.compact()`**) from an action.
-- **Optional token caps** via **`Context.budget`** (run and/or per-hour/day/week/month). Enforced by the budget tracker; separate from cost (Budget).
+- **Optional token caps** via **`Context.token_limits`** (run and/or per-hour/day/week/month). Enforced by the budget tracker; separate from cost (Budget).
 - **Emits events** (`context.compact`, `context.threshold`) and exposes **stats** after each call.
 
 **When it runs:** On every `agent.response()` (and streaming) when the agent uses the default context manager. You can pass a **`Context`** config or a custom **`ContextManager`** to the agent.
@@ -47,12 +47,12 @@ Syrin’s context system manages **token limits**, **on-demand compaction**, and
 | Goal | Use | Notes |
 |------|-----|--------|
 | Limit **cost** (USD) per run or per period | **Budget** | `Agent(budget=Budget(run=10.0, per=RateLimit(day=50)))` |
-| Limit **tokens** per run or per period | **Context.budget** (TokenLimits / TokenLimits) | Same field names as Budget: run, per, on_exceeded |
+| Limit **tokens** per run or per period | **Context.token_limits** (TokenLimits) | Same field names as Budget: run, per, on_exceeded |
 | Set **context window** size and reserve | **Context** (max_tokens, reserve) | reserve = tokens reserved for model output |
 | React at utilization (e.g. compact at 75%) | **Context.thresholds** + **ContextThreshold** + **compact_if_available** | Action receives **ThresholdContext**; call **evt.compact()** to compact |
 | Per-call stats (tokens, utilization, compact_count) | **result.context_stats** or **agent.context_stats** | **result.context** = Context used for that call (overrides agent's when passed) |
 
-**Budget vs token caps:** **Budget** = cost limits in USD. **Context.budget** (TokenLimits) = token caps (run and/or per period). Same field names (run, per, on_exceeded) for consistency.
+**Budget vs token caps:** **Budget** = cost limits in USD. **Context.token_limits** (TokenLimits) = token caps (run and/or per period). Same field names (run, per, on_exceeded) for consistency.
 
 ---
 
@@ -97,10 +97,10 @@ result = agent.response("Long conversation...")
 ## Concepts
 
 - **Context window** – The maximum tokens allowed for the current request’s context. Set by **`Context.max_tokens`** or inferred from the model (or 128k).
-- **Context window budget** – Internal **ContextWindowBudget**: `available = max_tokens - reserve` (default reserve 2000, or model’s **default_reserve_tokens** when set). Utilization = used tokens / available, capped at 1.0 when at or over budget. You don’t construct this; it’s built from **Context** during prepare.
+- **Context window capacity** – Internal **ContextWindowCapacity**: `available = max_tokens - reserve` (default reserve 2000, or model’s **default_reserve_tokens** when set). Utilization = used tokens / available, capped at 1.0 when at or over capacity. You don’t construct this; it’s built from **Context** during prepare.
 - **Thresholds** – **ContextThreshold** instances: at a given utilization (e.g. `at=75` or `at_range=(70, 75)`), an **action** callable is run. The callable receives **ThresholdContext** with `percentage`, `current_value`, `limit_value`, and **`compact()`** (context only).
 - **Compaction** – Reducing message list size (e.g. middle-out truncation or summarization). Happens **only** when something calls **`ctx.compact()`** or **`agent.context.compact()`** during **prepare** (typically from a threshold action). There is no automatic compaction at a fixed percentage.
-- **TokenLimits** – Optional token caps on **Context** via **`Context.budget`**: **run** (max tokens per run), **per** (hour/day/week/month), **on_exceeded** (callback). Same field names as **Budget** (run, per, on_exceeded). Enforced by the budget tracker; separate from cost (Budget).
+- **TokenLimits** – Optional token caps on **Context** via **`Context.token_limits`**: **run** (max tokens per run), **per** (hour/day/week/month), **on_exceeded** (callback). Same field names as **Budget** (run, per, on_exceeded). Enforced by the budget tracker; separate from cost (Budget).
 
 ---
 
@@ -117,7 +117,7 @@ result = agent.response("Long conversation...")
 | **max_tokens** | Cap total context size so you don’t exceed the model’s window or your own limit. | Max tokens for the context window. If `None`, resolved from the model’s **context_window** or 128k. Must be **> 0** when set. | Set explicitly (e.g. `80000`) or leave `None` to use model/default. |
 | **reserve** | Leave room for the model’s reply; otherwise utilization is based on input only. | Tokens subtracted from **max_tokens** to get “available” for input. Default 2000. **≥ 0**. Can be overridden by the model’s **default_reserve_tokens**. | Set on **Context** or on the model via **Model(..., default_reserve_tokens=8000)**. |
 | **thresholds** | React when utilization hits a percentage (e.g. compact at 75%, raise at 100%). | List of **ContextThreshold** (at/at_range, action). Only context thresholds are allowed. | Add **ContextThreshold(at=75, action=lambda ctx: ctx.compact() if ctx.compact else None)**. |
-| **budget** | Cap token usage per run and/or per period (separate from USD Budget). | Optional **TokenLimits**: **run**, **per**, **on_exceeded**. Same names as **Budget**. | **Context(budget=TokenLimits(run=50_000, on_exceeded=raise_on_exceeded))** or with **per=TokenRateLimit(...)**. |
+| **token_limits** | Cap token usage per run and/or per period (separate from USD Budget). | Optional **TokenLimits**: **run**, **per**, **on_exceeded**. Same names as **Budget**. | **Context(token_limits=TokenLimits(run=50_000, on_exceeded=raise_on_exceeded))** or with **per=TokenRateLimit(...)**. |
 | **encoding** | Token counting must use the same encoding as the model (e.g. cl100k_base for OpenAI). | TokenCounter encoding string. Default **"cl100k_base"**. | Set if you use a model with a different tokenizer; the default context manager uses it. |
 | **compactor** | Use a custom compaction strategy (e.g. summarizer) instead of the default middle-out truncation. | Optional **ContextCompactorProtocol**: **compact(messages, budget) -> CompactionResult**. | **Context(compactor=MyCompactor())**; default manager calls it during prepare when compaction runs. |
 
@@ -131,7 +131,7 @@ ctx = Context(
     reserve=2000,
     encoding="cl100k_base",
     thresholds=[...],        # see ContextThreshold section
-    budget=TokenLimits(run=50_000, per=TokenRateLimit(hour=100_000)),
+    token_limits=TokenLimits(run=50_000, per=TokenRateLimit(hour=100_000)),
 )
 ```
 
@@ -141,18 +141,18 @@ ctx = Context(
 - If it is **`None`** and the agent has a **model** with **ModelSettings.context_window**, that is used.
 - Otherwise **128000** is used.
 
-### ContextWindowBudget (internal)
+### ContextWindowCapacity (internal)
 
-The default context manager builds a **ContextWindowBudget** from **Context** (and optional model). You don’t construct it in normal use; it’s the internal “window” budget (max tokens, reserve, utilization) used during **prepare**.
+The default context manager builds a **ContextWindowCapacity** from **Context** (and optional model). You don’t construct it in normal use; it’s the internal “window” budget (max tokens, reserve, utilization) used during **prepare**.
 
 - **max_tokens** – From **Context** (or model / default).
 - **reserve** – Reserved for the model’s reply. From **Context.reserve** unless the model has **default_reserve_tokens** set (see [reserve and model](#4-reserve-and-model-hint)).
 - **available** – `max(0, max_tokens - reserve)`.
 - **used_tokens** – Set during **prepare**.
-- **utilization** – `used_tokens / available`, capped at **1.0** when at or over budget (or when **available** ≤ 0 and **used_tokens** > 0).
+- **utilization** – `used_tokens / available`, capped at **1.0** when at or over capacity (or when **available** ≤ 0 and **used_tokens** > 0).
 - **percent** – 0–100.
 
-**Context.get_budget(model)** returns a **ContextWindowBudget** for the current config. When **model** is provided, the model’s **default_reserve_tokens** (if set) is used for **reserve**.
+**Context.get_capacity(model)** returns a **ContextWindowCapacity** for the current config. When **model** is provided, the model’s **default_reserve_tokens** (if set) is used for **reserve**.
 
 ---
 
@@ -260,13 +260,13 @@ ctx.parent.context.compact()
 
 ## TokenLimits (token caps)
 
-**TokenLimits** is the token-cap configuration you set on **Context.budget**. It uses the same field names as **Budget** (USD): **run**, **per**, **on_exceeded**.
+**TokenLimits** is the token-cap configuration you set on **Context.token_limits**. It uses the same field names as **Budget** (USD): **run**, **per**, **on_exceeded**.
 
 **Why:** Cap token usage (input + output) per run and/or per time window without mixing with cost. Budget = USD only; token caps live on Context.
 
 **What:** Optional **run** (max tokens per request run), optional **per** (TokenRateLimit: hour/day/week/month), and **on_exceeded** (callback when a limit is hit). When set, the agent’s budget tracker enforces these after each LLM call.
 
-**How:** Pass **Context(budget=TokenLimits(run=..., per=..., on_exceeded=...))** to the agent. Use **raise_on_exceeded**, **warn_on_exceeded**, or a custom callable.
+**How:** Pass **Context(token_limits=TokenLimits(run=..., per=..., on_exceeded=...))** to the agent. Use **raise_on_exceeded**, **warn_on_exceeded**, or a custom callable.
 
 ### TokenLimits fields
 
@@ -485,7 +485,7 @@ class RecentOnlyManager:
         system_prompt: str,
         tools: list[dict],
         memory_context: str,
-        budget: ContextWindowBudget,
+        capacity: ContextWindowCapacity,
         context: Any = None,
     ) -> ContextPayload:
         recent = messages[-self._keep:] if len(messages) > self._keep else messages
@@ -541,7 +541,7 @@ You can replace the compactor in a custom manager or extend **DefaultContextMana
 ## Integration with memory and budget
 
 - **Memory:** Persistent memory (**Memory**) is recalled and formatted as **memory_context**. The default context manager injects it as a system message (**[Memory]\n...**) when **memory_context** is non-empty. So context stats and compaction apply to the full message list including memory.
-- **Budget:** Cost limits are **Budget** (USD). Token usage caps are **Context.budget** (**TokenLimits**). You can use both: **Agent(budget=Budget(...), context=Context(budget=TokenLimits(...)))**.
+- **Budget:** Cost limits are **Budget** (USD). Token usage caps are **Context.token_limits** (**TokenLimits**). You can use both: **Agent(budget=Budget(...), context=Context(token_limits=TokenLimits(...)))**.
 
 ---
 
@@ -549,10 +549,10 @@ You can replace the compactor in a custom manager or extend **DefaultContextMana
 
 | Class / type | Description |
 |--------------|-------------|
-| **Context** | Config: max_tokens, reserve, thresholds, budget, encoding, compactor. **get_budget(model)**. |
+| **Context** | Config: max_tokens, reserve, thresholds, token_limits, encoding, compactor. **get_capacity(model)**. |
 | **ContextStats** | total_tokens, max_tokens, utilization, compacted, compact_count (this run only), compact_method, thresholds_triggered. |
-| **TokenLimits** | Token caps: **run**, **per** (TokenRateLimit), **on_exceeded**. Use on **Context.budget**. |
-| **ContextWindowBudget** | Internal: max_tokens, reserve, available, used_tokens, utilization, percent, reset(). |
+| **TokenLimits** | Token caps: **run**, **per** (TokenRateLimit), **on_exceeded**. Use on **Context.token_limits**. |
+| **ContextWindowCapacity** | Internal: max_tokens, reserve, available, used_tokens, utilization, percent, reset(). |
 | **ContextThreshold** | at, at_range, action, metric=TOKENS, window=MAX_TOKENS. **should_trigger(percent, metric)**. |
 | **ThresholdContext** | percentage, metric, current_value, limit_value, budget_run, parent, metadata, **compact**. |
 | **ContextPayload** | messages, system_prompt, tools, tokens. |
@@ -569,7 +569,7 @@ You can replace the compactor in a custom manager or extend **DefaultContextMana
 | **create_context_manager(context, emit_fn, tracer)** | Build DefaultContextManager. |
 | **Response** (from agent) | **context_stats**, **context** – per-call context stats and effective Context for that run. |
 | **TokenLimits** | Token caps on Context: **run**, **per** (TokenRateLimit), **on_exceeded**. Same field names as Budget. |
-| **ContextWindowBudget** | Internal: max_tokens, reserve, available, used_tokens, utilization (used during prepare). |
+| **ContextWindowCapacity** | Internal: max_tokens, reserve, available, used_tokens, utilization (used during prepare). |
 
 ---
 
@@ -588,7 +588,7 @@ Ensure utilization actually reaches the threshold (e.g. use many or long message
 Use a threshold at 100% with an action that raises, e.g. **ContextThreshold(at=100, action=lambda ctx: (_ for _ in ()).throw(ValueError("Context full")))** or a named function that raises.
 
 **Token caps not enforced**  
-Set **Context.budget** (**run** and/or **per=TokenRateLimit(...)**). The agent’s budget tracker must be present (it is when the agent has a **Budget** or **context.budget**).
+Set **Context.token_limits** (**run** and/or **per=TokenRateLimit(...)**). The agent’s budget tracker must be present (it is when the agent has a **Budget** or **context.budget**).
 
 ---
 
@@ -597,7 +597,7 @@ Set **Context.budget** (**run** and/or **per=TokenRateLimit(...)**). The agent�
 - **compact() only during prepare** – **ctx.compact()** / **agent.context.compact()** only take effect when the default context manager is inside **prepare** (e.g. from a threshold action). Calling **compact()** outside that path is a no-op.
 - **Stats not persisted** – **ContextStats** (total_tokens, utilization, compact_count, etc.) reflect the last run only; they are not persisted across process restarts. **compact_count** is per run (this prepare only). For per-call stats use **result.context_stats** on the **Response**.
 - **Custom manager and budget** – If you pass a custom **ContextManager** as **context=**, it may ignore **Context** (and thus **budget**, **encoding**, **compactor**). The default manager respects all **Context** options.
-- **Context validation** – **max_tokens** must be **> 0** when set; **reserve** must be **≥ 0**. **get_budget()** also validates **max_tokens** when resolved from the model.
+- **Context validation** – **max_tokens** must be **> 0** when set; **reserve** must be **≥ 0**. **get_capacity()** also validates **max_tokens** when resolved from the model.
 
 ### More limitations (with examples)
 
@@ -666,7 +666,7 @@ print(result.context_stats.total_tokens)
 
 **4. reserve and model hint**
 
-**Context** uses **reserve** (default 2000). You can make it model-aware by setting **default_reserve_tokens** on the model; **Context.get_budget(model)** then uses that when building the budget.
+**Context** uses **reserve** (default 2000). You can make it model-aware by setting **default_reserve_tokens** on the model; **Context.get_capacity(model)** then uses that when building the capacity.
 
 ```python
 # Per-model reserve via Model constructor or with_params
@@ -675,7 +675,7 @@ agent = Agent(model=model, context=Context(max_tokens=128000))
 # Budget for this agent uses reserve 8000 from the model
 ```
 
-When the model has **default_reserve_tokens** set, that value is used for **reserve** when **get_budget(model)** is called; otherwise **Context.reserve** is used.
+When the model has **default_reserve_tokens** set, that value is used for **reserve** when **get_capacity(model)** is called; otherwise **Context.reserve** is used.
 
 ---
 

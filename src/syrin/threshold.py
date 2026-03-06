@@ -2,6 +2,12 @@
 
 Provides separate threshold classes for different use cases.
 
+**Threshold concepts:**
+- **metric:** What is measured — COST (USD), TOKENS (token usage), RPM/TPM/RPD (rate limits).
+- **window:** Over what scope the limit applies — RUN (this request), HOUR, DAY, WEEK, MONTH, or
+  MAX_TOKENS (context window utilization). BudgetThreshold uses run|hour|day|week|month;
+  ContextThreshold uses MAX_TOKENS only.
+
 Example:
     >>> from syrin import Budget
     >>> from syrin.threshold import BudgetThreshold

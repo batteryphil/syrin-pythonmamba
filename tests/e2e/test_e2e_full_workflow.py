@@ -274,7 +274,7 @@ class TestAgentWithTokenLimits:
         agent = Agent(
             model=_almock(),
             budget=Budget(run=100.0, on_exceeded=raise_on_exceeded),
-            context=Context(budget=TokenLimits(run=1, on_exceeded=raise_on_exceeded)),
+            context=Context(token_limits=TokenLimits(run=1, on_exceeded=raise_on_exceeded)),
         )
         with pytest.raises(BudgetExceededError) as exc:
             agent.response("Hello")
@@ -285,7 +285,7 @@ class TestAgentWithTokenLimits:
             model=_almock(),
             budget=Budget(run=100.0, on_exceeded=raise_on_exceeded),
             context=Context(
-                budget=TokenLimits(
+                token_limits=TokenLimits(
                     per=TokenRateLimit(hour=1),
                     on_exceeded=raise_on_exceeded,
                 )

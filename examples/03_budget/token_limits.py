@@ -3,7 +3,7 @@
 Demonstrates:
 - TokenLimits for per-run and per-window token caps
 - TokenRateLimit for hourly/daily token windows
-- Context(budget=TokenLimits(...)) to apply token caps
+- Context(token_limits=TokenLimits(...)) to apply token caps
 - Combining Budget (USD) with TokenLimits (tokens)
 
 Run: python -m examples.03_budget.token_limits
@@ -27,7 +27,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # 1. TokenLimits — per-run token cap
 agent = Agent(
     model=almock,
-    context=Context(budget=TokenLimits(run=15_000, on_exceeded=warn_on_exceeded)),
+    context=Context(token_limits=TokenLimits(run=15_000, on_exceeded=warn_on_exceeded)),
 )
 result = agent.response("What is machine learning?")
 print(f"Tokens used: {result.tokens.total_tokens}")
@@ -36,7 +36,7 @@ print(f"Tokens used: {result.tokens.total_tokens}")
 agent = Agent(
     model=almock,
     context=Context(
-        budget=TokenLimits(
+        token_limits=TokenLimits(
             run=15_000,
             per=TokenRateLimit(hour=50_000, day=200_000),
             on_exceeded=warn_on_exceeded,
@@ -52,7 +52,7 @@ agent = Agent(
     system_prompt="You are concise.",
     budget=Budget(run=0.05, on_exceeded=warn_on_exceeded),
     context=Context(
-        budget=TokenLimits(
+        token_limits=TokenLimits(
             run=15_000,
             per=TokenRateLimit(hour=50_000, day=200_000),
             on_exceeded=warn_on_exceeded,
@@ -73,7 +73,7 @@ class TokenLimitedAgent(Agent):
     system_prompt = "You are concise."
     budget = Budget(run=0.05, on_exceeded=warn_on_exceeded)
     context = Context(
-        budget=TokenLimits(
+        token_limits=TokenLimits(
             run=15_000,
             per=TokenRateLimit(hour=50_000, day=200_000),
             on_exceeded=warn_on_exceeded,

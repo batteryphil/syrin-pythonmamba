@@ -176,7 +176,7 @@ def test_agent_budget_exceeded_raises() -> None:
 
 
 def test_agent_budget_exceeded_run_tokens_raises_with_correct_message_and_type() -> None:
-    """When context.budget run limit exceeded, BudgetExceededError has budget_type 'run_tokens' and message."""
+    """When context.token_limits run limit exceeded, BudgetExceededError has budget_type 'run_tokens' and message."""
     from syrin.budget import Budget, TokenLimits, raise_on_exceeded
     from syrin.context import Context
     from syrin.exceptions import BudgetExceededError
@@ -185,7 +185,7 @@ def test_agent_budget_exceeded_run_tokens_raises_with_correct_message_and_type()
     agent = Agent(
         model=model,
         budget=Budget(run=10.0, on_exceeded=raise_on_exceeded),
-        context=Context(budget=TokenLimits(run=50, on_exceeded=raise_on_exceeded)),
+        context=Context(token_limits=TokenLimits(run=50, on_exceeded=raise_on_exceeded)),
     )
     with patch.object(
         agent._provider,
@@ -315,7 +315,7 @@ def test_agent_budget_uses_cost_from_pricing_override() -> None:
 
 
 def test_agent_budget_exceeded_hour_tokens_raises_with_correct_type_and_message() -> None:
-    """When context.budget per-hour exceeded, BudgetExceededError has budget_type 'hour_tokens' and message."""
+    """When context.token_limits per-hour exceeded, BudgetExceededError has budget_type 'hour_tokens' and message."""
     from syrin import RateLimit
     from syrin.budget import Budget, TokenLimits, TokenRateLimit, raise_on_exceeded
     from syrin.context import Context
@@ -330,7 +330,7 @@ def test_agent_budget_exceeded_hour_tokens_raises_with_correct_type_and_message(
             on_exceeded=raise_on_exceeded,
         ),
         context=Context(
-            budget=TokenLimits(
+            token_limits=TokenLimits(
                 per=TokenRateLimit(hour=50),
                 on_exceeded=raise_on_exceeded,
             )

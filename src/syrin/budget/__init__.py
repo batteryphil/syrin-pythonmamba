@@ -168,7 +168,7 @@ class TokenRateLimit(BaseModel):
 
     Example:
         >>> from syrin import Context, TokenLimits, TokenRateLimit
-        >>> Context(budget=TokenLimits(per=TokenRateLimit(hour=100_000, day=400_000)))
+        >>> Context(token_limits=TokenLimits(per=TokenRateLimit(hour=100_000, day=400_000)))
     """
 
     hour: int | None = Field(
@@ -205,7 +205,7 @@ class TokenLimits(BaseModel):
     caps (TokenRateLimit). When a limit is exceeded, on_exceeded is called; raise
     to stop the run, return to continue.
 
-    **How:** Use as Context.budget: Context(budget=TokenLimits(run=50_000, ...)).
+    **How:** Use as Context.token_limits: Context(token_limits=TokenLimits(run=50_000, ...)).
     The agent's budget tracker enforces limits after each LLM call.
 
     Example:
@@ -213,7 +213,7 @@ class TokenLimits(BaseModel):
         >>> from syrin.budget import TokenLimits, TokenRateLimit, raise_on_exceeded
         >>> agent = Agent(
         ...     model=Model("openai/gpt-4o"),
-        ...     context=Context(budget=TokenLimits(run=50_000, on_exceeded=raise_on_exceeded)),
+        ...     context=Context(token_limits=TokenLimits(run=50_000, on_exceeded=raise_on_exceeded)),
         ... )
     """
 

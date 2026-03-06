@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+### Breaking
+
+- **Context:** `Context.budget` removed. Use **`Context.token_limits`** (TokenLimits) for token caps. **`ContextWindowBudget`** renamed to **`ContextWindowCapacity`**. **`Context.get_budget(model)`** renamed to **`Context.get_capacity(model)`**. **ContextManager.prepare()** now takes **`capacity`** (ContextWindowCapacity) instead of **`budget`**.
 
 ---
 
