@@ -17,6 +17,7 @@ class ContextSegmentSource(StrEnum):
     TOOLS = "tools"
     CURRENT_PROMPT = "current_prompt"
     INJECTED = "injected"
+    PULLED = "pulled"
 
 
 ContextRotRisk = Literal["low", "medium", "high"]
@@ -105,6 +106,14 @@ class ContextSnapshot:
     provenance: list[ContextSegmentProvenance] = field(default_factory=list)
     why_included: list[str] = field(default_factory=list)
     context_rot_risk: ContextRotRisk = "low"
+    context_mode: str = "full"
+    """Context mode used: full, focused, or intelligent."""
+    context_mode_dropped_count: int = 0
+    """Number of conversation messages dropped by context_mode (focused/intelligent)."""
+    pulled_segments: list[dict[str, Any]] = field(default_factory=list)
+    """When formation_mode=pull: segments retrieved from context store (content, role, score)."""
+    pull_scores: list[float] = field(default_factory=list)
+    """Relevance scores for pulled_segments."""
 
     def to_dict(self, include_raw_messages: bool = False) -> dict[str, Any]:
         """Export snapshot for visualization or logging. JSON-serializable."""
@@ -144,6 +153,10 @@ class ContextSnapshot:
             ],
             "why_included": self.why_included,
             "context_rot_risk": self.context_rot_risk,
+            "context_mode": self.context_mode,
+            "context_mode_dropped_count": self.context_mode_dropped_count,
+            "pulled_segments": self.pulled_segments,
+            "pull_scores": self.pull_scores,
         }
         if include_raw_messages and self.raw_messages is not None:
             out["raw_messages"] = self.raw_messages

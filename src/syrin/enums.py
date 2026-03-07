@@ -31,6 +31,32 @@ class ContextStrategy(StrEnum):
     SUMMARIZE = "summarize"
 
 
+class ContextMode(StrEnum):
+    """How to select conversation history for context formation.
+
+    Attributes:
+        FULL: Full conversation history (default). Compaction when over capacity.
+        FOCUSED: Keep only last N turns (user+assistant pairs). Reduces irrelevant history.
+        INTELLIGENT: Relevance-filtered (requires scorer; supported in Step 10).
+    """
+
+    FULL = "full"
+    FOCUSED = "focused"
+    INTELLIGENT = "intelligent"
+
+
+class FormationMode(StrEnum):
+    """How conversation history is fed into context.
+
+    Attributes:
+        PUSH: Use conversation memory directly (last N or full). Default.
+        PULL: Query context store by relevance to current prompt; only matching segments.
+    """
+
+    PUSH = "push"
+    PULL = "pull"
+
+
 class CompactionMethod(StrEnum):
     """Method used when context compaction runs. See ContextCompactor for when each is chosen.
 

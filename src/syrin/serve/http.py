@@ -37,6 +37,21 @@ def _add_startup_endpoint_logging(app: Any) -> None:
             print(_syrin_cli_message(use_color=use_color), flush=True)
 
 
+def _to_json_serializable(obj: Any) -> Any:
+    """Convert config values to JSON-serializable form to avoid Pydantic serializer warnings."""
+    if obj is None or isinstance(obj, (int, float, str, bool)):
+        return obj
+    if hasattr(obj, "value") and not hasattr(obj, "model_dump"):
+        return obj.value
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump(mode="json")
+    if isinstance(obj, dict):
+        return {k: _to_json_serializable(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_to_json_serializable(x) for x in obj]
+    return obj
+
+
 def _ensure_serve_deps() -> None:
     """Ensure FastAPI and uvicorn are installed. Raise with install hint if not."""
     try:
@@ -411,15 +426,18 @@ def build_router(
         agent_id = reg.make_agent_id(agent)
         schema = reg.get_schema(agent_id) or extract_agent_schema(agent)
         baseline, overrides, current = _get_baseline_overrides_current(agent)
+        baseline_js = {k: _to_json_serializable(v) for k, v in baseline.items()}
+        overrides_js = {k: _to_json_serializable(v) for k, v in overrides.items()}
+        current_js = {k: _to_json_serializable(v) for k, v in current.items()}
         out = schema.model_copy(
             update={
                 "agent_id": agent_id,
-                "baseline_values": baseline,
-                "overrides": overrides,
-                "current_values": current,
+                "baseline_values": baseline_js,
+                "overrides": overrides_js,
+                "current_values": current_js,
             }
         ).model_dump(mode="json")
-        _enrich_sections_with_values(out["sections"], baseline, overrides, current)
+        _enrich_sections_with_values(out["sections"], baseline_js, overrides_js, current_js)
         return out
 
     @router.patch(_route("/config"))

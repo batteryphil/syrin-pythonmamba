@@ -3,19 +3,17 @@
 from __future__ import annotations
 
 from syrin import Agent, CheckpointConfig, Model
-from syrin.enums import MessageRole
-from syrin.memory.conversation import BufferMemory
-from syrin.types import Message
+from syrin.memory import Memory
 
 
 class TestCheckpointStoresMessages:
     """Save checkpoint stores conversation messages."""
 
     def test_save_checkpoint_includes_messages(self) -> None:
-        """Checkpoint state includes messages from conversation memory."""
-        mem = BufferMemory()
-        mem.add(Message(role=MessageRole.USER, content="Hello"))
-        mem.add(Message(role=MessageRole.ASSISTANT, content="Hi there"))
+        """Checkpoint state includes messages from memory."""
+        mem = Memory()
+        mem.add_conversation_segment("Hello", role="user")
+        mem.add_conversation_segment("Hi there", role="assistant")
 
         agent = Agent(
             model=Model.Almock(),
@@ -23,8 +21,6 @@ class TestCheckpointStoresMessages:
             memory=mem,
             checkpoint=CheckpointConfig(storage="memory"),
         )
-        # Simulate a turn so messages are in memory
-        agent._conversation_memory = mem
         checkpoint_id = agent.save_checkpoint()
 
         assert checkpoint_id is not None
@@ -49,7 +45,7 @@ class TestCheckpointStoresMessages:
 
     def test_save_checkpoint_includes_context_snapshot_in_metadata(self) -> None:
         """Checkpoint metadata includes context_snapshot when available."""
-        mem = BufferMemory()
+        mem = Memory()
         agent = Agent(
             model=Model.Almock(),
             system_prompt="Hi",
@@ -72,10 +68,10 @@ class TestLoadCheckpointRestoresMessages:
     """Load checkpoint restores conversation messages and iteration."""
 
     def test_load_checkpoint_restores_messages(self) -> None:
-        """Loading checkpoint restores messages to conversation memory."""
-        mem = BufferMemory()
-        mem.add(Message(role=MessageRole.USER, content="A"))
-        mem.add(Message(role=MessageRole.ASSISTANT, content="B"))
+        """Loading checkpoint restores messages to memory."""
+        mem = Memory()
+        mem.add_conversation_segment("A", role="user")
+        mem.add_conversation_segment("B", role="assistant")
 
         agent = Agent(
             model=Model.Almock(),
@@ -83,12 +79,11 @@ class TestLoadCheckpointRestoresMessages:
             memory=mem,
             checkpoint=CheckpointConfig(storage="memory"),
         )
-        agent._conversation_memory = mem
         cid = agent.save_checkpoint()
 
         # Clear and add different content
-        mem.clear()
-        mem.add(Message(role=MessageRole.USER, content="X"))
+        mem.load_conversation_messages([])
+        mem.add_conversation_segment("X", role="user")
 
         ok = agent.load_checkpoint(cid)
         assert ok is True
@@ -112,16 +107,17 @@ class TestLoadCheckpointRestoresMessages:
         assert ok is True
         assert agent.iteration == 5
 
-    def test_load_checkpoint_no_conversation_memory_skips_restore(self) -> None:
-        """Load with no conversation memory does not fail; iteration still restored."""
+    def test_load_checkpoint_no_memory_skips_message_restore(self) -> None:
+        """Load with memory=None does not fail; iteration still restored."""
         agent = Agent(
             model=Model.Almock(),
             system_prompt="Hi",
+            memory=None,
             checkpoint=CheckpointConfig(storage="memory"),
         )
         agent._last_iteration = 3
         cid = agent.save_checkpoint()
-        assert agent._conversation_memory is None
+        assert agent._persistent_memory is None
 
         agent._last_iteration = 0
         ok = agent.load_checkpoint(cid)
@@ -143,7 +139,7 @@ class TestCheckpointRoundtrip:
 
     def test_roundtrip_messages_preserved(self) -> None:
         """Save after multi-turn, load, verify messages then continue."""
-        mem = BufferMemory()
+        mem = Memory()
         agent = Agent(
             model=Model.Almock(),
             system_prompt="You are helpful.",
@@ -156,7 +152,7 @@ class TestCheckpointRoundtrip:
         cid = agent.save_checkpoint()
 
         # New agent instance (simulate restart), load checkpoint
-        mem2 = BufferMemory()
+        mem2 = Memory()
         agent2 = Agent(
             model=Model.Almock(),
             system_prompt="You are helpful.",

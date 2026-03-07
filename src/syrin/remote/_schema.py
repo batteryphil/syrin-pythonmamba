@@ -402,7 +402,7 @@ def get_agent_section_schema_and_values(agent: Any) -> tuple[ConfigSchema, dict[
 
 
 def _current_value_for_path(obj: Any, path: str) -> Any:
-    """Get current value from an object by dotted path (e.g. budget.run). Only one level for now."""
+    """Get current value from an object by dotted path. Returns JSON-serializable values."""
     if obj is None:
         return None
     parts = path.split(".", 1)
@@ -410,8 +410,10 @@ def _current_value_for_path(obj: Any, path: str) -> Any:
     if hasattr(obj, key):
         val = getattr(obj, key)
         if len(parts) == 1:
-            if hasattr(val, "value"):
+            if hasattr(val, "value") and not hasattr(val, "model_dump"):
                 return val.value
+            if hasattr(val, "model_dump"):
+                return val.model_dump(mode="json")
             return val
         return _current_value_for_path(val, parts[1])
     return None

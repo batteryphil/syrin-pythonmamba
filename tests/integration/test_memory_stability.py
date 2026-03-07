@@ -6,9 +6,9 @@ import pytest
 
 from syrin import Agent
 from syrin.enums import MemoryType
-from syrin.memory import BufferMemory
+from syrin.memory import Memory
 from syrin.model import Model
-from syrin.types import Message, ProviderResponse, TokenUsage
+from syrin.types import ProviderResponse, TokenUsage
 
 
 def _mock_provider_response(content: str = "ok") -> ProviderResponse:
@@ -83,16 +83,15 @@ class TestPersistentMemoryRememberRecallForget:
 
 
 class TestConversationMemoryStability:
-    """Conversation memory (BufferMemory) path: history included in build_messages in order."""
+    """Memory path: history included in build_messages in order."""
 
     def test_buffer_memory_history_included_in_build_messages(self) -> None:
-        """When BufferMemory is pre-populated, build_messages includes history in order."""
-        from syrin.enums import MessageRole
+        """When Memory is pre-populated, build_messages includes history in order."""
 
         model = Model("anthropic/claude-3-5-sonnet")
-        mem = BufferMemory()
-        mem.add(Message(role=MessageRole.USER, content="First message"))
-        mem.add(Message(role=MessageRole.ASSISTANT, content="Hi there"))
+        mem = Memory()
+        mem.add_conversation_segment("First message", role="user")
+        mem.add_conversation_segment("Hi there", role="assistant")
         agent = Agent(model=model, system_prompt="Test.", memory=mem)
         messages = agent._build_messages("Second message")
         contents = [m.content for m in messages]
@@ -101,10 +100,10 @@ class TestConversationMemoryStability:
         assert "Second message" in contents
         assert contents[-1] == "Second message"
 
-    def test_conversation_memory_isolation_from_persistent(self) -> None:
-        """When using conversation memory only, recall is not used for build_messages (no persistent backend)."""
+    def test_memory_none_recall_raises(self) -> None:
+        """memory=None: recall raises (no persistent backend)."""
         model = Model("anthropic/claude-3-5-sonnet")
-        agent = Agent(model=model, system_prompt="Test.", memory=BufferMemory())
+        agent = Agent(model=model, system_prompt="Test.", memory=None)
         assert agent._memory_backend is None
         with pytest.raises(RuntimeError, match="persistent memory"):
             agent.recall("anything")
@@ -151,10 +150,10 @@ class TestRecallContract:
             assert hasattr(e, "type") and e.type == MemoryType.CORE
             assert hasattr(e, "importance") and isinstance(e.importance, (int, float))
 
-    def test_agent_recall_without_persistent_memory_raises(self) -> None:
-        """Agent with only conversation memory (no persistent): recall() raises RuntimeError."""
+    def test_agent_recall_without_memory_raises(self) -> None:
+        """Agent with memory=None: recall() raises RuntimeError."""
         model = Model("anthropic/claude-3-5-sonnet")
-        agent = Agent(model=model, system_prompt="Test.", memory=BufferMemory())
+        agent = Agent(model=model, system_prompt="Test.", memory=None)
         with pytest.raises(RuntimeError, match="persistent memory"):
             agent.recall("anything")
 

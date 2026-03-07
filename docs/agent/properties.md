@@ -16,7 +16,7 @@ if state:
 
 ### memory
 
-Current memory configuration (persistent or conversation).
+Current memory configuration (persistent or conversation). Default is BufferMemory. Use `memory=None` to disable.
 
 ```python
 mem = agent.memory
@@ -24,7 +24,7 @@ mem = agent.memory
 
 ### conversation_memory
 
-Conversation memory instance, if set.
+Conversation memory instance (read-only). Set via `memory=BufferMemory()` or `memory=WindowMemory(k=N)`.
 
 ```python
 conv = agent.conversation_memory

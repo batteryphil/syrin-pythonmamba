@@ -33,7 +33,7 @@ from syrin import (
 )
 from syrin.budget import stop_on_exceeded
 from syrin.exceptions import BudgetExceededError, BudgetThresholdError
-from syrin.memory import BufferMemory, WindowMemory
+from syrin.memory import Memory
 from syrin.threshold import BudgetThreshold
 from syrin.tool import tool
 
@@ -304,27 +304,14 @@ class TestAgentWithTokenLimits:
 class TestAgentWithMemory:
     """Memory: buffer, window, persistent (4-type), decay."""
 
-    def test_buffer_memory_retains_all(self) -> None:
-        from syrin.enums import MessageRole
-        from syrin.types import Message
-
-        mem = BufferMemory()
-        mem.add(Message(role=MessageRole.USER, content="Message 1"))
-        mem.add(Message(role=MessageRole.ASSISTANT, content="Reply 1"))
+    def test_memory_retains_conversation(self) -> None:
+        """Memory retains conversation; build_messages includes history."""
+        mem = Memory()
+        mem.add_conversation_segment("Message 1", role="user")
+        mem.add_conversation_segment("Reply 1", role="assistant")
         agent = Agent(model=_almock(), memory=mem)
         msgs = agent._build_messages("Message 2")
-        # Should include: system (if any) + 2 history + new user message
         assert len(msgs) >= 3
-
-    def test_window_memory_limits_history(self) -> None:
-        from syrin.enums import MessageRole
-        from syrin.types import Message
-
-        mem = WindowMemory(k=1)
-        for i in range(5):
-            mem.add(Message(role=MessageRole.USER, content=f"User {i}"))
-            mem.add(Message(role=MessageRole.ASSISTANT, content=f"Bot {i}"))
-        assert len(mem.get_messages()) == 2  # last pair only
 
     def test_persistent_memory_remember_recall_forget(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
@@ -374,7 +361,7 @@ class TestAgentWithMemory:
         agent = Agent(model=_almock(), memory=False)
         r = agent.response("Hello")
         assert r.content is not None
-        assert agent._conversation_memory is None
+        assert agent._persistent_memory is None
 
     def test_no_memory_raises_on_remember(self) -> None:
         """Agent with memory=False raises on remember()."""

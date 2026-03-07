@@ -15,6 +15,7 @@ from syrin.budget import TokenLimits
 from syrin.context.compactors import ContextCompactor, ContextCompactorProtocol
 from syrin.context.injection import InjectPlacement
 from syrin.context.snapshot import ContextBreakdown
+from syrin.enums import ContextMode, FormationMode
 
 
 @dataclass
@@ -138,6 +139,16 @@ class Context:
     """Where to place injected messages: prepend_to_system, before_current_turn (default), after_current_turn."""
     inject_source_detail: str = "injected"
     """Provenance source_detail for injected messages (e.g. 'rag', 'dynamic_rules')."""
+    context_mode: ContextMode = ContextMode.FULL
+    """How to select conversation history: full (default), focused (last N turns), intelligent (relevance; Step 10)."""
+    focused_keep: int = 10
+    """When context_mode=focused, number of turns (user+assistant pairs) to keep. Must be >= 1."""
+    formation_mode: FormationMode = FormationMode.PUSH
+    """Push = use conversation memory; Pull = use agent's Memory for segment storage and retrieval."""
+    pull_top_k: int = 10
+    """When formation_mode=PULL, max segments to retrieve per turn."""
+    pull_threshold: float = 0.0
+    """When formation_mode=PULL, minimum relevance score (0.0-1.0) to include a segment."""
 
     def __post_init__(self) -> None:
         if self.reserve < 0:
@@ -149,6 +160,14 @@ class Context:
                 "auto_compact_at must be between 0 and 1 (fraction of context window), "
                 f"got {self.auto_compact_at}"
             )
+        if self.context_mode == ContextMode.FOCUSED and self.focused_keep < 1:
+            raise ValueError(
+                f"focused_keep must be >= 1 when context_mode=focused, got {self.focused_keep}"
+            )
+        if self.pull_top_k < 0:
+            raise ValueError(f"pull_top_k must be >= 0, got {self.pull_top_k}")
+        if not 0.0 <= self.pull_threshold <= 1.0:
+            raise ValueError(f"pull_threshold must be between 0 and 1, got {self.pull_threshold}")
         self._validate_thresholds()
 
     def _validate_thresholds(self) -> None:

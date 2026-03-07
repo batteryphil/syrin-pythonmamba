@@ -131,6 +131,67 @@ def build_nested_update(
     return update
 
 
+def _get_model_class_for_field(
+    model_class: type[BaseModel], key: str
+) -> type[BaseModel] | type[object] | None:
+    """Get the model/dataclass type for a field if it's BaseModel or dataclass (handles Optional)."""
+    import dataclasses
+    import typing
+
+    field = model_class.model_fields.get(key)
+    if field is None:
+        return None
+    ann = field.annotation
+    if ann is None:
+        return None
+    # Handle Optional[X] / X | None
+    raw_args = typing.get_args(ann)
+    candidates: tuple[Any, ...] = raw_args if raw_args else (ann,)
+    for a in candidates:
+        if a is type(None):
+            continue
+        try:
+            if issubclass(a, BaseModel):
+                return cast(type[BaseModel] | type[object], a)
+            if dataclasses.is_dataclass(a):
+                return cast(type[BaseModel] | type[object], a)
+        except TypeError:
+            pass
+    try:
+        if issubclass(ann, BaseModel):
+            return cast(type[BaseModel] | type[object], ann)
+        if dataclasses.is_dataclass(ann):
+            return cast(type[BaseModel] | type[object], ann)
+    except TypeError:
+        pass
+    return None
+
+
+def _coerce_enum_for_field(model_class: type[BaseModel], key: str, value: object) -> object:
+    """If field expects an enum and value is str, coerce to enum. Else return value."""
+    import enum
+    import typing
+
+    if not isinstance(value, str):
+        return value
+    field = model_class.model_fields.get(key)
+    if field is None:
+        return value
+    ann = field.annotation
+    if ann is None:
+        return value
+    args = list(typing.get_args(ann)) or [ann]
+    for a in args:
+        if a is type(None):
+            continue
+        try:
+            if issubclass(a, enum.Enum) and value in (m.value for m in a):
+                return a(value)
+        except TypeError:
+            pass
+    return value
+
+
 def merge_nested_update(
     current: BaseModel | None,
     update: dict[str, Any],
@@ -149,6 +210,19 @@ def merge_nested_update(
                     child_cls = type(child)
                     merged = merge_nested_update(child, val, child_cls)
                     update[key] = merged
+            else:
+                # child is None or dataclass: validate dict into model/dataclass if field expects one
+                field_cls = _get_model_class_for_field(model_class, key)
+                if field_cls is not None:
+                    if hasattr(field_cls, "model_validate"):
+                        update[key] = field_cls.model_validate(val)
+                    else:
+                        update[key] = field_cls(**val)
+        elif isinstance(val, str):
+            # Coerce string to enum when field expects enum (avoids serializer warnings)
+            coerced = _coerce_enum_for_field(model_class, key, val)
+            if coerced is not val:
+                update[key] = coerced
     result = current.model_copy(update=update)
     return model_class.model_validate(result.model_dump())
 

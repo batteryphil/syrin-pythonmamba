@@ -15,7 +15,7 @@ from typing import Any
 
 from syrin.context import Context
 from syrin.context.config import ContextWindowCapacity
-from syrin.enums import MessageRole
+from syrin.enums import FormationMode, MessageRole
 from syrin.types import Message
 
 
@@ -44,7 +44,7 @@ def build_messages(
         user_input: The user's message.
         system_prompt: System prompt text.
         tools: List of ToolSpec or tool-like (with to_tool_spec or dict).
-        conversation_memory: Optional conversation memory (get_messages()).
+        conversation_memory: Unused (kept for API compatibility).
         memory_backend: Optional persistent memory backend (search).
         persistent_memory: Optional Memory (top_k for recall).
         context_manager: Context manager with prepare(messages, system_prompt, tools, memory_context, capacity, context).
@@ -87,13 +87,45 @@ def build_messages(
     if system_content:
         messages.append(Message(role=MessageRole.SYSTEM, content=system_content))
 
-    # Conversation memory
-    if conversation_memory is not None:
+    pulled_segments_data: list[dict[str, Any]] = []
+    pull_scores_list: list[float] = []
+
+    # Conversation: push (conversation_memory or persistent Memory) or pull (persistent Memory)
+    effective_context = call_context
+    formation_mode = (
+        getattr(effective_context, "formation_mode", FormationMode.PUSH)
+        if effective_context is not None
+        else FormationMode.PUSH
+    )
+    if (
+        formation_mode == FormationMode.PULL
+        and effective_context is not None
+        and persistent_memory is not None
+    ):
+        top_k = getattr(effective_context, "pull_top_k", 10)
+        threshold = getattr(effective_context, "pull_threshold", 0.0)
+        pulled = persistent_memory.get_relevant_segments(
+            user_input, top_k=top_k, threshold=threshold
+        )
+        for seg, score in pulled:
+            messages.append(
+                Message(
+                    role=MessageRole(seg.role)
+                    if seg.role in ("user", "assistant", "system")
+                    else MessageRole.USER,
+                    content=seg.content,
+                )
+            )
+            pulled_segments_data.append(
+                {"content": seg.content[:200], "role": seg.role, "score": score}
+            )
+            pull_scores_list.append(score)
+    elif persistent_memory is not None:
         mem_messages = _in_span(
             tracer,
             "memory.recall",
             {"memory.kind": "conversation"},
-            conversation_memory.get_messages,
+            lambda: persistent_memory.get_conversation_messages(),
             result_attr=("MEMORY_RESULTS_COUNT", len),
         )
         messages.extend(mem_messages)
@@ -129,6 +161,8 @@ def build_messages(
         context=call_context,
         inject=inject,
         inject_source_detail=inject_source_detail,
+        pulled_segments=pulled_segments_data,
+        pull_scores=pull_scores_list,
     )
 
     final_messages = []

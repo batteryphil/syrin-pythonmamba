@@ -68,12 +68,11 @@ def test_agent_build_messages() -> None:
 
 
 def test_agent_build_messages_includes_memory() -> None:
-    from syrin.memory import BufferMemory
-    from syrin.types import Message
+    from syrin.memory import Memory
 
-    mem = BufferMemory()
-    mem.add(Message(role=MessageRole.USER, content="First"))
-    mem.add(Message(role=MessageRole.ASSISTANT, content="Hi there"))
+    mem = Memory()
+    mem.add_conversation_segment("First", role="user")
+    mem.add_conversation_segment("Hi there", role="assistant")
     model = Model("openai/gpt-4")
     agent = Agent(model=model, system_prompt="Bot.", memory=mem)
     messages = agent._build_messages("Second")
@@ -715,16 +714,15 @@ def test_agent_response_with_tool_execution_error() -> None:
 
 def test_agent_memory_persistence_with_large_data() -> None:
     """Test memory handles data correctly."""
-    from syrin.memory import BufferMemory
-    from syrin.types import Message, MessageRole
+    from syrin.memory import Memory
 
-    mem = BufferMemory()
+    mem = Memory()
     # Add moderate amount of data
     large_content = "x" * 10000
-    mem.add(Message(role=MessageRole.USER, content=large_content))
+    mem.add_conversation_segment(large_content, role="user")
 
     # Verify memory works without calling agent (to avoid memory backend issues)
-    messages = mem.get_messages()
+    messages = mem.get_conversation_messages()
     assert len(messages) == 1
     assert len(messages[0].content) == 10000
 

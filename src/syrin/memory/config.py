@@ -9,7 +9,7 @@ import threading
 import uuid
 from collections.abc import Callable
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
@@ -30,6 +30,7 @@ from syrin.memory.vector_configs import (
 )
 
 if TYPE_CHECKING:
+    from syrin.context.store import ContextSegment
     from syrin.memory.snapshot import MemorySnapshot
     from syrin.memory.store import MemoryStore
 
@@ -243,6 +244,7 @@ class Memory(BaseModel):
 
     _store: MemoryStore | None = PrivateAttr(default=None)
     _backend: MemoryBackendProtocol | None = PrivateAttr(default=None)
+    _segment_store: Any = PrivateAttr(default=None)  # InMemoryContextStore, lazy-init
 
     backend: MemoryBackend = Field(
         default=MemoryBackend.MEMORY,
@@ -752,6 +754,75 @@ class Memory(BaseModel):
             deduplicate=dedup,
             consolidation_budget=budget,
         )
+
+    def _get_segment_store(self) -> Any:
+        """Lazy-init internal segment store for pull-based context."""
+        if self._segment_store is None:
+            from syrin.context.store import InMemoryContextStore
+
+            object.__setattr__(self, "_segment_store", InMemoryContextStore())
+        return self._segment_store
+
+    def add_conversation_segment(self, content: str, role: str = "user") -> None:
+        """Store a conversation segment for pull-based context retrieval.
+
+        Used when formation_mode=PULL. Segments are retrieved by relevance to
+        the current prompt. Memory is the single long-term storage for both
+        facts (remember/recall) and conversation segments.
+        """
+        from syrin.context.store import ContextSegment
+
+        store = self._get_segment_store()
+        store.add_segment(ContextSegment(content=content, role=role))
+
+    def get_relevant_segments(
+        self,
+        query: str,
+        top_k: int = 10,
+        threshold: float = 0.0,
+    ) -> list[tuple[ContextSegment, float]]:
+        """Return conversation segments most relevant to query, for pull-based context."""
+        from syrin.context.store import ContextSegment as _CS
+
+        store = self._get_segment_store()
+        result = store.get_relevant(query=query, top_k=top_k, threshold=threshold)
+        return cast(list[tuple[_CS, float]], result)
+
+    def get_conversation_messages(self, limit: int = 10000) -> list[Any]:
+        """Return conversation segments as messages in order, for push-based context.
+
+        Used when formation_mode=PUSH. Converts stored segments to Message objects.
+        """
+        from syrin.enums import MessageRole
+        from syrin.types import Message
+
+        store = self._get_segment_store()
+        segments = store.list_recent(n=limit)
+        return [
+            Message(
+                role=MessageRole(s.role)
+                if s.role in ("user", "assistant", "system")
+                else MessageRole.USER,
+                content=s.content,
+            )
+            for s in segments
+        ]
+
+    def load_conversation_messages(self, messages: list[Any]) -> None:
+        """Replace conversation segments with the given messages. For checkpoint restore."""
+        from syrin.context.store import ContextSegment
+
+        store = self._get_segment_store()
+        store.clear()
+        for m in messages:
+            if isinstance(m, dict):
+                role_str = str(m.get("role", "user"))
+                content = str(m.get("content", ""))
+            else:
+                role = getattr(m, "role", "user")
+                role_str = role.value if hasattr(role, "value") else str(role)
+                content = getattr(m, "content", "") or ""
+            store.add_segment(ContextSegment(content=content, role=role_str))
 
     def entries(
         self,

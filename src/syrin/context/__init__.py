@@ -47,7 +47,14 @@ from syrin.context.snapshot import (
     ContextSnapshot,
     MessagePreview,
 )
-from syrin.enums import CompactionMethod
+from syrin.context.store import (
+    ContextSegment,
+    ContextStore,
+    InMemoryContextStore,
+    RelevanceScorer,
+    SimpleTextScorer,
+)
+from syrin.enums import CompactionMethod, ContextMode, FormationMode
 from syrin.threshold import BudgetThreshold, ContextThreshold
 
 __all__ = [
@@ -70,6 +77,7 @@ __all__ = [
     "TokenCounter",
     "TokenCount",
     "get_counter",
+    "ContextMode",
     # Compactors
     "CompactionMethod",
     "Compactor",
@@ -83,4 +91,11 @@ __all__ = [
     "ContextPayload",
     "DefaultContextManager",
     "create_context_manager",
+    # Store (pull-based context)
+    "ContextSegment",
+    "ContextStore",
+    "InMemoryContextStore",
+    "RelevanceScorer",
+    "SimpleTextScorer",
+    "FormationMode",
 ]

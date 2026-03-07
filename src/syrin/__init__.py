@@ -162,9 +162,11 @@ from syrin.enums import (
     CheckpointStrategy,
     CircuitState,
     ContentType,
+    ContextMode,
     ContextStrategy,
     DecayStrategy,
     DocFormat,
+    FormationMode,
     GuardrailStage,
     Hook,
     InjectionStrategy,
@@ -219,13 +221,10 @@ from syrin.loop import (
 )
 from syrin.mcp import MCP, MCPClient
 from syrin.memory import (
-    BufferMemory,
-    ConversationMemory,
     Decay,
     Memory,
     MemoryBudget,
     MemoryEntry,
-    WindowMemory,
 )
 
 # =============================================================================
@@ -465,9 +464,6 @@ __all__ = [
     "MemoryEntry",
     "MemoryBudget",
     "Decay",
-    "BufferMemory",
-    "WindowMemory",
-    "ConversationMemory",
     # Context
     # =============================================================================
     "Context",
@@ -536,7 +532,9 @@ __all__ = [
     # =============================================================================
     "StopReason",
     "LoopStrategy",
+    "ContextMode",
     "ContextStrategy",
+    "FormationMode",
     "TracingBackend",
     "TraceLevel",
     "MessageRole",

@@ -250,7 +250,7 @@ class TestInheritanceEdgeCases:
 
     def test_inheritance_with_memory(self) -> None:
         """Test inheritance with memory configuration."""
-        from syrin.memory import BufferMemory
+        from syrin.memory import Memory
 
         class Base(Agent):
             model = Model("openai/gpt-4")
@@ -259,9 +259,9 @@ class TestInheritanceEdgeCases:
             pass
 
         # Create with memory
-        mem = BufferMemory()
+        mem = Memory()
         agent = Child(memory=mem)
-        assert agent._conversation_memory is not None
+        assert agent._persistent_memory is not None
 
     def test_inheritance_with_budget(self) -> None:
         """Test inheritance with budget configuration."""

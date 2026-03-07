@@ -41,7 +41,6 @@ from syrin import (
 from syrin.context import Context
 from syrin.enums import DecayStrategy, MemoryBackend, MemoryType, WriteMode
 from syrin.guardrails import ContentFilter, LengthGuardrail
-from syrin.memory import WindowMemory
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -115,7 +114,6 @@ class Chatbot(Agent):
     """Full-featured chatbot with persistent memory, remember tool, guardrails, and checkpoints."""
 
     _agent_name = "chatbot"
-    _syrin_default_conversation_memory = WindowMemory(10)
     _agent_description = (
         "Conversational chatbot with persistent memory, guardrails, and checkpoints"
     )

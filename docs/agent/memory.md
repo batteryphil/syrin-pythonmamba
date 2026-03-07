@@ -110,27 +110,28 @@ On each request, the agent:
 
 ---
 
-## Conversation Memory
+## Memory
 
-Session-only history (user/assistant messages). Pass a `ConversationMemory` instance:
+Single memory type for conversation and optional persistent recall:
 
 ```python
-from syrin.memory import BufferMemory
+from syrin.memory import Memory
 
 agent = Agent(
     model=model,
-    memory=BufferMemory(),  # Or WindowMemory(k=10)
+    memory=Memory(),  # Default when omitted.
 )
 ```
 
-If you pass `ConversationMemory`, persistent memory is not used; the agent relies on that instance for conversation history.
+- Default: `memory=Memory()` when omitted (multi-turn enabled).
+- `memory=None` or `memory=False` — Disable memory (no history, no recall).
 
 ---
 
 ## Properties
 
 - `agent.memory` — Current memory config (persistent or conversation).
-- `agent.conversation_memory` — Conversation memory, if set.
+- `agent.conversation_memory` — Conversation memory, if set (read-only).
 - `agent.persistent_memory` — Persistent memory config, if set.
 
 ---

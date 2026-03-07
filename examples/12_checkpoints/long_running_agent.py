@@ -4,7 +4,7 @@ Demonstrates:
 - Session continuity across restarts (checkpoint stores messages + context snapshot)
 - save_checkpoint / load_checkpoint restores conversation and iteration
 - Context.auto_compact_at for proactive compaction
-- BufferMemory for conversation history (restored on load)
+- Memory for conversation history (restored on load)
 
 Run: python -m examples.12_checkpoints.long_running_agent
 """
@@ -16,14 +16,14 @@ from pathlib import Path
 
 from examples.models.models import almock
 from syrin import Agent, CheckpointConfig, CheckpointTrigger, Context
-from syrin.memory.conversation import BufferMemory
+from syrin.memory import Memory
 
 
 def main() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "long_running.db"
 
-        mem = BufferMemory()
+        mem = Memory()
         agent = Agent(
             model=almock,
             system_prompt="You are a helpful assistant. Keep replies concise.",
@@ -52,7 +52,7 @@ def main() -> None:
         print(f"Available checkpoints: {ids}")
 
         # Simulate restart: new agent, load from same storage
-        mem2 = BufferMemory()
+        mem2 = Memory()
         agent2 = Agent(
             model=almock,
             system_prompt="You are a helpful assistant. Keep replies concise.",

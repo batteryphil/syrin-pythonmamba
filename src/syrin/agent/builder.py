@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from syrin.agent import Agent
     from syrin.budget import Budget
     from syrin.context import Context
-    from syrin.memory import ConversationMemory, Memory
+    from syrin.memory import Memory
     from syrin.model import Model
 
 
@@ -41,7 +41,7 @@ class AgentBuilder:
         self._max_tool_iterations: int = 10
         self._budget_store: Any = None
         self._budget_store_key: str = "default"
-        self._memory: ConversationMemory | Memory | None = None
+        self._memory: Memory | None = None
         self._loop_strategy: Any = None
         self._loop: Any = None
         self._guardrails: Any = None
@@ -88,7 +88,7 @@ class AgentBuilder:
         self._budget_store_key = key
         return self
 
-    def with_memory(self, memory: ConversationMemory | Memory) -> AgentBuilder:
+    def with_memory(self, memory: Memory) -> AgentBuilder:
         """Set conversation or persistent memory."""
         self._memory = memory
         return self

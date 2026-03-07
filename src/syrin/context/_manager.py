@@ -18,11 +18,64 @@ from syrin.context.snapshot import (
     MessagePreview,
     _context_rot_risk_from_utilization,
 )
-from syrin.enums import Hook, ThresholdMetric
+from syrin.enums import ContextMode, Hook, ThresholdMetric
 from syrin.threshold import ThresholdContext
 
 # Max chars for content_snippet in MessagePreview.
 _SNIPPET_MAX_CHARS = 80
+
+
+def _apply_context_mode(
+    messages: list[dict[str, Any]],
+    mode: ContextMode,
+    focused_keep: int,
+) -> tuple[list[dict[str, Any]], int]:
+    """Apply context mode to messages. Return (filtered_messages, dropped_count).
+
+    Conversation = user/assistant messages before the last (current user). Prefix = leading system.
+    """
+    if mode == ContextMode.FULL:
+        return messages, 0
+    if mode == ContextMode.INTELLIGENT:
+        raise NotImplementedError(
+            "context_mode=intelligent requires a relevance scorer; "
+            "use context_mode=focused for now, or wait for pull-based context store (Step 10)"
+        )
+    if mode != ContextMode.FOCUSED:
+        return messages, 0
+
+    if not messages:
+        return messages, 0
+
+    # Last message = current user. Prefix = leading system. Conversation = user/assistant before last.
+    prefix: list[dict[str, Any]] = []
+    i = 0
+    while i < len(messages) and messages[i].get("role") == "system":
+        prefix.append(messages[i])
+        i += 1
+
+    if i >= len(messages):
+        return messages, 0
+
+    # conversation + current_user
+    rest = messages[i:]
+    if len(rest) <= 1:
+        return messages, 0  # Only current user or empty after prefix
+
+    conversation = rest[:-1]
+    current_user_msg = rest[-1]
+
+    # Last N turns: a turn = user + assistant(s). Find start index for last N user messages.
+    user_indices = [j for j, m in enumerate(conversation) if m.get("role") == "user"]
+    if not user_indices or focused_keep >= len(user_indices):
+        return messages, 0
+
+    start_idx = user_indices[-focused_keep]
+    filtered_conv = conversation[start_idx:]
+    dropped = len(conversation) - len(filtered_conv)
+
+    result = prefix + filtered_conv + [current_user_msg]
+    return result, dropped
 
 
 @dataclass
@@ -135,6 +188,7 @@ class DefaultContextManager:
     _injected_indices: set[int] = field(default_factory=set, repr=False)
     _injected_source_detail: str | None = field(default=None, repr=False)
     _last_injected_messages: list[dict[str, Any]] = field(default_factory=list, repr=False)
+    _context_mode_dropped_count: int = field(default=0, repr=False)
 
     def __post_init__(self) -> None:
         """Apply Context.encoding and Context.compactor (or default with compaction_*) when set."""
@@ -214,6 +268,8 @@ class DefaultContextManager:
         *,
         inject: list[dict[str, Any]] | None = None,
         inject_source_detail: str | None = None,
+        pulled_segments: list[dict[str, Any]] | None = None,
+        pull_scores: list[float] | None = None,
     ) -> ContextPayload:
         """Prepare context for LLM call with automatic management.
 
@@ -268,6 +324,13 @@ class DefaultContextManager:
                     "content"
                 ):
                     all_messages = [system_msg] + all_messages
+
+            # Apply context mode (full / focused / intelligent)
+            mode = getattr(effective_context, "context_mode", ContextMode.FULL)
+            focused_keep = getattr(effective_context, "focused_keep", 10)
+            all_messages, self._context_mode_dropped_count = _apply_context_mode(
+                all_messages, mode, focused_keep
+            )
 
             # Resolve injected messages: per-call inject takes precedence over runtime_inject
             injected_msgs: list[dict[str, Any]] = []
@@ -417,6 +480,10 @@ class DefaultContextManager:
                     tokens_used=tokens_used,
                     capacity=capacity,
                     breakdown=breakdown,
+                    context_mode=mode.value,
+                    context_mode_dropped_count=self._context_mode_dropped_count,
+                    pulled_segments=pulled_segments or [],
+                    pull_scores=pull_scores or [],
                 )
                 self._last_snapshot = snap
                 self._emit(
@@ -502,6 +569,10 @@ class DefaultContextManager:
         tokens_used: int,
         capacity: ContextWindowCapacity,
         breakdown: ContextBreakdown,
+        context_mode: str = "full",
+        context_mode_dropped_count: int = 0,
+        pulled_segments: list[dict[str, Any]] | None = None,
+        pull_scores: list[float] | None = None,
     ) -> ContextSnapshot:
         """Build ContextSnapshot from the last prepare state. Breakdown is computed once in prepare()."""
         import time
@@ -597,6 +668,10 @@ class DefaultContextManager:
             provenance=provenances,
             why_included=why_included,
             context_rot_risk=_context_rot_risk_from_utilization(utilization_pct),
+            context_mode=context_mode,
+            context_mode_dropped_count=context_mode_dropped_count,
+            pulled_segments=pulled_segments or [],
+            pull_scores=pull_scores or [],
         )
 
     def snapshot(self) -> ContextSnapshot:

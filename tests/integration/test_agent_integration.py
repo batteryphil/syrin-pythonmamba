@@ -7,7 +7,7 @@ Uses Model.Almock(latency_seconds=0.01) for fast tests.
 from __future__ import annotations
 
 from syrin import Agent, Budget, Memory, MemoryType, Model
-from syrin.memory import BufferMemory
+from syrin.memory import Memory
 from syrin.tool import tool
 
 
@@ -52,20 +52,18 @@ class TestAgentWithWithoutBudget:
 
 class TestAgentWithWithoutMemory:
     def test_agent_with_buffer_memory(self) -> None:
-        """Agent with BufferMemory — conversation history included in context."""
-        from syrin.enums import MessageRole
-        from syrin.types import Message
+        """Agent with Memory — conversation history included in context."""
 
         model = _almock()
-        mem = BufferMemory()
-        mem.add(Message(role=MessageRole.USER, content="My name is Alice."))
-        mem.add(Message(role=MessageRole.ASSISTANT, content="Hello Alice!"))
+        mem = Memory()
+        mem.add_conversation_segment("My name is Alice.", role="user")
+        mem.add_conversation_segment("Hello Alice!", role="assistant")
         agent = Agent(model=model, system_prompt="You are helpful.", memory=mem)
 
         response = agent.response("What is my name?")
 
         assert response.content is not None
-        assert len(mem.get_messages()) >= 2
+        assert len(mem.get_conversation_messages()) >= 2
 
     def test_agent_with_memory_4type(self) -> None:
         """Agent with Memory (4-type) — remember/recall works."""

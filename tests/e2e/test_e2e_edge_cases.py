@@ -28,7 +28,7 @@ from syrin import (
 )
 from syrin.budget import BudgetTracker
 from syrin.events import EventContext
-from syrin.memory import BufferMemory, WindowMemory
+from syrin.memory import Memory
 from syrin.threshold import BudgetThreshold
 from syrin.tool import tool
 
@@ -189,36 +189,24 @@ class TestBudgetEdgeCases:
 class TestMemoryEdgeCases:
     """Memory system boundary conditions."""
 
-    def test_window_memory_k_equals_1(self) -> None:
-        from syrin.enums import MessageRole
-        from syrin.types import Message
+    def test_memory_conversation_retains_order(self) -> None:
+        """Memory retains conversation in order."""
+        mem = Memory()
+        for i in range(5):
+            mem.add_conversation_segment(f"U{i}", role="user")
+            mem.add_conversation_segment(f"A{i}", role="assistant")
+        msgs = mem.get_conversation_messages()
+        assert len(msgs) == 10
+        assert msgs[0].content == "U0"
+        assert msgs[-1].content == "A4"
 
-        mem = WindowMemory(k=1)
-        for i in range(100):
-            mem.add(Message(role=MessageRole.USER, content=f"U{i}"))
-            mem.add(Message(role=MessageRole.ASSISTANT, content=f"A{i}"))
-        msgs = mem.get_messages()
-        assert len(msgs) == 2
-        assert msgs[0].content == "U99"
-        assert msgs[1].content == "A99"
-
-    def test_window_memory_k_invalid(self) -> None:
-        with pytest.raises(ValueError, match="k must be >= 1"):
-            WindowMemory(k=0)
-
-    def test_window_memory_k_negative(self) -> None:
-        with pytest.raises(ValueError, match="k must be >= 1"):
-            WindowMemory(k=-1)
-
-    def test_buffer_memory_clear(self) -> None:
-        from syrin.enums import MessageRole
-        from syrin.types import Message
-
-        mem = BufferMemory()
-        mem.add(Message(role=MessageRole.USER, content="Test"))
-        assert len(mem.get_messages()) == 1
-        mem.clear()
-        assert len(mem.get_messages()) == 0
+    def test_memory_load_clears_and_replaces(self) -> None:
+        """load_conversation_messages clears and replaces."""
+        mem = Memory()
+        mem.add_conversation_segment("Test", role="user")
+        assert len(mem.get_conversation_messages()) == 1
+        mem.load_conversation_messages([])
+        assert len(mem.get_conversation_messages()) == 0
 
     def test_persistent_memory_unicode_content(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())

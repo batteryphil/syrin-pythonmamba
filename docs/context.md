@@ -15,6 +15,7 @@ Syrin’s context system manages **token limits**, **on-demand compaction**, and
 - [TokenLimits (token caps)](#tokenlimits-token-caps)
 - [Agent API](#agent-api)
 - [Context snapshot (full view)](#context-snapshot-full-view)
+- [Context mode (full, focused, intelligent)](#context-mode-full-focused-intelligent)
 - [Events](#events)
 - [Token counting](#token-counting)
 - [Custom context manager](#custom-context-manager)
@@ -55,6 +56,7 @@ Syrin’s context system manages **token limits**, **on-demand compaction**, and
 | Per-call stats (tokens, utilization, compact_count) | **result.context_stats** or **agent.context_stats** | **result.context** = Context used for that call (overrides agent's when passed) |
 | **Full context view** (what, why, where, rot risk) | **agent.context.snapshot()** | **ContextSnapshot**: message_preview, provenance, why_included, breakdown, context_rot_risk; export via **to_dict()** for viz tools. |
 | **Inject RAG/dynamic context** at prepare time | **Context.runtime_inject** or **response(..., inject=...)** | See [Runtime context injection](#runtime-context-injection). |
+| **Limit conversation history** (topic shifts) | **Context.context_mode** (e.g. `focused`) + **Context.focused_keep** | Use `context_mode=ContextMode.FOCUSED` to keep only last N turns; reduces irrelevant history. |
 
 **Budget vs token caps:** **Budget** = cost limits in USD. **Context.token_limits** (TokenLimits) = token caps (run and/or per period). Same field names (run, per, on_exceeded) for consistency.
 
@@ -131,6 +133,11 @@ result = agent.response("Long conversation...")
 | **runtime_inject** | Inject context at prepare time (e.g. RAG results, dynamic blocks). | Callable **PrepareInput → list[dict]** (role, content). Called when no per-call `inject` is provided. | **Context(runtime_inject=my_rag_fn)**; see [Runtime context injection](#runtime-context-injection). |
 | **inject_placement** | Where to place injected messages. | **InjectPlacement**: `prepend_to_system`, `before_current_turn` (default), `after_current_turn`. | `Context(inject_placement=InjectPlacement.BEFORE_CURRENT_TURN)` for RAG (docs before the question). |
 | **inject_source_detail** | Provenance label for injected content. | **str** (e.g. `"rag"`, `"dynamic_rules"`). | **Context(inject_source_detail="rag")**; appears in snapshot provenance and **why_included**. |
+| **context_mode** | How to select conversation history. | **ContextMode**: `full` (default), `focused`, `intelligent` (future). | **Context(context_mode=ContextMode.FOCUSED)** to keep last N turns when topic shifts. |
+| **focused_keep** | When `context_mode=focused`, number of turns to keep. | **int** (≥ 1). Default 10. One turn = user + assistant message. | **Context(context_mode=ContextMode.FOCUSED, focused_keep=5)** keeps last 5 exchanges. |
+| **formation_mode** | How conversation history is fed into context. | **FormationMode**: `push` (default), `pull`. | **push** = use conversation memory; **pull** = use agent's Memory for segment storage and retrieval. |
+| **pull_top_k** | When `formation_mode=pull`, max segments per turn. | **int** (≥ 0). Default 10. | **Context(pull_top_k=5)** to limit pulled segments. |
+| **pull_threshold** | When `formation_mode=pull`, min relevance score. | **float** (0.0–1.0). Default 0.0. | **Context(pull_threshold=0.5)** to filter low-relevance segments. |
 
 Example:
 
@@ -515,6 +522,78 @@ result = agent.response(
 ```
 
 **Handoff and spawn:** The same context snapshot is exposed in **HANDOFF_START** and **HANDOFF_BLOCKED** as **handoff_context**, and **SPAWN_START** includes **parent_context_tokens** (parent's snapshot token count). See [Handoff & Spawn](agent/handoff-spawn.md) for hook payloads and context visibility.
+
+---
+
+## Context mode (full, focused, intelligent)
+
+**Context.context_mode** controls how conversation history is selected for the context window. This helps when the user switches topics and older turns are irrelevant.
+
+| Mode | Behavior |
+|------|----------|
+| **full** (default) | Full conversation history. Compaction when over capacity. |
+| **focused** | Keep only the last N turns (user+assistant pairs). Reduces irrelevant history. |
+| **intelligent** | Relevance-filtered (requires scorer; coming in pull-based context store). Use `focused` for now. |
+
+When `context_mode=ContextMode.FOCUSED`, **focused_keep** (default 10) is the number of turns to keep. One turn = one user message + its assistant reply. System prompt, memory, injected content, and the current user message are always included.
+
+**Example: Topic shifts**
+
+```python
+from syrin import Agent, Context, Model
+from syrin.context import ContextMode
+
+agent = Agent(
+    model=Model.Almock(),
+    context=Context(
+        context_mode=ContextMode.FOCUSED,
+        focused_keep=5,
+    ),
+)
+# Long Syrin chat, then user asks "How does React work?"
+# Only last 5 exchanges are kept; older Syrin context is excluded.
+result = agent.response("How does React work?")
+```
+
+**Snapshot:** When mode is `focused`, **ContextSnapshot** includes `context_mode` and `context_mode_dropped_count` (number of messages excluded).
+
+### Pull-based context (formation_mode=PULL)
+
+When **formation_mode=FormationMode.PULL**, conversation segments are stored in the agent's **Memory** and retrieved by relevance to the current prompt. Use this for long conversations where only relevant past turns should be included.
+
+| formation_mode | Behavior |
+|----------------|----------|
+| **push** (default) | Use conversation memory (full or focused). Same as before. |
+| **pull** | Use agent's **Memory** for segment storage; retrieve segments relevant to the current user message. |
+
+**Requirements:** **formation_mode=PULL** requires **memory=Memory()** so segments can be stored and retrieved.
+
+**Example: Long conversations with relevance filtering**
+
+```python
+from syrin import Agent, Context, Model
+from syrin.context import FormationMode
+from syrin.memory import Memory
+
+agent = Agent(
+    model=Model.Almock(),
+    system_prompt="You are helpful.",
+    memory=Memory(),
+    context=Context(
+        formation_mode=FormationMode.PULL,
+        pull_top_k=10,
+        pull_threshold=0.1,
+    ),
+)
+agent.response("Tell me about Python")
+agent.response("What about Rust?")
+# Next turn: only segments relevant to "Python" are pulled from Memory
+agent.response("Give me a Python example")
+snap = agent.context.snapshot()
+print(snap.pulled_segments, snap.pull_scores)
+```
+
+**Snapshot:** When `formation_mode=PULL`, **ContextSnapshot** includes **pulled_segments** and **pull_scores** (content, role, score per segment).
 
 ---
 

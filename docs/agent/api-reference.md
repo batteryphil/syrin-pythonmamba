@@ -92,8 +92,8 @@ See [Constructor Reference](constructor.md) for full parameter details.
 | `budget_state` | `BudgetState \| None` |
 | `tools` | `list[ToolSpec]` |
 | `model_config` | `ModelConfig \| None` |
-| `memory` | `ConversationMemory | Memory | None` |
-| `conversation_memory` | `ConversationMemory | None` |
+| `memory` | `ConversationMemory | Memory | None` — Active memory (default: BufferMemory). |
+| `conversation_memory` | `ConversationMemory | None` — Read-only; set via `memory=`. |
 | `persistent_memory` | `Memory | None` |
 | `context` | `Context` |
 | `context_stats` | `ContextStats` |

@@ -57,7 +57,6 @@ from syrin.enums import (
     LoopStrategy,
     MemoryBackend,
     MemoryType,
-    MessageRole,
 )
 from syrin.events import EventContext, Events
 from syrin.exceptions import (
@@ -71,7 +70,7 @@ from syrin.exceptions import (
 )
 from syrin.guardrails import Guardrail, GuardrailChain, GuardrailResult
 from syrin.loop import Loop, LoopStrategyMapping, ReactLoop
-from syrin.memory import ConversationMemory, Memory
+from syrin.memory import Memory
 from syrin.memory.backends import InMemoryBackend, get_backend
 from syrin.memory.config import MemoryEntry
 from syrin.model import Model
@@ -473,7 +472,8 @@ class Agent(Servable, metaclass=_AgentMeta):
         if default_description is _UNSET:
             default_description = _merge_class_attrs(mro, "description", merge=False)
         cls._syrin_default_model = default_model if default_model is not _UNSET else None
-        cls._syrin_default_memory = default_memory if default_memory is not _UNSET else None
+        # Keep _UNSET when no class sets memory so __init__ can default to Memory
+        cls._syrin_default_memory = default_memory
         method_names = _get_system_prompt_method_names(cls)
         if len(method_names) > 1:
             names_str = ", ".join(f"'{n}'" for n in method_names)
@@ -532,8 +532,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
         budget_store: BudgetStore | None = None,
         budget_store_key: str = "default",
-        memory: ConversationMemory | Memory | bool | None = None,
-        conversation_memory: ConversationMemory | None = _UNSET,
+        memory: Memory | bool | None = _UNSET,
         loop_strategy: LoopStrategy = LoopStrategy.REACT,
         loop: Loop | type[Loop] | None = None,
         guardrails: list[Guardrail] | GuardrailChain | None = _UNSET,
@@ -572,10 +571,8 @@ class Agent(Servable, metaclass=_AgentMeta):
                 Why: Track spend across restarts. Requires budget_store_key.
             budget_store_key: Key for budget persistence (default "default").
                 Why: Isolate budgets per user/session when using budget_store.
-            memory: Conversation memory (BufferMemory) or persistent Memory.
-                Why: Enables remember/recall/forget or session history.
-            conversation_memory: Optional session chat history (e.g. WindowMemory(10)).
-                Why: When set with memory=Memory(...), keeps last N turns for multi-turn context.
+            memory: Memory for conversation and optional persistent recall. Default: Memory() for multi-turn. Set memory=None to disable.
+                Use memory=Memory() for remember/recall/forget.
             loop_strategy: Execution strategy (REACT, SINGLE_SHOT, etc.).
                 Why: REACT = tool loop; SINGLE_SHOT = one LLM call, no tools.
             loop: Custom Loop instance. Overrides loop_strategy if set.
@@ -651,10 +648,9 @@ class Agent(Servable, metaclass=_AgentMeta):
             budget = getattr(cls, "_syrin_default_budget", None)
         if guardrails is _UNSET:
             guardrails = getattr(cls, "_syrin_default_guardrails", None) or []
-        if memory is None:
-            memory = getattr(cls, "_syrin_default_memory", None)
-        if conversation_memory is _UNSET:
-            conversation_memory = getattr(cls, "_syrin_default_conversation_memory", None)
+        if memory is _UNSET:
+            class_mem = getattr(cls, "_syrin_default_memory", _UNSET)
+            memory = Memory() if class_mem is _UNSET or class_mem is None else class_mem
         if name is _UNSET:
             name = getattr(cls, "_syrin_default_name", None)
         if description is _UNSET:
@@ -766,7 +762,6 @@ class Agent(Servable, metaclass=_AgentMeta):
         self._budget_store = budget_store
         self._budget_store_key = budget_store_key
         self._token_limits = None
-        self._conversation_memory: ConversationMemory | None = None
         self._persistent_memory: Memory | None = None
         self._memory_backend: InMemoryBackend | None = None
         self._parent_agent: Agent | None = None
@@ -787,30 +782,38 @@ class Agent(Servable, metaclass=_AgentMeta):
             memory is not None
             and memory is not True
             and memory is not False
-            and not isinstance(memory, (Memory, ConversationMemory))
+            and not isinstance(memory, Memory)
         ):
             raise TypeError(
-                f"memory must be Memory, ConversationMemory, True, False, or None, got {type(memory).__name__}. "
-                "Use Memory(types=[...], top_k=10), BufferMemory(), True for defaults, or False/None to disable."
+                f"memory must be Memory, True, False, or None, got {type(memory).__name__}. "
+                "Use Memory(types=[...], top_k=10), True for defaults, or False/None to disable."
             )
         if memory is None or memory is False:
             self._persistent_memory = None
             self._memory_backend = None
-            self._conversation_memory = None
         elif memory is True:
             self._persistent_memory = Memory(
                 types=[MemoryType.CORE, MemoryType.EPISODIC],
                 top_k=10,
             )
             self._memory_backend = get_backend(MemoryBackend.MEMORY)
-            self._conversation_memory = None
-        elif isinstance(memory, Memory):
+        else:
             self._persistent_memory = memory
             self._memory_backend = get_backend(memory.backend, **memory._backend_kwargs())
-        else:
-            self._conversation_memory = memory
-        if conversation_memory is not None:
-            self._conversation_memory = conversation_memory
+
+        # Warn when context needs memory but memory is disabled
+        if self._persistent_memory is None and ctx_config is not None:
+            mode = getattr(ctx_config, "context_mode", None)
+            if mode is not None and str(getattr(mode, "value", mode)) == "intelligent":
+                import warnings
+
+                warnings.warn(
+                    "context_mode=intelligent requires memory for relevance filtering; "
+                    "provide memory (e.g. memory=Memory()) or use context_mode=focused.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
         if (budget is not None or self._token_limits is not None) and budget_store and budget:
             loaded = budget_store.load(budget_store_key)
             self._budget_tracker = loaded if loaded is not None else BudgetTracker()
@@ -981,9 +984,9 @@ class Agent(Servable, metaclass=_AgentMeta):
 
     @property
     def messages(self) -> list[Message]:
-        """Current conversation messages from conversation memory, or empty list if none."""
-        if self._conversation_memory is not None:
-            return self._conversation_memory.get_messages()
+        """Current conversation messages from memory, or empty list if none."""
+        if self._persistent_memory is not None:
+            return self._persistent_memory.get_conversation_messages()
         return []
 
     @property
@@ -1019,9 +1022,8 @@ class Agent(Servable, metaclass=_AgentMeta):
 
         agent_name = cast(str, name or self._agent_name)
         messages_serialized: list[dict[str, Any]] = []
-        if self._conversation_memory is not None:
-            for msg in self._conversation_memory.get_messages():
-                messages_serialized.append(msg.model_dump())
+        for msg in self.messages:
+            messages_serialized.append(msg.model_dump())
         context_snapshot: dict[str, Any] | None = None
         if hasattr(self, "_context") and hasattr(self._context, "snapshot"):
             snap = self._context.snapshot()
@@ -1091,8 +1093,8 @@ class Agent(Servable, metaclass=_AgentMeta):
         if state is None:
             return False
 
-        if self._conversation_memory is not None and state.messages:
-            self._conversation_memory.load_messages(
+        if state.messages and self._persistent_memory is not None:
+            self._persistent_memory.load_conversation_messages(
                 cast(list[dict[str, Any]], list(state.messages))
             )
         iter_val = getattr(state, "iteration", None)
@@ -1364,28 +1366,14 @@ class Agent(Servable, metaclass=_AgentMeta):
         return self._model_config
 
     @property
-    def memory(self) -> ConversationMemory | Memory | None:
-        """Active memory: conversation (session) or persistent (remember/recall).
-
-        Why: Inspect what memory type is in use. Use conversation_memory or
-        persistent_memory for specific type.
-
-        Returns:
-            ConversationMemory if session history; Memory if persistent.
-        """
-        return self._persistent_memory or self._conversation_memory
+    def memory(self) -> Memory | None:
+        """Active memory (conversation and optional persistent recall)."""
+        return self._persistent_memory
 
     @property
-    def conversation_memory(self) -> ConversationMemory | None:
-        """Session-only message history (user/assistant turns).
-
-        Why: Set when you pass BufferMemory or WindowMemory as memory=.
-        Used to keep multi-turn context without persistent storage.
-
-        Returns:
-            The ConversationMemory instance, or None if using persistent memory.
-        """
-        return self._conversation_memory
+    def conversation_memory(self) -> Memory | None:
+        """Memory used for conversation (alias for persistent_memory)."""
+        return self._persistent_memory
 
     @property
     def persistent_memory(self) -> Memory | None:
@@ -2191,16 +2179,19 @@ class Agent(Servable, metaclass=_AgentMeta):
                 EventContext(resolved=resolved),
             )
 
+        call_ctx = getattr(self, "_call_context", None)
+        if call_ctx is None and hasattr(self, "_context") and self._context is not None:
+            call_ctx = getattr(self._context, "context", None)
         return build_messages_for_llm(
             user_input,
             system_prompt=resolved,
             tools=self.tools,
-            conversation_memory=self._conversation_memory,
+            conversation_memory=None,
             memory_backend=self._memory_backend,
             persistent_memory=self._persistent_memory,
             context_manager=self._context,
             get_capacity=get_capacity,
-            call_context=getattr(self, "_call_context", None),
+            call_context=call_ctx,
             tracer=self._tracer,
             inject=getattr(self, "_call_inject", None),
             inject_source_detail=getattr(self, "_call_inject_source_detail", None),
@@ -2696,13 +2687,12 @@ class Agent(Servable, metaclass=_AgentMeta):
         return r
 
     def record_conversation_turn(self, user_input: str, assistant_content: str) -> None:
-        """Append a user/assistant turn to conversation_memory so the next request has context."""
-        if self._conversation_memory is None:
-            return
-        self._conversation_memory.add(Message(role=MessageRole.USER, content=user_input))
-        self._conversation_memory.add(
-            Message(role=MessageRole.ASSISTANT, content=assistant_content or "")
-        )
+        """Append a user/assistant turn to memory for next context."""
+        if self._persistent_memory is not None:
+            self._persistent_memory.add_conversation_segment(user_input, role="user")
+            self._persistent_memory.add_conversation_segment(
+                assistant_content or "", role="assistant"
+            )
 
     async def _run_loop_response_async(self, user_input: str) -> Response[str]:
         """Run using the configured loop strategy with full observability (async)."""
