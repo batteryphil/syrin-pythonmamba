@@ -36,15 +36,15 @@ def test_stdio_one_input_one_output() -> None:
     assert "tokens" in out
 
 
-def test_stdio_with_thread_id() -> None:
-    """STDIO passes thread_id through to output."""
+def test_stdio_with_conversation_id() -> None:
+    """STDIO passes conversation_id through to output."""
     agent = _TestAgent()
     config = ServeConfig()
-    stdin = io.StringIO('{"message": "Hello", "thread_id": "task-123"}\n')
+    stdin = io.StringIO('{"message": "Hello", "conversation_id": "conv-123"}\n')
     stdout = io.StringIO()
     run_stdio_protocol(agent, config, stdin=stdin, stdout=stdout)
     out = json.loads(stdout.getvalue().strip())
-    assert out.get("thread_id") == "task-123"
+    assert out.get("conversation_id") == "conv-123"
     assert "content" in out
 
 

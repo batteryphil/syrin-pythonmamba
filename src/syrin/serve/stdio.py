@@ -21,8 +21,8 @@ def run_stdio_protocol(
     """Run STDIO JSON lines protocol. Blocks until EOF on stdin.
 
     Reads one JSON per line from stdin. Each line: {"input": "..."} or {"message": "..."}
-    with optional "thread_id". Writes one JSON per line to stdout with content, cost,
-    tokens, thread_id.
+    with optional "conversation_id". Writes one JSON per line to stdout with content, cost,
+    tokens, conversation_id.
 
     Args:
         agent: Agent to run.
@@ -47,19 +47,21 @@ def run_stdio_protocol(
             _write_out({"error": f"Invalid JSON: {e}"})
             continue
         msg = obj.get("input") or obj.get("message") or obj.get("content")
-        thread_id = obj.get("thread_id")
+        conversation_id = obj.get("conversation_id")
         if not isinstance(msg, str) or not msg.strip():
             _write_out({"error": "Missing 'input', 'message', or 'content'"})
             continue
         try:
+            if conversation_id is not None:
+                object.__setattr__(agent, "_conversation_id", conversation_id)
             r = agent.response(msg.strip())
             payload = {
                 "content": str(r.content),
                 "cost": r.cost,
                 "tokens": r.tokens.total_tokens if r.tokens else 0,
             }
-            if thread_id is not None:
-                payload["thread_id"] = thread_id
+            if conversation_id is not None:
+                payload["conversation_id"] = conversation_id
             _write_out(payload)
         except Exception as e:
-            _write_out({"error": str(e), "thread_id": thread_id})
+            _write_out({"error": str(e), "conversation_id": conversation_id})

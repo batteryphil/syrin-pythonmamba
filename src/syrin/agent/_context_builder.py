@@ -89,6 +89,8 @@ def build_messages(
 
     pulled_segments_data: list[dict[str, Any]] = []
     pull_scores_list: list[float] = []
+    output_chunks_data: list[dict[str, Any]] = []
+    output_chunk_scores_list: list[float] = []
 
     # Conversation: push (conversation_memory or persistent Memory) or pull (persistent Memory)
     effective_context = call_context
@@ -130,6 +132,31 @@ def build_messages(
         )
         messages.extend(mem_messages)
 
+    # Output chunks: when store_output_chunks=True, retrieve relevant chunks and add before current user
+    if (
+        effective_context is not None
+        and getattr(effective_context, "store_output_chunks", False)
+        and persistent_memory is not None
+    ):
+        top_k_oc = getattr(effective_context, "output_chunk_top_k", 5)
+        threshold_oc = getattr(effective_context, "output_chunk_threshold", 0.0)
+        oc_result = persistent_memory.get_relevant_output_chunks(
+            user_input, top_k=top_k_oc, threshold=threshold_oc
+        )
+        for seg, score in oc_result:
+            messages.append(
+                Message(
+                    role=MessageRole(seg.role)
+                    if seg.role in ("user", "assistant", "system")
+                    else MessageRole.ASSISTANT,
+                    content=seg.content,
+                )
+            )
+            output_chunks_data.append(
+                {"content": seg.content[:200], "role": seg.role, "score": score}
+            )
+            output_chunk_scores_list.append(score)
+
     messages.append(Message(role=MessageRole.USER, content=user_input))
 
     # To dicts for context manager
@@ -163,6 +190,8 @@ def build_messages(
         inject_source_detail=inject_source_detail,
         pulled_segments=pulled_segments_data,
         pull_scores=pull_scores_list,
+        output_chunks=output_chunks_data,
+        output_chunk_scores=output_chunk_scores_list,
     )
 
     final_messages = []

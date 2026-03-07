@@ -57,6 +57,18 @@ class FormationMode(StrEnum):
     PULL = "pull"
 
 
+class OutputChunkStrategy(StrEnum):
+    """How to split assistant content into chunks for retrieval by relevance.
+
+    Attributes:
+        PARAGRAPH: Split on blank lines (\\n\\n). Default.
+        FIXED: Split by fixed character size (output_chunk_size).
+    """
+
+    PARAGRAPH = "paragraph"
+    FIXED = "fixed"
+
+
 class CompactionMethod(StrEnum):
     """Method used when context compaction runs. See ContextCompactor for when each is chosen.
 

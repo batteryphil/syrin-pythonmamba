@@ -1,7 +1,7 @@
-"""Context store for pull-based context formation (Step 10).
+"""Context store for pull-based context formation (Step 10) and output chunks (Step 11).
 
 Store conversation segments; retrieve by relevance to the current query.
-Memory uses InMemoryContextStore internally for formation_mode=PULL.
+Memory uses InMemoryContextStore internally for formation_mode=PULL and output chunks.
 ContextStore/InMemoryContextStore remain available for custom implementations.
 """
 
@@ -79,6 +79,38 @@ class SimpleTextScorer:
 def _tokenize(text: str) -> list[str]:
     """Split text into word tokens."""
     return re.findall(r"\b\w+\b", text)
+
+
+def chunk_assistant_content(
+    content: str,
+    strategy: str = "paragraph",
+    chunk_size: int = 300,
+) -> list[str]:
+    """Split assistant content into chunks for relevance retrieval.
+
+    Args:
+        content: Full assistant reply text.
+        strategy: "paragraph" (split on \\n\\n) or "fixed" (by chunk_size chars).
+        chunk_size: Character size per chunk when strategy="fixed". Ignored for paragraph.
+
+    Returns:
+        List of non-empty chunk strings. Empty list if content is empty or whitespace-only.
+    """
+    text = (content or "").strip()
+    if not text:
+        return []
+
+    if strategy == "fixed":
+        chunks: list[str] = []
+        for i in range(0, len(text), chunk_size):
+            piece = text[i : i + chunk_size]
+            if piece.strip():
+                chunks.append(piece)
+        return chunks
+
+    # paragraph (default)
+    raw = re.split(r"\n\s*\n", text)
+    return [p.strip() for p in raw if p.strip()]
 
 
 @runtime_checkable
@@ -168,4 +200,5 @@ __all__ = [
     "InMemoryContextStore",
     "RelevanceScorer",
     "SimpleTextScorer",
+    "chunk_assistant_content",
 ]

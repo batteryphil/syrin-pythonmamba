@@ -144,13 +144,13 @@ def test_agent_two_system_prompts_raises() -> None:
 
 
 def test_agent_get_prompt_builtins() -> None:
-    """get_prompt_builtins returns date, agent_id, thread_id."""
+    """get_prompt_builtins returns date, agent_id, conversation_id."""
     agent = Agent(model=_almock(), system_prompt="Hi")
     builtins = agent.get_prompt_builtins()
     assert "date" in builtins
     assert "agent_id" in builtins
-    assert "thread_id" in builtins
-    assert builtins["thread_id"] is None
+    assert "conversation_id" in builtins
+    assert builtins["conversation_id"] is None
 
 
 def test_agent_inject_builtins_false() -> None:
@@ -159,7 +159,7 @@ def test_agent_inject_builtins_false() -> None:
     vars_ = agent.effective_prompt_vars()
     assert "date" not in vars_
     assert "agent_id" not in vars_
-    assert "thread_id" not in vars_
+    assert "conversation_id" not in vars_
 
 
 def test_agent_prompt_missing_var_raises() -> None:

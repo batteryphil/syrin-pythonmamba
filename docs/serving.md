@@ -208,9 +208,9 @@ agent.serve(protocol=ServeProtocol.STDIO)
 
 Reads one JSON per line from stdin, writes one JSON per line to stdout.
 
-**Input (stdin):** `{"input": "Hello", "thread_id": "optional"}`
+**Input (stdin):** `{"input": "Hello", "conversation_id": "optional"}`
 
-**Output (stdout):** `{"content": "...", "cost": 0.0, "tokens": N, "thread_id": "optional"}`
+**Output (stdout):** `{"content": "...", "cost": 0.0, "tokens": N, "conversation_id": "optional"}`
 
 Use for background tasks, subprocess, MCP host calling your agent.
 

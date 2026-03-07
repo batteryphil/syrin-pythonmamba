@@ -40,6 +40,11 @@ from syrin.context.config import (
 )
 from syrin.context.counter import TokenCount, TokenCounter, get_counter
 from syrin.context.injection import InjectPlacement, PrepareInput
+from syrin.context.map import (
+    ContextMap,
+    ContextMapBackend,
+    FileContextMapBackend,
+)
 from syrin.context.snapshot import (
     ContextBreakdown,
     ContextSegmentProvenance,
@@ -91,6 +96,10 @@ __all__ = [
     "ContextPayload",
     "DefaultContextManager",
     "create_context_manager",
+    # Map (persistent context map)
+    "ContextMap",
+    "ContextMapBackend",
+    "FileContextMapBackend",
     # Store (pull-based context)
     "ContextSegment",
     "ContextStore",

@@ -418,7 +418,7 @@ When a tool declares a first parameter named `ctx` (typed as `RunContext[YourDep
 |-----------|------|-------------|
 | `deps` | YourDeps | The injected dependencies (Agent.deps). |
 | `agent_name` | str | Current agent class name (e.g. `"Researcher"`). |
-| `thread_id` | str \| None | Current thread ID for state isolation. |
+| `conversation_id` | str \| None | Current conversation ID for state isolation (per-user or per-session). |
 | `budget_state` | BudgetState \| None | Current budget state (limit, remaining, spent, percent_used). |
 | `retry_count` | int | Current retry attempt (for output validation). |
 

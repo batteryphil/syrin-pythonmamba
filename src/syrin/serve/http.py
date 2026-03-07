@@ -104,7 +104,7 @@ def build_router(
     def _chat_body(r: dict[str, Any]) -> tuple[str, str | None]:
         message = r.get("message") or r.get("input") or r.get("content")
         if isinstance(message, str):
-            return message.strip(), r.get("thread_id")
+            return message.strip(), r.get("conversation_id")
         return "", None
 
     collect_debug = config.debug and config.enable_playground
@@ -116,7 +116,7 @@ def build_router(
     @router.post(_route("/chat"))
     async def chat(body: dict[str, Any] | None = Body(default=None)) -> Any:  # noqa: B008
         """Run agent and return full response. POST body: {message: str}."""
-        msg, thread_id = _chat_body(body or {})
+        msg, conversation_id = _chat_body(body or {})
         if not msg:
             return JSONResponse(
                 status_code=400,

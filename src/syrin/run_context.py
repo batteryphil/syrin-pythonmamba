@@ -27,7 +27,7 @@ class RunContext(Generic[DepsT]):
     Attributes:
         deps: The injected dependencies (Agent.deps).
         agent_name: Current agent class name (e.g. "Researcher").
-        thread_id: Current thread ID for state isolation, or None.
+        conversation_id: Current conversation ID for state isolation, or None.
         budget_state: Current budget state (limit, remaining, spent, percent_used)
             or None when no budget.
         retry_count: Current retry attempt (for output validation loops).
@@ -54,8 +54,8 @@ class RunContext(Generic[DepsT]):
     agent_name: str
     """Current agent class name (e.g. 'Researcher')."""
 
-    thread_id: str | None
-    """Current thread ID for state isolation, or None."""
+    conversation_id: str | None
+    """Current conversation ID for state isolation (per-user or per-session), or None."""
 
     budget_state: BudgetState | None
     """Current budget state or None when no budget."""

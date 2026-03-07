@@ -245,6 +245,7 @@ class Memory(BaseModel):
     _store: MemoryStore | None = PrivateAttr(default=None)
     _backend: MemoryBackendProtocol | None = PrivateAttr(default=None)
     _segment_store: Any = PrivateAttr(default=None)  # InMemoryContextStore, lazy-init
+    _output_chunk_store: Any = PrivateAttr(default=None)  # InMemoryContextStore, lazy-init
 
     backend: MemoryBackend = Field(
         default=MemoryBackend.MEMORY,
@@ -823,6 +824,55 @@ class Memory(BaseModel):
                 role_str = role.value if hasattr(role, "value") else str(role)
                 content = getattr(m, "content", "") or ""
             store.add_segment(ContextSegment(content=content, role=role_str))
+
+    def _get_output_chunk_store(self) -> Any:
+        """Lazy-init internal output chunk store for stored output chunks (Step 11)."""
+        if self._output_chunk_store is None:
+            from syrin.context.store import InMemoryContextStore
+
+            object.__setattr__(self, "_output_chunk_store", InMemoryContextStore())
+        return self._output_chunk_store
+
+    def add_output_chunks(
+        self,
+        content: str,
+        *,
+        turn_id: int | None = None,
+        strategy: str = "paragraph",
+        chunk_size: int = 300,
+    ) -> None:
+        """Chunk assistant content and store for relevance retrieval (Step 11).
+
+        When store_output_chunks=True, the agent calls this after each assistant turn.
+        Chunks are retrieved by relevance to the current query in build_messages.
+
+        Args:
+            content: Full assistant reply text.
+            turn_id: Optional turn index for ordering.
+            strategy: "paragraph" (split on blank lines) or "fixed" (by chunk_size).
+            chunk_size: Character size per chunk when strategy="fixed".
+        """
+        from syrin.context.store import ContextSegment, chunk_assistant_content
+
+        chunks = chunk_assistant_content(content, strategy=strategy, chunk_size=chunk_size)
+        if not chunks:
+            return
+        store = self._get_output_chunk_store()
+        for ch in chunks:
+            store.add_segment(ContextSegment(content=ch, role="assistant", turn_id=turn_id))
+
+    def get_relevant_output_chunks(
+        self,
+        query: str,
+        top_k: int = 5,
+        threshold: float = 0.0,
+    ) -> list[tuple[ContextSegment, float]]:
+        """Return output chunks most relevant to query, for stored output chunks (Step 11)."""
+        from syrin.context.store import ContextSegment as _CS
+
+        store = self._get_output_chunk_store()
+        result = store.get_relevant(query=query, top_k=top_k, threshold=threshold)
+        return cast(list[tuple[_CS, float]], result)
 
     def entries(
         self,

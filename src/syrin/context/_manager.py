@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from syrin.context.compactors import CompactionResult, ContextCompactor, ContextCompactorProtocol
 from syrin.context.config import Context, ContextStats, ContextWindowCapacity
 from syrin.context.counter import TokenCounter, get_counter
 from syrin.context.injection import InjectPlacement, PrepareInput
+from syrin.context.map import ContextMap
 from syrin.context.snapshot import (
     ContextBreakdown,
     ContextSegmentProvenance,
@@ -270,6 +271,8 @@ class DefaultContextManager:
         inject_source_detail: str | None = None,
         pulled_segments: list[dict[str, Any]] | None = None,
         pull_scores: list[float] | None = None,
+        output_chunks: list[dict[str, Any]] | None = None,
+        output_chunk_scores: list[float] | None = None,
     ) -> ContextPayload:
         """Prepare context for LLM call with automatic management.
 
@@ -332,10 +335,19 @@ class DefaultContextManager:
                 all_messages, mode, focused_keep
             )
 
-            # Resolve injected messages: per-call inject takes precedence over runtime_inject
+            # Resolve injected messages: map summary (if inject_map_summary), then inject or runtime_inject
             injected_msgs: list[dict[str, Any]] = []
+            if getattr(effective_context, "inject_map_summary", False):
+                ctx_map = self.get_map()
+                if ctx_map.summary and ctx_map.summary.strip():
+                    injected_msgs.append(
+                        {
+                            "role": "system",
+                            "content": f"[Session summary]\n{ctx_map.summary}",
+                        }
+                    )
             if inject is not None:
-                injected_msgs = list(inject)
+                injected_msgs.extend(list(inject))
                 self._injected_source_detail = inject_source_detail or getattr(
                     effective_context, "inject_source_detail", "injected"
                 )
@@ -354,7 +366,7 @@ class DefaultContextManager:
                     memory_context=memory_context,
                     user_input=user_input,
                 )
-                injected_msgs = runtime_inject_fn(prepare_input)
+                injected_msgs.extend(runtime_inject_fn(prepare_input))
                 self._injected_source_detail = getattr(
                     effective_context, "inject_source_detail", "injected"
                 )
@@ -484,6 +496,8 @@ class DefaultContextManager:
                     context_mode_dropped_count=self._context_mode_dropped_count,
                     pulled_segments=pulled_segments or [],
                     pull_scores=pull_scores or [],
+                    output_chunks=output_chunks or [],
+                    output_chunk_scores=output_chunk_scores or [],
                 )
                 self._last_snapshot = snap
                 self._emit(
@@ -573,6 +587,8 @@ class DefaultContextManager:
         context_mode_dropped_count: int = 0,
         pulled_segments: list[dict[str, Any]] | None = None,
         pull_scores: list[float] | None = None,
+        output_chunks: list[dict[str, Any]] | None = None,
+        output_chunk_scores: list[float] | None = None,
     ) -> ContextSnapshot:
         """Build ContextSnapshot from the last prepare state. Breakdown is computed once in prepare()."""
         import time
@@ -672,7 +688,48 @@ class DefaultContextManager:
             context_mode_dropped_count=context_mode_dropped_count,
             pulled_segments=pulled_segments or [],
             pull_scores=pull_scores or [],
+            output_chunks=output_chunks or [],
+            output_chunk_scores=output_chunk_scores or [],
         )
+
+    def _get_map_backend(self) -> Any:
+        """Lazy-init map backend from context. Returns None when map_backend is None."""
+        backend = getattr(self.context, "map_backend", None)
+        if backend != "file":
+            return None
+        path = getattr(self.context, "map_path", None) or ""
+        if not path.strip():
+            return None
+        from syrin.context.map import FileContextMapBackend
+
+        return FileContextMapBackend(path)
+
+    def get_map(self) -> ContextMap:
+        """Return the persistent context map. Empty if no backend configured."""
+        backend = self._get_map_backend()
+        if backend is None:
+            return ContextMap()
+        return cast(ContextMap, backend.load())
+
+    def update_map(self, partial: ContextMap | dict[str, Any]) -> None:
+        """Merge partial into the map and persist. No-op if no backend."""
+        import time as _time
+
+        backend = self._get_map_backend()
+        if backend is None:
+            return
+        current = backend.load()
+        p = ContextMap.from_dict(partial) if isinstance(partial, dict) else partial
+        if p.topics:
+            current.topics = list(p.topics)
+        if p.decisions:
+            current.decisions = list(p.decisions)
+        if p.segment_ids:
+            current.segment_ids = list(p.segment_ids)
+        if p.summary or (isinstance(partial, dict) and "summary" in partial):
+            current.summary = p.summary
+        current.last_updated = _time.time()
+        backend.save(current)
 
     def snapshot(self) -> ContextSnapshot:
         """Return a point-in-time view of the context from the last prepare.

@@ -16,7 +16,7 @@ class PromptContext:
     """Context passed to callable system prompts at resolution time.
 
     Enables dynamic prompts that access agent state, memory, budget,
-    and built-in values (date, agent_id, thread_id).
+    and built-in values (date, agent_id, conversation_id).
     """
 
     agent: Any
@@ -25,8 +25,8 @@ class PromptContext:
     agent_id: str
     """Agent name (for routing, logging). Same as agent.name or class name."""
 
-    thread_id: str | None
-    """Current thread ID for state isolation. None if not set."""
+    conversation_id: str | None
+    """Current conversation ID for state isolation (per-user or per-session). None if not set."""
 
     memory: Any
     """Persistent memory backend (Memory) or None. Use for ctx.memory.recall(...)."""
@@ -38,7 +38,7 @@ class PromptContext:
     """Current UTC datetime. For prompts that need \"today's date\"."""
 
     builtins: dict[str, Any] = field(default_factory=dict)
-    """Built-in vars (date, agent_id, thread_id) that would be injected. For introspection."""
+    """Built-in vars (date, agent_id, conversation_id) that would be injected. For introspection."""
 
     def __post_init__(self) -> None:
         if self.builtins is None:
@@ -48,7 +48,7 @@ class PromptContext:
 def make_prompt_context(
     agent: Any,
     *,
-    thread_id: str | None = None,
+    conversation_id: str | None = None,
     inject_builtins: bool = True,
 ) -> PromptContext:
     """Build PromptContext from an Agent instance."""
@@ -70,12 +70,12 @@ def make_prompt_context(
         builtins = {
             "date": date_val,
             "agent_id": agent_id,
-            "thread_id": thread_id,
+            "conversation_id": conversation_id,
         }
     return PromptContext(
         agent=agent,
         agent_id=str(agent_id),
-        thread_id=thread_id,
+        conversation_id=conversation_id,
         memory=memory,
         budget_state=budget_state,
         date=date_val,

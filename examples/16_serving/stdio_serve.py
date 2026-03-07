@@ -7,8 +7,8 @@ For background tasks, subprocess, MCP host calling your agent.
 
 Requires: uv pip install syrin[serve]
 
-Input (stdin): {"input": "Hello", "thread_id": "optional"}
-Output (stdout): {"content": "...", "cost": 0.0, "tokens": N, "thread_id": "optional"}
+Input (stdin): {"input": "Hello", "conversation_id": "optional"}
+Output (stdout): {"content": "...", "cost": 0.0, "tokens": N, "conversation_id": "optional"}
 
 Run: echo '{"input": "Hi"}' | python -m examples.serving.stdio_serve
 """

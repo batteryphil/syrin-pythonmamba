@@ -114,6 +114,10 @@ class ContextSnapshot:
     """When formation_mode=pull: segments retrieved from context store (content, role, score)."""
     pull_scores: list[float] = field(default_factory=list)
     """Relevance scores for pulled_segments."""
+    output_chunks: list[dict[str, Any]] = field(default_factory=list)
+    """When store_output_chunks=True: assistant chunks retrieved by relevance (content, role, score)."""
+    output_chunk_scores: list[float] = field(default_factory=list)
+    """Relevance scores for output_chunks."""
 
     def to_dict(self, include_raw_messages: bool = False) -> dict[str, Any]:
         """Export snapshot for visualization or logging. JSON-serializable."""
@@ -157,6 +161,8 @@ class ContextSnapshot:
             "context_mode_dropped_count": self.context_mode_dropped_count,
             "pulled_segments": self.pulled_segments,
             "pull_scores": self.pull_scores,
+            "output_chunks": self.output_chunks,
+            "output_chunk_scores": self.output_chunk_scores,
         }
         if include_raw_messages and self.raw_messages is not None:
             out["raw_messages"] = self.raw_messages

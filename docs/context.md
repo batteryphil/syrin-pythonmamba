@@ -57,6 +57,8 @@ Syrin’s context system manages **token limits**, **on-demand compaction**, and
 | **Full context view** (what, why, where, rot risk) | **agent.context.snapshot()** | **ContextSnapshot**: message_preview, provenance, why_included, breakdown, context_rot_risk; export via **to_dict()** for viz tools. |
 | **Inject RAG/dynamic context** at prepare time | **Context.runtime_inject** or **response(..., inject=...)** | See [Runtime context injection](#runtime-context-injection). |
 | **Limit conversation history** (topic shifts) | **Context.context_mode** (e.g. `focused`) + **Context.focused_keep** | Use `context_mode=ContextMode.FOCUSED` to keep only last N turns; reduces irrelevant history. |
+| **Long answers don't bloat context** | **Context.store_output_chunks=True** | Chunk assistant replies by paragraph; retrieve only relevant chunks for the current query. |
+| **Session summary across resets** | **Context.map_backend='file'** + **inject_map_summary=True** | Persistent context map (topics, decisions, summary) survives resets; inject at prepare to ground the model. |
 
 **Budget vs token caps:** **Budget** = cost limits in USD. **Context.token_limits** (TokenLimits) = token caps (run and/or per period). Same field names (run, per, on_exceeded) for consistency.
 
@@ -138,6 +140,14 @@ result = agent.response("Long conversation...")
 | **formation_mode** | How conversation history is fed into context. | **FormationMode**: `push` (default), `pull`. | **push** = use conversation memory; **pull** = use agent's Memory for segment storage and retrieval. |
 | **pull_top_k** | When `formation_mode=pull`, max segments per turn. | **int** (≥ 0). Default 10. | **Context(pull_top_k=5)** to limit pulled segments. |
 | **pull_threshold** | When `formation_mode=pull`, min relevance score. | **float** (0.0–1.0). Default 0.0. | **Context(pull_threshold=0.5)** to filter low-relevance segments. |
+| **store_output_chunks** | Chunk long assistant replies and retrieve by relevance (Step 11). | **bool**. Default False. | **Context(store_output_chunks=True)** to reduce context bloat from long answers. |
+| **output_chunk_top_k** | Max output chunks to include per turn when `store_output_chunks=True`. | **int** (≥ 0). Default 5. | **Context(output_chunk_top_k=10)**. |
+| **output_chunk_threshold** | Min relevance score (0.0–1.0) for output chunks. | **float**. Default 0.0. | **Context(output_chunk_threshold=0.2)**. |
+| **output_chunk_strategy** | How to split assistant content. | **OutputChunkStrategy**: `paragraph` (default), `fixed`. | **Context(output_chunk_strategy=OutputChunkStrategy.FIXED)**. |
+| **output_chunk_size** | Character size per chunk when strategy=`fixed`. | **int** (≥ 1). Default 300. | **Context(output_chunk_size=200)**. |
+| **map_backend** | Backend for persistent context map. | `None` (default) or `"file"`. | **Context(map_backend="file", map_path=".syrin/context_map.json")** |
+| **map_path** | File path when `map_backend="file"`. | **str**. Required when map_backend=file. | **Context(map_path=".syrin/context_map.json")** |
+| **inject_map_summary** | Inject map summary at prepare when non-empty. | **bool**. Default False. | **Context(inject_map_summary=True)** |
 
 Example:
 
@@ -453,6 +463,9 @@ Use it to debug context formation, feed visualization tools (e.g. Letta-style UI
 | **why_included** | `list[str]` | Human-readable reasons (e.g. "system prompt", "recalled memory", "conversation history", "current user message"). |
 | **context_rot_risk** | `"low" \| "medium" \| "high"` | Derived from utilization: low &lt; 60%, medium 60–70%, high ≥ 70%. |
 | **compacted**, **compact_method** | `bool`, `str \| None` | Whether compaction ran and which method. |
+| **output_chunks** | `list[dict]` | When `store_output_chunks=True`: chunks included (content snippet, role, score). |
+| **output_chunk_scores** | `list[float]` | Relevance scores for output_chunks. |
+| **pulled_segments**, **pull_scores** | (when `formation_mode=PULL`) | Segments retrieved from Memory; relevance scores. |
 
 **Export for visualization:** **`snapshot.to_dict()`** returns a JSON-serializable dict. Use **`to_dict(include_raw_messages=True)`** only when you need the full message list (can be large).
 
@@ -594,6 +607,70 @@ print(snap.pulled_segments, snap.pull_scores)
 ```
 
 **Snapshot:** When `formation_mode=PULL`, **ContextSnapshot** includes **pulled_segments** and **pull_scores** (content, role, score per segment).
+
+### Stored output chunks (store_output_chunks=True)
+
+When **store_output_chunks=True**, long assistant replies are chunked (e.g. by paragraph) and stored in Memory. For the next turn, only chunks relevant to the current query are retrieved and added to context. This keeps context lean when prior answers were long.
+
+**Requirements:** **store_output_chunks** requires **memory=Memory()** so chunks can be stored and retrieved.
+
+**Config:** **output_chunk_top_k** (default 5), **output_chunk_threshold** (0.0–1.0), **output_chunk_strategy** (paragraph or fixed), **output_chunk_size** (when strategy=fixed).
+
+**Example: Long answers, relevant chunks only**
+
+```python
+from syrin import Agent, Context, Model
+from syrin.memory import Memory
+
+agent = Agent(
+    model=Model.Almock(),
+    system_prompt="Be verbose. Use multiple paragraphs when explaining.",
+    memory=Memory(),
+    context=Context(
+        store_output_chunks=True,
+        output_chunk_top_k=5,
+        output_chunk_threshold=0.0,
+    ),
+)
+agent.response("Explain Syrin's memory system in detail.")
+# Next turn: only paragraphs relevant to "relevance threshold" are included
+agent.response("What about the relevance threshold?")
+snap = agent.context.snapshot()
+print(snap.output_chunks, snap.output_chunk_scores)
+```
+
+**Snapshot:** When **store_output_chunks=True**, **ContextSnapshot** includes **output_chunks** and **output_chunk_scores**.
+
+### Persistent context map (map_backend, inject_map_summary)
+
+The context map is a durable index (topics, key decisions, segment pointers, session summary) that survives context resets. It lives in a file or custom backend and drives retrieval and grounding.
+
+**Use cases:**
+- Session summary: persist a summary and inject it at prepare so the model stays grounded across restarts.
+- Topics / decisions: track what the conversation covers; use for pull logic or custom UI.
+
+**API:** **`agent.context.get_map()`** returns the current map; **`agent.context.update_map(partial)`** merges a partial map and persists. Pass a **ContextMap** or a dict with `topics`, `decisions`, `segment_ids`, `summary`.
+
+**Config:** **map_backend** (`"file"` or `None`), **map_path** (required when file), **inject_map_summary** (True = inject map summary as a system block at prepare when non-empty).
+
+**Example: session summary across resets**
+
+```python
+from syrin import Agent, Context, Model
+
+agent = Agent(
+    model=Model.Almock(),
+    context=Context(
+        map_backend="file",
+        map_path=".syrin/context_map.json",
+        inject_map_summary=True,
+    ),
+)
+# After a turn: optionally update the map
+agent.context.update_map({"summary": "User asked about Python; we discussed type hints."})
+agent.response("Continue from where we left off.")
+# Map summary is injected before the current turn.
+```
 
 ---
 
@@ -944,11 +1021,16 @@ async def run():
 
 ## Complete examples
 
-Runnable scripts in **examples/11_context/** showcase snapshot, breakdown, thresholds, and compaction:
+Runnable scripts in **examples/11_context/** showcase snapshot, breakdown, thresholds, compaction, injection, pull-based store, output chunks, and persistent map:
 
 - **context_management.py** — Tour: basics, snapshot, manual compaction, thresholds, custom ContextManager. Run: `python -m examples.11_context.context_management`
 - **context_snapshot_demo.py** — Full snapshot and breakdown (capacity, components, provenance, why_included, context_rot_risk, export). Run: `python -m examples.11_context.context_snapshot_demo`
 - **context_thresholds_compaction_demo.py** — Threshold at 50% triggers compaction; events and stats. Run: `python -m examples.11_context.context_thresholds_compaction_demo`
+- **context_proactive_compaction_demo.py** — `auto_compact_at=0.6` (proactive compaction). Run: `python -m examples.11_context.context_proactive_compaction_demo`
+- **context_runtime_injection_demo.py** — `runtime_inject` (RAG) and per-call `inject`. Run: `python -m examples.11_context.context_runtime_injection_demo`
+- **context_formation_mode_pull_demo.py** — Pull-based retrieval; `pulled_segments` and `pull_scores` in snapshot. Run: `python -m examples.11_context.context_formation_mode_pull_demo`
+- **context_output_chunks_demo.py** — Stored output chunks; long answers → relevant chunks only. Run: `python -m examples.11_context.context_output_chunks_demo`
+- **context_map_demo.py** — Persistent context map; session summary across resets. Run: `python -m examples.11_context.context_map_demo`
 
 See **examples/11_context/README.md** for a short index.
 

@@ -15,7 +15,7 @@ from syrin.budget import TokenLimits
 from syrin.context.compactors import ContextCompactor, ContextCompactorProtocol
 from syrin.context.injection import InjectPlacement
 from syrin.context.snapshot import ContextBreakdown
-from syrin.enums import ContextMode, FormationMode
+from syrin.enums import ContextMode, FormationMode, OutputChunkStrategy
 
 
 @dataclass
@@ -149,6 +149,24 @@ class Context:
     """When formation_mode=PULL, max segments to retrieve per turn."""
     pull_threshold: float = 0.0
     """When formation_mode=PULL, minimum relevance score (0.0-1.0) to include a segment."""
+    store_output_chunks: bool = False
+    """When True, chunk assistant replies and retrieve by relevance to current query (Step 11)."""
+    output_chunk_top_k: int = 5
+    """Max output chunks to include per turn when store_output_chunks=True."""
+    output_chunk_threshold: float = 0.0
+    """Min relevance score (0.0-1.0) for output chunks to include."""
+    output_chunk_strategy: OutputChunkStrategy = OutputChunkStrategy.PARAGRAPH
+    """How to split assistant content: paragraph (default) or fixed."""
+    output_chunk_size: int = 300
+    """Character size per chunk when output_chunk_strategy=fixed."""
+    map_backend: str | None = None
+    """Persistent map backend: 'file' or None. None = no persistence."""
+    map_path: str | None = None
+    """Path for file backend (e.g. '.syrin/context_map.json'). Used when map_backend='file'."""
+    map_update_every_turns: int | None = None
+    """Update map every N completed turns. None = never auto-update (manual only)."""
+    inject_map_summary: bool = False
+    """When True, inject map.summary as context before current turn."""
 
     def __post_init__(self) -> None:
         if self.reserve < 0:
@@ -168,6 +186,20 @@ class Context:
             raise ValueError(f"pull_top_k must be >= 0, got {self.pull_top_k}")
         if not 0.0 <= self.pull_threshold <= 1.0:
             raise ValueError(f"pull_threshold must be between 0 and 1, got {self.pull_threshold}")
+        if self.output_chunk_top_k < 0:
+            raise ValueError(f"output_chunk_top_k must be >= 0, got {self.output_chunk_top_k}")
+        if not 0.0 <= self.output_chunk_threshold <= 1.0:
+            raise ValueError(
+                f"output_chunk_threshold must be between 0 and 1, got {self.output_chunk_threshold}"
+            )
+        if self.output_chunk_strategy == OutputChunkStrategy.FIXED and self.output_chunk_size < 1:
+            raise ValueError(
+                f"output_chunk_size must be >= 1 when strategy=fixed, got {self.output_chunk_size}"
+            )
+        if self.map_backend is not None and self.map_backend != "file":
+            raise ValueError(f"map_backend must be 'file' or None, got {self.map_backend!r}")
+        if self.map_backend == "file" and not (self.map_path or "").strip():
+            raise ValueError("map_path is required when map_backend='file'")
         self._validate_thresholds()
 
     def _validate_thresholds(self) -> None:

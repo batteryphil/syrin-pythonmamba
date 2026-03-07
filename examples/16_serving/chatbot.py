@@ -1,8 +1,10 @@
 """Chatbot Example — Full-featured chatbot with context, memory, guardrails, and checkpoints.
 
 Demonstrates:
-- Context: Context(max_tokens=) for controlled context window
-- Memory: Memory with SQLite backend (persistent), 4 types, Decay, auto_store
+- Context: max_tokens, auto_compact_at (proactive compaction at 75% utilization)
+- Context enhancements: store_output_chunks (long answers → relevant chunks only),
+  persistent context map (session summary across restarts)
+- Memory: SQLite backend (persistent), 4 types, Decay, auto_store
 - remember tool: Explicit storage when user says "remember that X"
 - Guardrails: ContentFilter + LengthGuardrail for input/output safety
 - Checkpoints: CheckpointConfig with STEP trigger and memory storage
@@ -51,6 +53,7 @@ guardrails = [
 
 # Persistent SQLite memory — survives restarts; write_mode=SYNC for reliable testing
 MEMORY_DB = Path(__file__).resolve().parent / "chatbot_memory.db"
+MAP_PATH = Path(__file__).resolve().parent / "chatbot_context_map.json"
 memory = Memory(
     backend=MemoryBackend.SQLITE,
     path=str(MEMORY_DB),
@@ -101,7 +104,16 @@ def repeat_back(phrase: str) -> str:
     return f"You said: {phrase}"
 
 
-context = Context(max_tokens=16000)
+context = Context(
+    max_tokens=16000,
+    auto_compact_at=0.75,
+    store_output_chunks=True,
+    output_chunk_top_k=5,
+    output_chunk_threshold=0.0,
+    map_backend="file",
+    map_path=str(MAP_PATH),
+    inject_map_summary=True,
+)
 
 checkpoint = CheckpointConfig(
     storage="memory",
@@ -115,14 +127,16 @@ class Chatbot(Agent):
 
     _agent_name = "chatbot"
     _agent_description = (
-        "Conversational chatbot with persistent memory, guardrails, and checkpoints"
+        "Conversational chatbot with persistent memory, context enhancements "
+        "(output chunks, persistent map), guardrails, and checkpoints"
     )
     # Use gpt4_mini for real LLM (memory recall visible); almock for no-API-key demos
     model = gpt4_mini if os.getenv("OPENAI_API_KEY") else almock
     system_prompt = (
         "You are a helpful, friendly chatbot with persistent memory. "
-        "You recall past turns automatically. When the user asks you to remember something, "
-        "use the remember_fact tool. Use get_current_time when asked the time or date. "
+        "You recall past turns automatically. If a session summary is provided, stay grounded in it. "
+        "When the user asks you to remember something, use the remember_fact tool. "
+        "Use get_current_time when asked the time or date. "
         "Use repeat_back only when the user explicitly asks you to repeat or echo. "
         "Keep responses concise. Be respectful and safe."
     )
@@ -138,6 +152,8 @@ if __name__ == "__main__":
     agent = Chatbot()
     print("Chatbot serving at http://localhost:8000")
     print(f"  Memory: {MEMORY_DB} (persistent SQLite)")
+    print(f"  Context map: {MAP_PATH} (persistent, inject_map_summary=True)")
+    print("  Context: store_output_chunks=True, auto_compact_at=0.75")
     print("  POST /chat  — send messages")
     print("  GET /playground — web UI")
     agent.serve(port=8000, enable_playground=True, debug=True)

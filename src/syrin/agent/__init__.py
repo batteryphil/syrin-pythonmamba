@@ -9,6 +9,7 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 if TYPE_CHECKING:
+    from syrin.context.map import ContextMap
     from syrin.serve.config import ServeConfig  # noqa: F401
 
 from syrin.budget import (
@@ -41,6 +42,14 @@ class _ContextFacade:
     def snapshot(self) -> ContextSnapshot:
         """Return a point-in-time view of the context from the last prepare (full view: provenance, why_included, context_rot_risk)."""
         return self._manager.snapshot()
+
+    def get_map(self) -> ContextMap:
+        """Return the persistent context map. Empty if no map backend configured."""
+        return self._manager.get_map()
+
+    def update_map(self, partial: Any) -> None:
+        """Merge partial into the persistent map and persist. No-op if no map backend."""
+        return self._manager.update_map(partial)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._config, name)
@@ -855,7 +864,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             )
         self._loop = loop_instance
         self._last_iteration: int = 0
-        self._thread_id: str | None = None  # Set by run context; used in prompt vars
+        self._conversation_id: str | None = None  # Set by caller; scopes state per conversation
         self._child_count: int = 0
         if max_children is not None:
             self._max_children = max_children
@@ -2081,15 +2090,15 @@ class Agent(Servable, metaclass=_AgentMeta):
         return merged
 
     def get_prompt_builtins(self) -> dict[str, Any]:
-        """Return built-in vars (date, agent_id, thread_id) that would be injected."""
+        """Return built-in vars (date, agent_id, conversation_id) that would be injected."""
         from datetime import datetime, timezone
 
         agent_id = getattr(self, "_agent_name", None) or self.__class__.__name__
-        thread_id = getattr(self, "_thread_id", None)
+        conversation_id = getattr(self, "_conversation_id", None)
         return {
             "date": datetime.now(timezone.utc),
             "agent_id": agent_id,
-            "thread_id": thread_id,
+            "conversation_id": conversation_id,
         }
 
     def _resolve_system_prompt(
@@ -2160,8 +2169,10 @@ class Agent(Servable, metaclass=_AgentMeta):
 
         call_pv = getattr(self, "_call_prompt_vars", None) or {}
         effective_vars = self.effective_prompt_vars(call_vars=call_pv)
-        thread_id = getattr(self, "_thread_id", None)
-        ctx = make_prompt_context(self, thread_id=thread_id, inject_builtins=self._inject_builtins)
+        conversation_id = getattr(self, "_conversation_id", None)
+        ctx = make_prompt_context(
+            self, conversation_id=conversation_id, inject_builtins=self._inject_builtins
+        )
         emit = getattr(self, "_emit_event", None)
         if emit:
             emit(
@@ -2292,7 +2303,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                         ctx = RunContext(
                             deps=self._deps,
                             agent_name=cast(str, self._agent_name),
-                            thread_id=getattr(self, "_thread_id", None),
+                            conversation_id=getattr(self, "_conversation_id", None),
                             budget_state=self.budget_state,
                             retry_count=0,
                         )
@@ -2693,6 +2704,22 @@ class Agent(Servable, metaclass=_AgentMeta):
             self._persistent_memory.add_conversation_segment(
                 assistant_content or "", role="assistant"
             )
+            ctx_config = getattr(self._context, "context", None)
+            if (
+                ctx_config is not None
+                and getattr(ctx_config, "store_output_chunks", False)
+                and (assistant_content or "").strip()
+            ):
+                strat = getattr(ctx_config, "output_chunk_strategy", None)
+                strat_val = (
+                    strat.value if strat is not None and hasattr(strat, "value") else "paragraph"
+                )
+                size = getattr(ctx_config, "output_chunk_size", 300)
+                self._persistent_memory.add_output_chunks(
+                    assistant_content,
+                    strategy=strat_val,
+                    chunk_size=max(1, size),
+                )
 
     async def _run_loop_response_async(self, user_input: str) -> Response[str]:
         """Run using the configured loop strategy with full observability (async)."""

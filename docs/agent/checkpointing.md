@@ -111,7 +111,7 @@ agent2 = Agent(..., memory=BufferMemory(), checkpoint=...)
 agent2.load_checkpoint(cid)  # Restores messages + iteration
 ```
 
-For multi-thread or multi-user setups, use `save_checkpoint(name=f"{agent_name}_{thread_id}")` to scope checkpoints per thread.
+For multi-user or multi-conversation setups, use `save_checkpoint(name=f"{agent_name}_{conversation_id}")` to scope checkpoints per conversation.
 
 ## Automatic Checkpoints
 

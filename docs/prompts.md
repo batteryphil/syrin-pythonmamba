@@ -49,7 +49,7 @@ agent.response("Hi")  # Resolves persona_prompt at run time
 agent.response("Hi", prompt_vars={"user_name": "Bob"})
 ```
 
-**Built-ins:** When `inject_builtins=True` (default), `date`, `agent_id`, and `thread_id` are added to `prompt_vars` unless you already provide them.
+**Built-ins:** When `inject_builtins=True` (default), `date`, `agent_id`, and `conversation_id` are added to `prompt_vars` unless you already provide them.
 
 ---
 
@@ -95,14 +95,14 @@ def build_prompt(ctx: PromptContext) -> str:
 agent = Agent(model=Model.OpenAI("gpt-4o-mini"), system_prompt=build_prompt)
 ```
 
-`PromptContext` fields: `agent`, `agent_id`, `thread_id`, `memory`, `budget_state`, `date`, `builtins`.
+`PromptContext` fields: `agent`, `agent_id`, `conversation_id`, `memory`, `budget_state`, `date`, `builtins`.
 
 ---
 
 ## Introspection
 
 - **effective_prompt_vars(call_vars=None)** — merged prompt_vars (class + instance + call + builtins)
-- **get_prompt_builtins()** — `{date, agent_id, thread_id}` that would be injected
+- **get_prompt_builtins()** — `{date, agent_id, conversation_id}` that would be injected
 - **inject_builtins=False** — disable built-in injection
 
 ---

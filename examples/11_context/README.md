@@ -25,6 +25,15 @@ python -m examples.11_context.context_proactive_compaction_demo
 
 # Runtime context injection: RAG, per-call inject
 python -m examples.11_context.context_runtime_injection_demo
+
+# Formation mode: pull (relevance-based retrieval)
+python -m examples.11_context.context_formation_mode_pull_demo
+
+# Stored output chunks: long answers → relevant chunks only
+python -m examples.11_context.context_output_chunks_demo
+
+# Persistent context map: session summary across resets
+python -m examples.11_context.context_map_demo
 ```
 
 ## What each example shows
@@ -38,6 +47,9 @@ python -m examples.11_context.context_runtime_injection_demo
 | **context_custom_compaction_prompt_demo** | **Context(compaction_prompt=..., compaction_system_prompt=..., compaction_model=...)** to override summarization prompts and use an LLM when compaction runs. |
 | **context_compaction_methods_demo** | **CompactionMethod**: when you get **none**, **middle_out_truncate**, or **summarize** — uses ContextCompactor with different budgets/message counts to trigger each method. |
 | **context_runtime_injection_demo** | **Runtime injection**: **Context.runtime_inject** (RAG callable) and **response(inject=...)** per-call; snapshot provenance and **injected_tokens** in breakdown. |
+| **context_formation_mode_pull_demo** | **Formation mode PULL**: conversation segments stored in Memory, retrieved by relevance; snapshot **pulled_segments** and **pull_scores**. |
+| **context_output_chunks_demo** | **Stored output chunks**: long assistant replies chunked by paragraph; only relevant chunks included; snapshot **output_chunks** and **output_chunk_scores**. |
+| **context_map_demo** | **Persistent context map**: `map_backend="file"`, `inject_map_summary=True`; session summary survives resets; **get_map()** / **update_map()**. |
 
 ## Key APIs
 
@@ -46,3 +58,4 @@ python -m examples.11_context.context_runtime_injection_demo
 - **`Context(max_tokens=, reserve=, thresholds=[...])`** — Window size and actions at utilization %.
 - **`Context(auto_compact_at=0.6)`** — Proactively compact when utilization ≥ 60% (one knob; no threshold needed).
 - **`ContextThreshold(at=N, action=lambda evt: evt.compact())`** — Run compaction when usage hits N%.
+- **`agent.context.get_map()`** / **`agent.context.update_map(partial)`** — Persistent context map when `map_backend="file"`.
