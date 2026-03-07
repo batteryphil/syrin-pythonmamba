@@ -1,16 +1,19 @@
 """Context configuration and stats."""
 
 import dataclasses
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from syrin.threshold import ContextThreshold
 
 if TYPE_CHECKING:
+    from syrin.context.injection import PrepareInput
     from syrin.model import Model
 
 from syrin.budget import TokenLimits
 from syrin.context.compactors import ContextCompactor, ContextCompactorProtocol
+from syrin.context.injection import InjectPlacement
 from syrin.context.snapshot import ContextBreakdown
 
 
@@ -129,6 +132,12 @@ class Context:
     """Model for summarization. None = placeholder (no LLM). Passed to default ContextCompactor."""
     auto_compact_at: float | None = None
     """Proactive compaction: when utilization (0.0–1.0) >= this value, compact once before evaluating thresholds. None = no proactive compaction."""
+    runtime_inject: Callable[["PrepareInput"], list[dict[str, Any]]] | None = None
+    """Optional callable to inject context at prepare time (e.g. RAG). Receives PrepareInput; returns list of message dicts. Not called when prepare(inject=...) is provided."""
+    inject_placement: InjectPlacement = InjectPlacement.BEFORE_CURRENT_TURN
+    """Where to place injected messages: prepend_to_system, before_current_turn (default), after_current_turn."""
+    inject_source_detail: str = "injected"
+    """Provenance source_detail for injected messages (e.g. 'rag', 'dynamic_rules')."""
 
     def __post_init__(self) -> None:
         if self.reserve < 0:

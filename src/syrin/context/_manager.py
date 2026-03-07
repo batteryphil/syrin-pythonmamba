@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from syrin.context.compactors import CompactionResult, ContextCompactor, ContextCompactorProtocol
 from syrin.context.config import Context, ContextStats, ContextWindowCapacity
 from syrin.context.counter import TokenCounter, get_counter
+from syrin.context.injection import InjectPlacement, PrepareInput
 from syrin.context.snapshot import (
     ContextBreakdown,
     ContextSegmentProvenance,
@@ -131,6 +132,9 @@ class DefaultContextManager:
     _current_compact_fn: Callable[[], None] | None = field(default=None, repr=False)
     _run_compaction_count: int = field(default=0, repr=False)
     _last_snapshot: ContextSnapshot | None = field(default=None, repr=False)
+    _injected_indices: set[int] = field(default_factory=set, repr=False)
+    _injected_source_detail: str | None = field(default=None, repr=False)
+    _last_injected_messages: list[dict[str, Any]] = field(default_factory=list, repr=False)
 
     def __post_init__(self) -> None:
         """Apply Context.encoding and Context.compactor (or default with compaction_*) when set."""
@@ -166,6 +170,39 @@ class DefaultContextManager:
         """Set the tracer for observability."""
         self._tracer = tracer
 
+    def _merge_injected(
+        self,
+        messages: list[dict[str, Any]],
+        injected: list[dict[str, Any]],
+        placement: InjectPlacement,
+    ) -> tuple[list[dict[str, Any]], set[int]]:
+        """Merge injected messages into messages by placement. Return (merged, inserted_indices)."""
+        # Normalize injected: ensure role and content
+        normalized = []
+        for m in injected:
+            d = dict(m) if isinstance(m, dict) else {}
+            role = d.get("role", "user")
+            content = d.get("content", "")
+            normalized.append({"role": role, "content": content})
+
+        if not normalized:
+            return messages, set()
+
+        if placement == InjectPlacement.PREPEND_TO_SYSTEM:
+            merged = normalized + messages
+            return merged, set(range(len(normalized)))
+
+        if placement == InjectPlacement.AFTER_CURRENT_TURN:
+            merged = messages + normalized
+            return merged, set(range(len(messages), len(messages) + len(normalized)))
+
+        # BEFORE_CURRENT_TURN: insert before last message (current user)
+        if not messages:
+            return normalized, set(range(len(normalized)))
+        merged = messages[:-1] + normalized + messages[-1:]
+        start = len(messages) - 1
+        return merged, set(range(start, start + len(normalized)))
+
     def prepare(
         self,
         messages: list[dict[str, Any]],
@@ -174,6 +211,9 @@ class DefaultContextManager:
         memory_context: str = "",
         capacity: ContextWindowCapacity | None = None,
         context: Context | None = None,
+        *,
+        inject: list[dict[str, Any]] | None = None,
+        inject_source_detail: str | None = None,
     ) -> ContextPayload:
         """Prepare context for LLM call with automatic management.
 
@@ -185,6 +225,10 @@ class DefaultContextManager:
             capacity: Context window capacity (auto-created if not provided)
             context: Optional Context for this call only (overrides agent's context; capacity and thresholds).
                 When set, use its get_capacity() if capacity not provided, and its thresholds.
+            inject: Optional per-call injected messages (RAG, dynamic blocks). When provided,
+                runtime_inject callable is not used.
+            inject_source_detail: Provenance source_detail for inject (e.g. 'rag').
+                Default from Context.inject_source_detail when inject from runtime_inject.
 
         Returns:
             ContextPayload ready for LLM call
@@ -196,6 +240,10 @@ class DefaultContextManager:
             if span:
                 span.set_attribute("context.max_tokens", capacity.max_tokens)
                 span.set_attribute("context.available", capacity.available)
+
+            self._injected_indices = set()
+            self._injected_source_detail = None
+            self._last_injected_messages = []
 
             memory_msg: dict[str, Any] | None = None
             if memory_context:
@@ -220,6 +268,56 @@ class DefaultContextManager:
                     "content"
                 ):
                     all_messages = [system_msg] + all_messages
+
+            # Resolve injected messages: per-call inject takes precedence over runtime_inject
+            injected_msgs: list[dict[str, Any]] = []
+            if inject is not None:
+                injected_msgs = list(inject)
+                self._injected_source_detail = inject_source_detail or getattr(
+                    effective_context, "inject_source_detail", "injected"
+                )
+            elif getattr(effective_context, "runtime_inject", None) is not None:
+                runtime_inject_fn = effective_context.runtime_inject
+                assert runtime_inject_fn is not None
+                last_user = next(
+                    (m for m in reversed(messages) if m.get("role") == "user"),
+                    None,
+                )
+                user_input = last_user.get("content", "") if last_user else ""
+                prepare_input = PrepareInput(
+                    messages=all_messages,
+                    system_prompt=system_prompt,
+                    tools=tools,
+                    memory_context=memory_context,
+                    user_input=user_input,
+                )
+                injected_msgs = runtime_inject_fn(prepare_input)
+                self._injected_source_detail = getattr(
+                    effective_context, "inject_source_detail", "injected"
+                )
+
+            # Merge injected messages by placement
+            placement = getattr(
+                effective_context, "inject_placement", InjectPlacement.BEFORE_CURRENT_TURN
+            )
+            injected_tokens_count: int = 0
+            if injected_msgs:
+                all_messages, inserted_at = self._merge_injected(
+                    all_messages, injected_msgs, placement
+                )
+                self._injected_indices = inserted_at
+                self._last_injected_messages = [
+                    dict(all_messages[i]) for i in sorted(inserted_at) if i < len(all_messages)
+                ]
+                for i in inserted_at:
+                    if i < len(all_messages):
+                        msg = all_messages[i]
+                        content = msg.get("content", "")
+                        content_str = content if isinstance(content, str) else str(content)
+                        role = msg.get("role", "user")
+                        injected_tokens_count += self._counter.count(
+                            content_str
+                        ) + self._counter._role_overhead(role)
 
             tokens_before = self._counter.count_messages(all_messages).total
             tools_tokens = self._counter.count_tools(tools)
@@ -298,6 +396,7 @@ class DefaultContextManager:
                     memory_context=memory_context,
                     tools=tools,
                     tokens_used=tokens_used,
+                    injected_tokens=injected_tokens_count,
                 )
                 self._stats = ContextStats(
                     total_tokens=tokens_used,
@@ -428,7 +527,15 @@ class DefaultContextManager:
             )
             tok = self._counter.count(content_str) + self._counter._role_overhead(role)
 
-            if system_prompt and content_str.strip() == system_prompt.strip():
+            is_injected = any(
+                m.get("role") == role and str(m.get("content", "")) == content_str
+                for m in self._last_injected_messages
+            )
+            if is_injected:
+                source = ContextSegmentSource.INJECTED
+                detail = self._injected_source_detail or "injected"
+                why_included.append(f"injected: {detail}")
+            elif system_prompt and content_str.strip() == system_prompt.strip():
                 source = ContextSegmentSource.SYSTEM
                 why_included.append("system prompt")
             elif memory_context and "[Memory]" in content_str:
@@ -451,11 +558,14 @@ class DefaultContextManager:
                     source=source,
                 )
             )
+            prov_detail: str | None = f"message index {i}"
+            if source == ContextSegmentSource.INJECTED and self._injected_source_detail:
+                prov_detail = self._injected_source_detail
             provenances.append(
                 ContextSegmentProvenance(
                     segment_id=str(i),
                     source=source,
-                    source_detail=f"message index {i}",
+                    source_detail=prov_detail,
                 )
             )
 

@@ -54,6 +54,7 @@ Syrin’s context system manages **token limits**, **on-demand compaction**, and
 | Proactively compact at a fraction (e.g. 60%) | **Context.auto_compact_at** (e.g. `0.6`) | One knob; compaction runs once per prepare when utilization ≥ value; no threshold needed |
 | Per-call stats (tokens, utilization, compact_count) | **result.context_stats** or **agent.context_stats** | **result.context** = Context used for that call (overrides agent's when passed) |
 | **Full context view** (what, why, where, rot risk) | **agent.context.snapshot()** | **ContextSnapshot**: message_preview, provenance, why_included, breakdown, context_rot_risk; export via **to_dict()** for viz tools. |
+| **Inject RAG/dynamic context** at prepare time | **Context.runtime_inject** or **response(..., inject=...)** | See [Runtime context injection](#runtime-context-injection). |
 
 **Budget vs token caps:** **Budget** = cost limits in USD. **Context.token_limits** (TokenLimits) = token caps (run and/or per period). Same field names (run, per, on_exceeded) for consistency.
 
@@ -127,6 +128,9 @@ result = agent.response("Long conversation...")
 | **compaction_system_prompt** | Override the system prompt for the summarization LLM. | Optional **str**. **None** = default from **syrin.context.prompts**. | Use with **compaction_model** for custom summarization behavior. |
 | **compaction_model** | Model used for summarization when compaction runs. | Optional **Model**. **None** = placeholder (no LLM; keeps system + last 4 messages and a summary line). | Set to e.g. **Model.Almock()** or **Model.OpenAI("gpt-4o-mini")** for real LLM summarization. |
 | **auto_compact_at** | Proactively compact when context utilization reaches a fraction (e.g. 60%) to reduce context rot. | **float \| None** in **[0.0, 1.0]** (e.g. `0.6` = 60%). **None** = no proactive compaction. | **Context(auto_compact_at=0.6)** to compact once per prepare when utilization ≥ 60%; same **context.compact** event and compactor as threshold-triggered compaction. |
+| **runtime_inject** | Inject context at prepare time (e.g. RAG results, dynamic blocks). | Callable **PrepareInput → list[dict]** (role, content). Called when no per-call `inject` is provided. | **Context(runtime_inject=my_rag_fn)**; see [Runtime context injection](#runtime-context-injection). |
+| **inject_placement** | Where to place injected messages. | **InjectPlacement**: `prepend_to_system`, `before_current_turn` (default), `after_current_turn`. | `Context(inject_placement=InjectPlacement.BEFORE_CURRENT_TURN)` for RAG (docs before the question). |
+| **inject_source_detail** | Provenance label for injected content. | **str** (e.g. `"rag"`, `"dynamic_rules"`). | **Context(inject_source_detail="rag")**; appears in snapshot provenance and **why_included**. |
 
 Example:
 
@@ -436,7 +440,7 @@ Use it to debug context formation, feed visualization tools (e.g. Letta-style UI
 | **timestamp** | `float` | When the snapshot was taken. |
 | **total_tokens**, **max_tokens**, **tokens_available** | `int` | Capacity. |
 | **utilization_pct** | `float` | Used vs available (0–100). |
-| **breakdown** | **ContextBreakdown** | **system_tokens**, **tools_tokens**, **memory_tokens**, **messages_tokens**. |
+| **breakdown** | **ContextBreakdown** | **system_tokens**, **tools_tokens**, **memory_tokens**, **messages_tokens**, **injected_tokens**. |
 | **message_preview** | `list[MessagePreview]` | Per-message: **role**, **content_snippet**, **token_count**, **source** (system / memory / conversation / tools / current_prompt / injected). |
 | **provenance** | `list[ContextSegmentProvenance]` | Per segment: **segment_id**, **source**, **source_detail**. |
 | **why_included** | `list[str]` | Human-readable reasons (e.g. "system prompt", "recalled memory", "conversation history", "current user message"). |
@@ -459,6 +463,56 @@ data = snap.to_dict()
 ```
 
 **Hook:** **context.snapshot** is emitted after each **prepare** with payload **snapshot** (the **to_dict()** result) and **utilization_pct**.
+
+### Runtime context injection
+
+Inject additional context at prepare time (RAG results, dynamic rules, etc.) without changing the agent class.
+
+**Two options:**
+
+1. **Context.runtime_inject** — callable configured on Context, invoked each prepare.
+2. **Per-call inject** — pass `inject=` to **response()**, **arun()**, **stream()**, or **astream()**.
+
+**PrepareInput** (passed to `runtime_inject`) has: `messages`, `system_prompt`, `tools`, `memory_context`, `user_input`.
+
+**Placement** (InjectPlacement):
+- **prepend_to_system** — injected before the first system message.
+- **before_current_turn** (default) — injected between conversation history and the current user message (typical for RAG).
+- **after_current_turn** — injected after the current user message.
+
+Injected messages appear in the snapshot with `source=injected` and your `inject_source_detail` (e.g. `"rag"`). **ContextBreakdown** includes **injected_tokens**.
+
+**Example: RAG with runtime_inject:**
+
+```python
+from syrin import Agent, Context, Model
+from syrin.context import InjectPlacement, PrepareInput
+
+def rag_injector(inp: PrepareInput) -> list[dict]:
+    docs = vector_store.search(inp.user_input, top_k=5)
+    return [{"role": "system", "content": f"[RAG]\n{doc}"} for doc in docs]
+
+agent = Agent(
+    model=Model.Almock(),
+    context=Context(
+        runtime_inject=rag_injector,
+        inject_placement=InjectPlacement.BEFORE_CURRENT_TURN,
+        inject_source_detail="rag",
+    ),
+)
+result = agent.response("What does the docs say about X?")
+```
+
+**Example: Per-call inject (e.g. from async RAG layer):**
+
+```python
+docs = await fetch_rag(user_input)
+result = agent.response(
+    user_input,
+    inject=[{"role": "system", "content": f"[RAG]\n{d}"} for d in docs],
+    inject_source_detail="rag",
+)
+```
 
 **Handoff and spawn:** The same context snapshot is exposed in **HANDOFF_START** and **HANDOFF_BLOCKED** as **handoff_context**, and **SPAWN_START** includes **parent_context_tokens** (parent's snapshot token count). See [Handoff & Spawn](agent/handoff-spawn.md) for hook payloads and context visibility.
 
@@ -642,7 +696,9 @@ You can replace the compactor in a custom manager or extend **DefaultContextMana
 | **Context** | Config: max_tokens, reserve, thresholds, token_limits, encoding, compactor, **compaction_prompt**, **compaction_system_prompt**, **compaction_model**. **get_capacity(model)**. |
 | **ContextStats** | total_tokens, max_tokens, utilization, compacted, compact_count (this run only), compact_method, thresholds_triggered, **breakdown** (ContextBreakdown \| None; set after prepare). |
 | **ContextSnapshot** | Full view from **agent.context.snapshot()**: timestamp, total_tokens, max_tokens, utilization_pct, breakdown, message_preview, provenance, why_included, context_rot_risk, compacted, compact_method. **to_dict(include_raw_messages=False)** for export. |
-| **ContextBreakdown** | system_tokens, tools_tokens, memory_tokens, messages_tokens; **total_tokens** property. |
+| **ContextBreakdown** | system_tokens, tools_tokens, memory_tokens, messages_tokens, **injected_tokens**; **total_tokens** property. |
+| **InjectPlacement** | StrEnum: **PREPEND_TO_SYSTEM**, **BEFORE_CURRENT_TURN**, **AFTER_CURRENT_TURN**. Use with **Context.inject_placement**. |
+| **PrepareInput** | Dataclass passed to **runtime_inject**: messages, system_prompt, tools, memory_context, user_input. |
 | **MessagePreview** | role, content_snippet, token_count, **source** (ContextSegmentSource). |
 | **ContextSegmentProvenance** | segment_id, source, source_detail. |
 | **ContextSegmentSource** | StrEnum: SYSTEM, MEMORY, CONVERSATION, TOOLS, CURRENT_PROMPT, INJECTED. |

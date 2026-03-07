@@ -39,6 +39,7 @@ from syrin.context.config import (
     ContextWindowCapacity,
 )
 from syrin.context.counter import TokenCount, TokenCounter, get_counter
+from syrin.context.injection import InjectPlacement, PrepareInput
 from syrin.context.snapshot import (
     ContextBreakdown,
     ContextSegmentProvenance,
@@ -58,6 +59,8 @@ __all__ = [
     "BudgetThreshold",
     "ContextThreshold",
     # Snapshot
+    "InjectPlacement",
+    "PrepareInput",
     "ContextBreakdown",
     "ContextSegmentProvenance",
     "ContextSegmentSource",

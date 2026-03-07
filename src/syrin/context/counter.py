@@ -138,8 +138,9 @@ class TokenCounter:
         memory_context: str,
         tools: list[dict[str, Any]],
         tokens_used: int,
+        injected_tokens: int = 0,
     ) -> ContextBreakdown:
-        """Compute token breakdown by component (system, tools, memory, messages).
+        """Compute token breakdown by component (system, tools, memory, messages, injected).
 
         Used by the context manager to populate ContextSnapshot.breakdown and
         ContextStats.breakdown. messages_tokens is derived as the residual so
@@ -150,12 +151,11 @@ class TokenCounter:
             memory_context: Recalled memory text injected as [Memory] block (may be empty).
             tools: Tool definition dicts.
             tokens_used: Total token count for this prepare (authoritative total).
+            injected_tokens: Tokens in runtime-injected context (RAG, etc.). Default 0.
 
         Returns:
             ContextBreakdown with system_tokens, tools_tokens, memory_tokens,
-            and messages_tokens (residual). breakdown.total_tokens equals tokens_used
-            when tokens_used >= sum(system, tools, memory); otherwise messages_tokens
-            is clamped to 0.
+            messages_tokens (residual), and injected_tokens.
         """
         system_tokens = 0
         if system_prompt:
@@ -168,13 +168,14 @@ class TokenCounter:
             )
         messages_tokens = max(
             0,
-            tokens_used - system_tokens - tools_tokens - memory_tokens,
+            tokens_used - system_tokens - tools_tokens - memory_tokens - injected_tokens,
         )
         return ContextBreakdown(
             system_tokens=system_tokens,
             tools_tokens=tools_tokens,
             memory_tokens=memory_tokens,
             messages_tokens=messages_tokens,
+            injected_tokens=injected_tokens,
         )
 
     def _role_overhead(self, role: str) -> int:

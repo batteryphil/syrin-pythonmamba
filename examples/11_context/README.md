@@ -22,6 +22,9 @@ python -m examples.11_context.context_compaction_methods_demo
 
 # Proactive compaction: auto_compact_at (e.g. 0.6 = 60% utilization)
 python -m examples.11_context.context_proactive_compaction_demo
+
+# Runtime context injection: RAG, per-call inject
+python -m examples.11_context.context_runtime_injection_demo
 ```
 
 ## What each example shows
@@ -34,6 +37,7 @@ python -m examples.11_context.context_proactive_compaction_demo
 | **context_proactive_compaction_demo** | **Context(auto_compact_at=0.6)** — compact once per prepare when utilization ≥ 60%; no threshold needed; same **context.compact** event. |
 | **context_custom_compaction_prompt_demo** | **Context(compaction_prompt=..., compaction_system_prompt=..., compaction_model=...)** to override summarization prompts and use an LLM when compaction runs. |
 | **context_compaction_methods_demo** | **CompactionMethod**: when you get **none**, **middle_out_truncate**, or **summarize** — uses ContextCompactor with different budgets/message counts to trigger each method. |
+| **context_runtime_injection_demo** | **Runtime injection**: **Context.runtime_inject** (RAG callable) and **response(inject=...)** per-call; snapshot provenance and **injected_tokens** in breakdown. |
 
 ## Key APIs
 

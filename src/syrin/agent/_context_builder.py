@@ -31,6 +31,8 @@ def build_messages(
     get_capacity: Callable[[], ContextWindowCapacity],
     call_context: Context | None = None,
     tracer: Any = None,
+    inject: list[dict[str, Any]] | None = None,
+    inject_source_detail: str | None = None,
 ) -> list[Message]:
     """Build the message list for the next LLM call.
 
@@ -49,6 +51,8 @@ def build_messages(
         get_capacity: Callable that returns ContextWindowCapacity for this call.
         call_context: Optional per-call Context override.
         tracer: Optional tracer for spans (memory.recall).
+        inject: Optional per-call injected messages (RAG, dynamic blocks).
+        inject_source_detail: Provenance source_detail for injected messages (e.g. 'rag').
 
     Returns:
         List of Message ready for the LLM.
@@ -123,6 +127,8 @@ def build_messages(
         memory_context=memory_context,
         capacity=capacity,
         context=call_context,
+        inject=inject,
+        inject_source_detail=inject_source_detail,
     )
 
     final_messages = []

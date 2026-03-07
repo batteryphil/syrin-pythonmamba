@@ -2202,6 +2202,8 @@ class Agent(Servable, metaclass=_AgentMeta):
             get_capacity=get_capacity,
             call_context=getattr(self, "_call_context", None),
             tracer=self._tracer,
+            inject=getattr(self, "_call_inject", None),
+            inject_source_detail=getattr(self, "_call_inject_source_detail", None),
         )
 
     def _build_output(
@@ -2778,6 +2780,9 @@ class Agent(Servable, metaclass=_AgentMeta):
         user_input: str,
         context: Context | None = None,
         prompt_vars: dict[str, Any] | None = None,
+        *,
+        inject: list[dict[str, Any]] | None = None,
+        inject_source_detail: str | None = None,
     ) -> Response[str]:
         """Run the agent: LLM completion + tool loop. Synchronous.
 
@@ -2792,6 +2797,9 @@ class Agent(Servable, metaclass=_AgentMeta):
                 used for this call is on ``result.context``; per-call stats on ``result.context_stats``.
             prompt_vars: Optional per-call prompt vars for dynamic system prompts.
                 Overrides instance prompt_vars for this call only.
+            inject: Optional per-call context injection (RAG results, dynamic blocks).
+                Each item is a dict with ``role`` and ``content``. Overrides Context.runtime_inject when provided.
+            inject_source_detail: Provenance label for inject (e.g. 'rag').
 
         Returns:
             Response with content, cost, tokens, model, stop_reason, structured
@@ -2804,6 +2812,8 @@ class Agent(Servable, metaclass=_AgentMeta):
         _validate_user_input(user_input, "response")
         self._call_context = context
         self._call_prompt_vars = dict(prompt_vars) if prompt_vars else None
+        self._call_inject = inject
+        self._call_inject_source_detail = inject_source_detail
         try:
             self._run_report = AgentReport()
             if self._budget is not None or self._token_limits is not None:
@@ -2821,12 +2831,17 @@ class Agent(Servable, metaclass=_AgentMeta):
         finally:
             self._call_context = None
             self._call_prompt_vars = None
+            self._call_inject = None
+            self._call_inject_source_detail = None
 
     async def arun(
         self,
         user_input: str,
         context: Context | None = None,
         prompt_vars: dict[str, Any] | None = None,
+        *,
+        inject: list[dict[str, Any]] | None = None,
+        inject_source_detail: str | None = None,
     ) -> Response[str]:
         """Run the agent asynchronously. Same as response() but non-blocking.
 
@@ -2849,6 +2864,8 @@ class Agent(Servable, metaclass=_AgentMeta):
         _validate_user_input(user_input, "arun")
         self._call_context = context
         self._call_prompt_vars = dict(prompt_vars) if prompt_vars else None
+        self._call_inject = inject
+        self._call_inject_source_detail = inject_source_detail
         try:
             self._run_report = AgentReport()
             if self._budget is not None or self._token_limits is not None:
@@ -2866,12 +2883,17 @@ class Agent(Servable, metaclass=_AgentMeta):
         finally:
             self._call_context = None
             self._call_prompt_vars = None
+            self._call_inject = None
+            self._call_inject_source_detail = None
 
     def stream(
         self,
         user_input: str,
         context: Context | None = None,
         prompt_vars: dict[str, Any] | None = None,
+        *,
+        inject: list[dict[str, Any]] | None = None,
+        inject_source_detail: str | None = None,
     ) -> Iterator[StreamChunk]:
         """Stream response text as it arrives. Synchronous iterator.
 
@@ -2898,6 +2920,8 @@ class Agent(Servable, metaclass=_AgentMeta):
         _validate_user_input(user_input, "stream")
         self._call_context = context
         self._call_prompt_vars = dict(prompt_vars) if prompt_vars else None
+        self._call_inject = inject
+        self._call_inject_source_detail = inject_source_detail
         try:
             if self._budget is not None or self._token_limits is not None:
                 self._budget_tracker.reset_run()
@@ -2907,12 +2931,17 @@ class Agent(Servable, metaclass=_AgentMeta):
         finally:
             self._call_context = None
             self._call_prompt_vars = None
+            self._call_inject = None
+            self._call_inject_source_detail = None
 
     async def astream(
         self,
         user_input: str,
         context: Context | None = None,
         prompt_vars: dict[str, Any] | None = None,
+        *,
+        inject: list[dict[str, Any]] | None = None,
+        inject_source_detail: str | None = None,
     ) -> AsyncIterator[StreamChunk]:
         """Stream response text as it arrives. Async iterator.
 
@@ -2934,6 +2963,8 @@ class Agent(Servable, metaclass=_AgentMeta):
         _validate_user_input(user_input, "astream")
         self._call_context = context
         self._call_prompt_vars = dict(prompt_vars) if prompt_vars else None
+        self._call_inject = inject
+        self._call_inject_source_detail = inject_source_detail
         try:
             if self._budget is not None or self._token_limits is not None:
                 self._budget_tracker.reset_run()
@@ -3042,6 +3073,8 @@ class Agent(Servable, metaclass=_AgentMeta):
         finally:
             self._call_context = None
             self._call_prompt_vars = None
+            self._call_inject = None
+            self._call_inject_source_detail = None
 
     def as_router(self, config: Any | None = None, **config_kwargs: Any) -> Any:
         """Return a FastAPI APIRouter for this agent. Mount on your app.

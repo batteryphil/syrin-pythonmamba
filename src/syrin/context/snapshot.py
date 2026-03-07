@@ -37,7 +37,7 @@ def _context_rot_risk_from_utilization(utilization_pct: float) -> ContextRotRisk
 
 @dataclass
 class ContextBreakdown:
-    """Token counts by component (system, tools, memory, conversation messages)."""
+    """Token counts by component (system, tools, memory, conversation messages, injected)."""
 
     system_tokens: int = 0
     """Tokens in system prompt."""
@@ -47,11 +47,19 @@ class ContextBreakdown:
     """Tokens in recalled memory block."""
     messages_tokens: int = 0
     """Tokens in conversation + current user message."""
+    injected_tokens: int = 0
+    """Tokens in runtime-injected context (RAG, dynamic blocks)."""
 
     @property
     def total_tokens(self) -> int:
         """Total tokens across all components."""
-        return self.system_tokens + self.tools_tokens + self.memory_tokens + self.messages_tokens
+        return (
+            self.system_tokens
+            + self.tools_tokens
+            + self.memory_tokens
+            + self.messages_tokens
+            + self.injected_tokens
+        )
 
 
 @dataclass
@@ -111,6 +119,7 @@ class ContextSnapshot:
                 "tools_tokens": self.breakdown.tools_tokens,
                 "memory_tokens": self.breakdown.memory_tokens,
                 "messages_tokens": self.breakdown.messages_tokens,
+                "injected_tokens": self.breakdown.injected_tokens,
                 "total_tokens": self.breakdown.total_tokens,
             },
             "compacted": self.compacted,
