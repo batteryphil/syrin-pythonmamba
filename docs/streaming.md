@@ -569,10 +569,10 @@ A: No, same tokens. Streaming just displays them as they arrive.
 A: Not overall, but feels faster because user sees progress.
 
 **Q: Can I stream with tools?**
-A: Yes! Tools work normally, response is streamed.
+A: No. `stream()` and `astream()` perform a single LLM completion and do not run the tool loop. If your agent has tools, use `response()` or `arun()` instead. For voice or WebSocket integrations that need streaming and tools, call `arun()` and emit the returned text.
 
 **Q: Should I always use streaming?**
-A: Only for long responses. For short responses, use normal `run()`.
+A: No. Use streaming for long responses where you want token-by-token output. For short responses or when you need tool execution, use `response()` or `arun()`.
 
 ## Next Steps
 
