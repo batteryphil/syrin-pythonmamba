@@ -140,6 +140,113 @@ class MemoryAgent(Agent):
 
 ---
 
+## Knowledge (RAG)
+
+Load documents from files, URLs, or raw text and attach them to an agent as a searchable knowledge base. Documents are normalized to a common `Document` type with `content`, `source`, `source_type`, and optional `metadata`.
+
+**Document model:** Immutable. Required: `content`, `source`, `source_type`. Optional: `metadata` (e.g. page, section).
+
+**Source constructors (via `Knowledge.*`):**
+
+- **Files:** `Knowledge.PDF(path)`, `Knowledge.Markdown(path)`, `Knowledge.TextFile(path)`, `Knowledge.YAML(path)`, `Knowledge.JSON(path, jq_path=...)`, `Knowledge.Python(path)`
+- **Directories:** `Knowledge.Directory(path, glob="**/*.md", pattern=..., recursive=True)`
+- **Raw text:** `Knowledge.Text("inline fact")`, `Knowledge.Texts(["fact1", "fact2"])`
+- **Remote:** `Knowledge.URL(url)`, `Knowledge.GitHub(username, repos=["repo1", "repo2"])` (or `repos=None` for all public repos)
+
+**Knowledge class (orchestrator):** Full pipeline: load → chunk → embed → store → search. Requires `embedding` (e.g. `Embedding.OpenAI`). Lazy ingest on first `search()`.
+
+```python
+from syrin import Knowledge, KnowledgeBackend
+from syrin.embedding import Embedding
+from syrin.knowledge import Document
+
+# Document: immutable, with source and source_type
+doc = Document(content="Hello", source="user_provided", source_type="text")
+
+# Build sources (loaders)
+sources = [
+    Knowledge.PDF("./resume.pdf"),
+    Knowledge.Markdown("./about.md"),
+    Knowledge.Text("I have 5 years of Python experience."),
+    Knowledge.GitHub("myorg", repos=["project-a", "project-b"]),
+]
+
+# Knowledge orchestrator (embedding required)
+knowledge = Knowledge(
+    sources=sources,
+    embedding=Embedding.OpenAI("text-embedding-3-small"),
+    backend=KnowledgeBackend.MEMORY,  # or POSTGRES, SQLITE, etc.
+)
+
+# Attach to Agent for auto search_knowledge tool
+# agent = Agent(model=..., knowledge=knowledge)
+# await knowledge.ingest()  # or lazy on first search
+# results = await knowledge.search("Python experience")
+```
+
+**Agentic RAG:** Set `agentic=True` to add `search_knowledge_deep` (multi-step retrieval) and `verify_knowledge` (claim verification) tools. The agent gets control over query decomposition, result grading, and iterative refinement.
+
+```python
+from syrin.embedding import Embedding
+from syrin.knowledge import AgenticRAGConfig, Knowledge
+
+knowledge = Knowledge(
+    sources=[Knowledge.PDF("./resume.pdf"), Knowledge.Text("Fact.")],
+    embedding=Embedding.OpenAI("text-embedding-3-small"),
+    backend=KnowledgeBackend.MEMORY,
+    agentic=True,
+    agentic_config=AgenticRAGConfig(
+        max_search_iterations=3,
+        decompose_complex=True,
+        grade_results=True,
+        relevance_threshold=0.5,
+        search_model=None,  # None = use agent's model
+    ),
+)
+# Agent gets: search_knowledge, search_knowledge_deep, verify_knowledge
+```
+
+**Hooks:** `KNOWLEDGE_AGENTIC_DECOMPOSE`, `KNOWLEDGE_AGENTIC_GRADE`, `KNOWLEDGE_AGENTIC_REFINE`, `KNOWLEDGE_AGENTIC_VERIFY`.
+
+**Knowledge Store (vector backends):** Store chunks with embeddings for semantic search. Use `get_knowledge_store(backend, ...)` or instantiate directly.
+
+- **Backends:** `KnowledgeBackend.MEMORY` (testing, no deps), `KnowledgeBackend.POSTGRES` (pgvector, production), `KnowledgeBackend.QDRANT`, `KnowledgeBackend.CHROMA`, `KnowledgeBackend.SQLITE` (sqlite-vec)
+- **Protocol:** `KnowledgeStore` has `upsert(chunks, embeddings)`, `search(query_embedding, top_k, filter, score_threshold)`, `delete(source=..., document_id=...)`, `count()`
+- **Optional deps:** `syrin[knowledge-postgres]` (asyncpg, pgvector), `syrin[knowledge-sqlite]` (sqlite-vec). Qdrant/Chroma use existing `syrin[qdrant]` / `syrin[chroma]`.
+
+```python
+from syrin import get_knowledge_store, KnowledgeBackend
+from syrin.knowledge import Chunk
+from syrin.knowledge.stores import InMemoryKnowledgeStore
+
+# In-memory (no deps)
+store = InMemoryKnowledgeStore(embedding_dimensions=1536)
+
+# Or via factory
+store = get_knowledge_store(KnowledgeBackend.MEMORY, embedding_dimensions=1536)
+# Postgres: get_knowledge_store(KnowledgeBackend.POSTGRES, connection_url="...", embedding_dimensions=1536)
+```
+
+**Loaders:** Each source has `.load()` (sync) and `.aload()` (async). `GitHubLoader` and `URLLoader` require async (`.aload()`). All return `list[Document]`.
+
+**Chunking:** Split documents into retrieval-optimized chunks with `ChunkConfig`, `ChunkStrategy`, and `get_chunker()`. Requires `syrin[knowledge]` (chonkie).
+
+- **Strategies:** `RECURSIVE` (default for general text), `MARKDOWN` (header-aware), `PAGE` (one chunk per page), `CODE` (AST-aware), `SENTENCE`, `TOKEN`, `SEMANTIC` (needs `config.embedding`), `AUTO` (selects by `source_type`: code → CODE, markdown → MARKDOWN, pdf+has_pages → PAGE, else RECURSIVE).
+- **Config:** `ChunkConfig(strategy=..., chunk_size=512, chunk_overlap=0, min_chunk_size=50, ...)`. Use `get_chunker(config)` to get a `Chunker`; call `chunker.chunk(documents)` or `await chunker.achunk(documents)` for async (e.g. SemanticChunker).
+- **Chunk:** Each chunk has `content`, `metadata`, `document_id` (= document source), `chunk_index`, `token_count`. Metadata includes `chunk_strategy` and, for markdown, optional `heading_hierarchy`.
+
+```python
+from syrin.knowledge import Document, ChunkConfig, ChunkStrategy, get_chunker
+
+docs = [Document(content="Long text...", source="doc.txt", source_type="text")]
+config = ChunkConfig(strategy=ChunkStrategy.RECURSIVE, chunk_size=256, min_chunk_size=0)
+chunker = get_chunker(config)
+chunks = chunker.chunk(docs)
+# chunks[i].content, .document_id, .chunk_index, .token_count, .metadata
+```
+
+---
+
 ## Response Object
 
 What you get back from `agent.response()`:

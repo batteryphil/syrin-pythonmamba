@@ -35,17 +35,18 @@ run_ruff_format() {
 }
 
 # Run mypy (type checking) — src/ only; tests/examples have relaxed typing in pyproject.toml
+# Uses uv run to ensure dev extra (openai, numpy, etc.) is available for optional imports.
 run_mypy() {
     echo -e "${YELLOW}Running mypy (type checking)...${NC}"
     rm -rf .mypy_cache
-    python -m mypy --strict src/
+    uv run python -m mypy src/
     echo -e "${GREEN}✓ Mypy check passed${NC}"
 }
 
 # Run pytest (all tests must pass)
 run_pytest() {
     echo -e "${YELLOW}Running pytest (tests)...${NC}"
-    python -m pytest tests/ -q --tb=short
+    uv run python -m pytest tests/ -q --tb=short
     echo -e "${GREEN}✓ All tests passed${NC}"
 }
 

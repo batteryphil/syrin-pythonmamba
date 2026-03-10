@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 import uuid
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -40,6 +41,44 @@ class TestEmbeddingConfig:
         cfg = EmbeddingConfig(custom_fn=wrong_size, dimensions=384)
         with pytest.raises(ValueError, match="returned 2 dimensions"):
             cfg.embed("test")
+
+    def test_embed_sync_with_provider_raises(self) -> None:
+        """embed() raises when embedding_provider is set (must use embed_async)."""
+        mock_provider = AsyncMock()
+        cfg = EmbeddingConfig(embedding_provider=mock_provider, dimensions=384)
+
+        with pytest.raises(ValueError, match="is sync"):
+            cfg.embed("hello")
+
+    @pytest.mark.asyncio
+    async def test_embed_async_with_provider(self) -> None:
+        """embed_async() uses embedding_provider."""
+        mock_provider = AsyncMock()
+        mock_provider.embed = AsyncMock(return_value=[[0.1] * 384])
+        cfg = EmbeddingConfig(embedding_provider=mock_provider, dimensions=384)
+
+        result = await cfg.embed_async("hello")
+
+        assert result == [0.1] * 384
+        mock_provider.embed.assert_called_once_with(["hello"])
+
+    @pytest.mark.asyncio
+    async def test_embed_async_without_provider_raises(self) -> None:
+        """embed_async() raises when embedding_provider is not set."""
+        cfg = EmbeddingConfig(dimensions=384)
+
+        with pytest.raises(ValueError, match="requires embedding_provider"):
+            await cfg.embed_async("hello")
+
+    @pytest.mark.asyncio
+    async def test_embed_async_empty_result_raises(self) -> None:
+        """embed_async() raises when provider returns empty result."""
+        mock_provider = AsyncMock()
+        mock_provider.embed = AsyncMock(return_value=[])
+        cfg = EmbeddingConfig(embedding_provider=mock_provider, dimensions=384)
+
+        with pytest.raises(ValueError, match="empty result"):
+            await cfg.embed_async("hello")
 
 
 class TestMemoryWithEmbeddingConfig:

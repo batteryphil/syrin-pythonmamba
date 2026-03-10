@@ -544,6 +544,43 @@ class BudgetTracker:
         with self._lock:
             self._reserved = max(0.0, self._reserved - amount)
 
+    def record_external(
+        self,
+        service: str,
+        cost_usd: float,
+        metadata: dict[str, object] | None = None,
+    ) -> None:
+        """Record a non-LLM cost (embedding, TTS, STT, external API, etc.).
+
+        Args:
+            service: Service identifier (e.g. "openai_embedding", "deepgram_stt").
+            cost_usd: Cost in USD.
+            metadata: Optional extra context (model, token_count, etc.).
+
+        Example:
+            tracker.record_external(
+                service="openai_embedding",
+                cost_usd=0.0001,
+                metadata={"model": "text-embedding-3-small", "token_count": 5000},
+            )
+        """
+        if cost_usd < 0:
+            raise ValueError(f"cost_usd cannot be negative, got {cost_usd}")
+        model_name = str(metadata.get("model", service)) if metadata else service
+        token_count = metadata.get("token_count", 0) if metadata else 0
+        if not isinstance(token_count, int):
+            token_count = 0
+        cost_info = CostInfo(
+            cost_usd=cost_usd,
+            model_name=model_name,
+            token_usage=TokenUsage(
+                input_tokens=token_count,
+                output_tokens=0,
+                total_tokens=token_count,
+            ),
+        )
+        self.record(cost_info)
+
     def record(self, cost: CostInfo) -> None:
         """Add a cost entry and update all windows. Prunes entries older than month window."""
         if cost.cost_usd < 0:

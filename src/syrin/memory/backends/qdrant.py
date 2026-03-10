@@ -21,10 +21,10 @@ try:
     QDRANT_AVAILABLE = True
 except ImportError:
     QDRANT_AVAILABLE = False
-    QdrantClient = None  # type: ignore[misc,assignment]
-    PointStruct = None  # type: ignore[misc,assignment]
-    VectorParams = None  # type: ignore[misc,assignment]
-    FilterSelector = None  # type: ignore[misc,assignment]
+    QdrantClient = None  # type: ignore[assignment,misc]
+    PointStruct = None  # type: ignore[assignment,misc]
+    VectorParams = None  # type: ignore[assignment,misc]
+    FilterSelector = None  # type: ignore[assignment,misc]
 
 from syrin.memory.config import MemoryEntry
 

@@ -176,7 +176,7 @@ def get_playground_html(
         debug_panel = """
         <details class="observability-panel" id="observability-panel">
           <summary>Observability (debug)</summary>
-          <pre id="events-display"></pre>
+          <div id="events-display" class="events-display"></div>
         </details>"""
 
     return f"""<!DOCTYPE html>
@@ -346,14 +346,22 @@ def get_playground_html(
       color: var(--text-muted);
       font-size: 0.875rem;
     }}
+    .observability-panel .events-display,
     .observability-panel pre {{
       margin: 0.5rem 0 0;
       font-size: 0.75rem;
       overflow-x: auto;
       white-space: pre-wrap;
-      max-height: 200px;
+      max-height: 280px;
       overflow-y: auto;
     }}
+    .event-block {{ margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }}
+    .event-hook {{ color: var(--accent); font-weight: 600; margin-bottom: 0.25rem; }}
+    .event-results {{ margin: 0.25rem 0; }}
+    .result-item {{ margin: 0.35rem 0; font-size: 0.7rem; }}
+    .result-meta {{ color: var(--text-muted); margin-right: 0.25rem; }}
+    .expand-btn {{ font-size: 0.65rem; padding: 0.1rem 0.35rem; cursor: pointer; background: var(--border); border: none; color: var(--text); border-radius: 4px; }}
+    .expand-btn:hover {{ background: var(--accent); }}
   </style>
 </head>
 <body>
@@ -435,12 +443,59 @@ def get_playground_html(
     }}).catch(() => {{}});
   }}
 
+  const TRUNCATE_LEN = 100;
+  function escapeHtml(s) {{
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }}
+  function renderEvent(ev) {{
+    const hook = ev.hook || "";
+    const ctx = ev.ctx || {{}};
+    let html = '<div class="event-block">';
+    html += '<div class="event-hook">' + escapeHtml(hook) + '</div>';
+    if (ctx.results && Array.isArray(ctx.results)) {{
+      html += '<div class="event-results">';
+      ctx.results.forEach((r, i) => {{
+        const content = r.content || "";
+        const short = content.length <= TRUNCATE_LEN ? content : content.slice(0, TRUNCATE_LEN) + "...";
+        html += '<div class="result-item">';
+        html += '<span class="result-meta">[' + (r.rank || i+1) + '] score=' + (r.score ?? "") + '</span> ';
+        if (content.length > TRUNCATE_LEN) {{
+          const rid = "res_" + i + "_" + Math.random().toString(36).slice(2, 8);
+          html += '<span id="' + rid + '_s">' + escapeHtml(short) + '</span>';
+          html += ' <button type="button" class="expand-btn" data-rid="' + rid + '">+ more</button>';
+          html += '<span id="' + rid + '_f" hidden>' + escapeHtml(content) + '</span>';
+        }} else {{
+          html += escapeHtml(content);
+        }}
+        html += '</div>';
+      }});
+      html += '</div>';
+    }}
+    const rest = {{ ...ctx }};
+    delete rest.results;
+    if (Object.keys(rest).length) {{
+      html += '<pre class="event-ctx">' + escapeHtml(JSON.stringify(rest, null, 2)) + '</pre>';
+    }}
+    html += '</div>';
+    return html;
+  }}
   function showEvents(events) {{
     if (!debug) return;
     const panel = document.getElementById("observability-panel");
-    const pre = document.getElementById("events-display");
-    if (!panel || !pre) return;
-    pre.textContent = JSON.stringify(events, null, 2);
+    const container = document.getElementById("events-display");
+    if (!panel || !container) return;
+    container.innerHTML = events.map(renderEvent).join("");
+    container.classList.add("events-container");
+    container.querySelectorAll(".expand-btn").forEach(btn => {{
+      btn.addEventListener("click", function() {{
+        const rid = this.getAttribute("data-rid");
+        const s = document.getElementById(rid + "_s");
+        const f = document.getElementById(rid + "_f");
+        if (!s || !f) return;
+        if (f.hidden) {{ f.hidden = false; s.hidden = true; this.textContent = "- less"; }}
+        else {{ f.hidden = true; s.hidden = false; this.textContent = "+ more"; }}
+      }});
+    }});
     panel.open = true;
   }}
 

@@ -388,6 +388,20 @@ class Hook(StrEnum):
     MEMORY_CONSOLIDATE = "memory.consolidate"
     MEMORY_EXTRACT = "memory.extract"
 
+    KNOWLEDGE_INGEST_START = "knowledge.ingest.start"
+    KNOWLEDGE_INGEST_END = "knowledge.ingest.end"
+    KNOWLEDGE_SEARCH_START = "knowledge.search.start"
+    KNOWLEDGE_SEARCH_END = "knowledge.search.end"
+    KNOWLEDGE_SYNC = "knowledge.sync"
+    KNOWLEDGE_SOURCE_ADDED = "knowledge.source.added"
+    KNOWLEDGE_SOURCE_REMOVED = "knowledge.source.removed"
+
+    # Agentic RAG (Step 6)
+    KNOWLEDGE_AGENTIC_DECOMPOSE = "knowledge.agentic.decompose"
+    KNOWLEDGE_AGENTIC_GRADE = "knowledge.agentic.grade"
+    KNOWLEDGE_AGENTIC_REFINE = "knowledge.agentic.refine"
+    KNOWLEDGE_AGENTIC_VERIFY = "knowledge.agentic.verify"
+
     CHECKPOINT_SAVE = "checkpoint.save"
     CHECKPOINT_LOAD = "checkpoint.load"
 
@@ -550,6 +564,24 @@ class MemoryBackend(StrEnum):
     CHROMA = "chroma"
     REDIS = "redis"
     POSTGRES = "postgres"
+
+
+class KnowledgeBackend(StrEnum):
+    """Knowledge store vector backend selection.
+
+    Available:
+    - MEMORY: In-memory (testing, ephemeral, no deps)
+    - SQLITE: Single-file, zero-config (sqlite-vec)
+    - POSTGRES: Production, pgvector, ACID
+    - QDRANT: High-performance vector search, cloud-ready
+    - CHROMA: Local dev, lightweight
+    """
+
+    MEMORY = "memory"
+    SQLITE = "sqlite"
+    POSTGRES = "postgres"
+    QDRANT = "qdrant"
+    CHROMA = "chroma"
 
 
 class MemoryScope(StrEnum):

@@ -54,6 +54,14 @@ VIDEO_PRICING: dict[str, float] = {
     "veo-2": 0.35,
 }
 
+# Per 1M tokens USD for embeddings. Used by embedding providers.
+# Keys: model_id or prefix (first match wins). Sources: OpenAI public pricing.
+EMBEDDING_PRICING: dict[str, float] = {
+    "text-embedding-3-small": 0.02,  # $0.02 per 1M tokens
+    "text-embedding-3-large": 0.13,  # $0.13 per 1M tokens
+    "text-embedding-ada-002": 0.10,  # $0.10 per 1M tokens
+}
+
 # Default video duration (seconds) when provider does not report it
 _DEFAULT_VIDEO_DURATION_SECONDS = 5.0
 
@@ -75,6 +83,17 @@ def _resolve_video_pricing(model_id: str) -> float:
         return 0.0
     normalized = model_id.split("/")[-1] if "/" in model_id else model_id
     for key, price in VIDEO_PRICING.items():
+        if normalized.startswith(key):
+            return price
+    return 0.0
+
+
+def _resolve_embedding_pricing(model_id: str) -> float:
+    """Return USD per 1M tokens for embedding model_id."""
+    if not model_id:
+        return 0.0
+    normalized = model_id.split("/")[-1] if "/" in model_id else model_id
+    for key, price in EMBEDDING_PRICING.items():
         if normalized.startswith(key):
             return price
     return 0.0
@@ -122,6 +141,32 @@ def calculate_video_cost(
         return 0.0
     price = _resolve_video_pricing(model_id)
     return round(price * duration_seconds, 6)
+
+
+def calculate_embedding_cost(
+    model_id: str,
+    token_count: int,
+) -> float:
+    """Compute cost in USD for embedding generation.
+
+    Used by embedding providers to track costs in BudgetTracker.
+    Returns 0.0 if model is unknown or token_count <= 0.
+
+    Args:
+        model_id: Model identifier (e.g. text-embedding-3-small).
+        token_count: Number of tokens processed.
+
+    Returns:
+        Cost in USD, rounded to 6 decimal places.
+
+    Example:
+        >>> calculate_embedding_cost("text-embedding-3-small", 1_000_000)
+        0.02
+    """
+    if token_count <= 0:
+        return 0.0
+    price = _resolve_embedding_pricing(model_id)
+    return round(price * (token_count / 1_000_000), 6)
 
 
 class ModelPricing:
@@ -284,12 +329,14 @@ def estimate_cost_for_call(
 
 
 __all__ = [
+    "EMBEDDING_PRICING",
     "IMAGE_PRICING",
     "ModelPricing",
     "MODEL_PRICING",
     "Pricing",
     "VIDEO_PRICING",
     "calculate_cost",
+    "calculate_embedding_cost",
     "calculate_image_cost",
     "calculate_video_cost",
     "count_tokens",

@@ -172,6 +172,7 @@ from syrin.enums import (
     GuardrailStage,
     Hook,
     InjectionStrategy,
+    KnowledgeBackend,
     LoopStrategy,
     Media,
     MemoryBackend,
@@ -225,6 +226,17 @@ from syrin.guardrails import (
     LengthGuardrail,
 )
 from syrin.hitl import ApprovalGate, ApprovalGateProtocol
+from syrin.knowledge import (
+    AgenticRAGConfig,
+    Chunk,
+    Document,
+    DocumentLoader,
+    Knowledge,
+)
+from syrin.knowledge.stores import (
+    InMemoryKnowledgeStore,
+    get_knowledge_store,
+)
 from syrin.loop import (
     HITL,
     REACT,
@@ -508,6 +520,17 @@ __all__ = [
     "MemoryEntry",
     "MemoryBudget",
     "Decay",
+    # =============================================================================
+    # Knowledge
+    # =============================================================================
+    "AgenticRAGConfig",
+    "Knowledge",
+    "Chunk",
+    "Document",
+    "DocumentLoader",
+    "InMemoryKnowledgeStore",
+    "get_knowledge_store",
+    "KnowledgeBackend",
     # Context
     # =============================================================================
     "Context",

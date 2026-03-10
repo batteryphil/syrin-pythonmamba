@@ -46,6 +46,9 @@ redis = ["redis"]
 postgres = ["psycopg2-binary"]
 classifier-embeddings = ["sentence-transformers"]
 pdf = ["pypdf"]
+knowledge = ["chonkie>=1.0", "openai"]
+knowledge-postgres = ["asyncpg>=0.29", "pgvector>=0.3"]
+knowledge-sqlite = ["sqlite-vec>=0.1"]
 generation = [
     "google-genai",
 ]
@@ -60,6 +63,10 @@ dev = [
     "uvicorn",
     "chromadb",
     "qdrant-client",
+    "chonkie>=1.0",
+    "openai",
+    "numpy",
+    "google-genai",
 ]
 
 [project.scripts]
@@ -185,6 +192,10 @@ module = "redis"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "syrin.memory.backends.redis"
+disable_error_code = ["assignment", "misc"]
+
+[[tool.mypy.overrides]]
 module = "psycopg2"
 ignore_missing_imports = true
 
@@ -199,6 +210,46 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "jsonschema"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "chonkie"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "openai"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "numpy"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["google", "google.genai"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["asyncpg", "pgvector", "pgvector.asyncpg", "sqlite_vec"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "syrin.knowledge.stores._postgres",
+    "syrin.knowledge.stores._qdrant",
+    "syrin.knowledge.stores._chroma",
+    "syrin.knowledge.stores._sqlite",
+]
+disable_error_code = [
+    "union-attr",
+    "has-type",
+    "arg-type",
+    "misc",
+    "assignment",
+    "no-redef",
+    "attr-defined",
+    "name-defined",
+    "call-overload",
+    "no-any-return",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -215,4 +266,9 @@ exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
 ]

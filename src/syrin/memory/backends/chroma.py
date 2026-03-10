@@ -24,7 +24,7 @@ try:
 except ImportError:
     chroma_available = False
     chromadb = None  # type: ignore[assignment]
-    Settings = None  # type: ignore[misc,assignment]
+    Settings = None  # type: ignore[assignment,misc]
 
 _chroma = chromadb
 _Settings = Settings

@@ -242,6 +242,7 @@ def build_router(
             tokens_val: dict[str, Any] | None = None
             attachments_from_result: list[dict[str, Any]] = []
             progressive = collect_debug
+            run_result: Any = None
 
             # When agent has tools, run the full REACT loop so tool calls are executed and
             # the user gets the real reply instead of the "model chose to use a tool" fallback.
@@ -267,6 +268,7 @@ def build_router(
                         )
                     yield _emit({"type": "error", "error": str(run_err)})
                     return
+                run_result = result
                 events_list = list(evts)
                 accumulated = result.content or ""
                 atts = getattr(result, "attachments", None) or []
@@ -380,6 +382,13 @@ def build_router(
                         "spent": state.spent,
                         "percent_used": state.percent_used,
                     }
+                elif run_result is not None and hasattr(run_result, "cost"):
+                    done["cost"] = run_result.cost
+                elif events_list:
+                    for _h, c in reversed(events_list):
+                        if isinstance(c, dict) and "cost" in c and c["cost"] is not None:
+                            done["cost"] = c["cost"]
+                            break
                 if tokens_val:
                     done["tokens"] = tokens_val
             if collect_debug and events_list:

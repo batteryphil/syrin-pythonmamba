@@ -1,17 +1,19 @@
 """Tool execution use case: execute tools by name.
 
 Agent delegates to execute_tool. Public API stays on Agent.
+Tools may be sync (return str) or async (return coroutine); caller must await.
 """
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, cast
 
 from syrin.exceptions import ToolExecutionError
 from syrin.run_context import RunContext
 
 
-def execute_tool(agent: Any, name: str, arguments: dict[str, Any]) -> str:
+def execute_tool(agent: Any, name: str, arguments: dict[str, Any]) -> str | Any:
     """Execute a tool by name. Returns result string or raises ToolExecutionError."""
     for spec in agent.tools:
         if spec.name == name:
@@ -32,6 +34,8 @@ def execute_tool(agent: Any, name: str, arguments: dict[str, Any]) -> str:
                     result = spec.func(ctx=ctx, **arguments)
                 else:
                     result = spec.func(**arguments)
+                if asyncio.iscoroutine(result):
+                    return result  # Caller must await
                 return str(result) if result is not None else ""
             except ToolExecutionError:
                 raise

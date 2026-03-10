@@ -205,6 +205,165 @@ def _make_generate_video_tool(
     )
 
 
+def _make_search_knowledge_tool(
+    get_knowledge: Callable[[], object],
+    emit: Callable[[str, dict[str, object]], None] | None = None,
+) -> ToolSpec:
+    """Build a ToolSpec for search_knowledge. Uses DI — no closure over agent."""
+
+    async def search_knowledge_tool(query: str, source: str | None = None) -> str:
+        kb = get_knowledge()
+        if kb is None:
+            return "Knowledge search is not available. No knowledge base configured."
+        from typing import cast
+
+        from syrin.knowledge import Knowledge
+        from syrin.knowledge._store import MetadataFilter
+
+        k = kb
+        if not isinstance(k, Knowledge):
+            return "Knowledge search failed: invalid knowledge instance."
+        filt: MetadataFilter | None = cast(MetadataFilter, {"source": source}) if source else None
+        results = await k.search(query, filter=filt)
+        if not results:
+            return "No relevant results found."
+        lines: list[str] = []
+        for r in results[:5]:
+            lines.append(f"[{r.rank}] (score={r.score:.2f}) {r.chunk.content[:300]}")
+        return "\n\n".join(lines)
+
+    schema: dict[str, object] = {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Search query for the knowledge base.",
+            },
+            "source": {
+                "type": "string",
+                "description": "Optional filter by source (e.g. document name).",
+            },
+        },
+        "required": ["query"],
+    }
+    return ToolSpec(
+        name="search_knowledge",
+        description=(
+            "Search the knowledge base for relevant information. "
+            "Use when you need to find facts, documents, or context before answering."
+        ),
+        parameters_schema=schema,
+        func=search_knowledge_tool,
+    )
+
+
+def _make_search_knowledge_deep_tool(
+    get_knowledge: Callable[[], object],
+    get_model: Callable[[], object | None],
+    get_budget_tracker: Callable[[], object | None],
+    emit: Callable[[str, dict[str, object]], None] | None = None,
+) -> ToolSpec:
+    """Build a ToolSpec for search_knowledge_deep (agentic multi-step retrieval)."""
+
+    async def search_knowledge_deep_tool(query: str, source: str | None = None) -> str:
+        kb = get_knowledge()
+        if kb is None:
+            return "Knowledge search is not available. No knowledge base configured."
+        from syrin.knowledge import Knowledge
+        from syrin.knowledge._agentic import search_knowledge_deep
+
+        if not isinstance(kb, Knowledge):
+            return "Knowledge search failed: invalid knowledge instance."
+        config = getattr(kb, "_agentic_config", None)
+        if config is None:
+            return "search_knowledge_deep requires agentic=True on Knowledge."
+        emit_fn = getattr(kb, "_emit", None)
+        return await search_knowledge_deep(
+            knowledge=kb,
+            query=query,
+            source=source,
+            config=config,
+            get_model=get_model,
+            emit=emit_fn,
+            get_budget_tracker=get_budget_tracker,
+        )
+
+    schema: dict[str, object] = {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Complex or multi-part query. Will be decomposed into sub-queries.",
+            },
+            "source": {
+                "type": "string",
+                "description": "Optional filter by source (e.g. document name).",
+            },
+        },
+        "required": ["query"],
+    }
+    return ToolSpec(
+        name="search_knowledge_deep",
+        description=(
+            "Deep search: decomposes complex queries into sub-queries, searches multiple times, "
+            "grades and refines results. Use for complex or multi-part questions."
+        ),
+        parameters_schema=schema,
+        func=search_knowledge_deep_tool,
+    )
+
+
+def _make_verify_knowledge_tool(
+    get_knowledge: Callable[[], object],
+    get_model: Callable[[], object | None],
+    get_budget_tracker: Callable[[], object | None],
+    emit: Callable[[str, dict[str, object]], None] | None = None,
+) -> ToolSpec:
+    """Build a ToolSpec for verify_knowledge (claim verification)."""
+
+    async def verify_knowledge_tool(claim: str) -> str:
+        kb = get_knowledge()
+        if kb is None:
+            return "Knowledge verification is not available. No knowledge base configured."
+        from syrin.knowledge import Knowledge
+        from syrin.knowledge._agentic import verify_knowledge
+
+        if not isinstance(kb, Knowledge):
+            return "Knowledge verification failed: invalid knowledge instance."
+        config = getattr(kb, "_agentic_config", None)
+        if config is None:
+            return "verify_knowledge requires agentic=True on Knowledge."
+        emit_fn = getattr(kb, "_emit", None)
+        return await verify_knowledge(
+            knowledge=kb,
+            claim=claim,
+            config=config,
+            get_model=get_model,
+            emit=emit_fn,
+            get_budget_tracker=get_budget_tracker,
+        )
+
+    schema: dict[str, object] = {
+        "type": "object",
+        "properties": {
+            "claim": {
+                "type": "string",
+                "description": "The claim to verify against the knowledge base.",
+            },
+        },
+        "required": ["claim"],
+    }
+    return ToolSpec(
+        name="verify_knowledge",
+        description=(
+            "Verify if a specific claim is supported, contradicted, or not found in the knowledge base. "
+            "Use to fact-check before responding."
+        ),
+        parameters_schema=schema,
+        func=verify_knowledge_tool,
+    )
+
+
 def _merge_class_attrs(mro: tuple[type, ...], name: str, merge: bool) -> Any:
     """From MRO: for 'merge' (e.g. tools) concatenate lists; else first defined."""
     tools_fallback = name == "tools"

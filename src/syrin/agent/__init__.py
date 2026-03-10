@@ -62,6 +62,9 @@ from syrin.agent._helpers import (
     _is_valid_system_prompt,
     _make_generate_image_tool,
     _make_generate_video_tool,
+    _make_search_knowledge_deep_tool,
+    _make_search_knowledge_tool,
+    _make_verify_knowledge_tool,
     _merge_class_attrs,
     _normalize_tools,
     _resolve_memory,
@@ -491,6 +494,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         input_file_rules: Any = None,
         image_generation: Any = None,
         video_generation: Any = None,
+        knowledge: object | None = None,
     ) -> None:
         """Create an agent with model, prompt, tools, and optional config.
 
@@ -555,6 +559,8 @@ class Agent(Servable, metaclass=_AgentMeta):
                 of auto-created default (output_media + API key). Use for custom providers or config.
             video_generation: Explicit VideoGenerator for video generation. When set, used instead
                 of auto-created default (output_media + API key). Use for custom providers or config.
+            knowledge: Knowledge instance for RAG. Adds search_knowledge tool. Requires embedding
+                and sources. Lazy ingest on first search.
 
         Example:
             >>> agent = Agent(
@@ -713,6 +719,16 @@ class Agent(Servable, metaclass=_AgentMeta):
                     f"video_generation must be VideoGenerator or None, got {type(video_generation).__name__}. "
                     "Use VideoGenerator(provider=...) from syrin.generation."
                 )
+        _knowledge = knowledge if knowledge is not None else getattr(cls, "knowledge", None)
+        if _knowledge is not None:
+            from syrin.knowledge import Knowledge as KnowledgeClass
+
+            if not isinstance(_knowledge, KnowledgeClass):
+                raise TypeError(
+                    f"knowledge must be Knowledge or None, got {type(_knowledge).__name__}. "
+                    "Use Knowledge(sources=[...], embedding=...) from syrin.knowledge."
+                )
+        self._knowledge = _knowledge
         self._input_media = _input_media
         self._output_media = _output_media
         self._input_file_rules = _input_file_rules_final
@@ -809,6 +825,47 @@ class Agent(Servable, metaclass=_AgentMeta):
                     emit=self._emit_event,
                 )
             )
+        if self._knowledge is not None and "search_knowledge" not in _tool_names:
+
+            def _get_bt() -> object | None:
+                return self.get_budget_tracker() if hasattr(self, "get_budget_tracker") else None
+
+            def _get_model() -> object | None:
+                return getattr(self, "_model", None)
+
+            self._knowledge._attach_to_agent(
+                emit=self._emit_event,
+                get_budget_tracker=_get_bt,
+                get_model=_get_model,
+            )
+            _tools_list.append(
+                _make_search_knowledge_tool(
+                    get_knowledge=lambda: self._knowledge,
+                    emit=self._emit_event,
+                )
+            )
+            if getattr(self._knowledge, "_agentic", False):
+                cfg = getattr(self._knowledge, "_agentic_config", None)
+                if cfg is not None:
+                    if "search_knowledge_deep" not in _tool_names:
+                        _tools_list.append(
+                            _make_search_knowledge_deep_tool(
+                                get_knowledge=lambda: self._knowledge,
+                                get_model=_get_model,
+                                get_budget_tracker=_get_bt,
+                                emit=self._emit_event,
+                            )
+                        )
+                        _tool_names.add("search_knowledge_deep")
+                    if "verify_knowledge" not in _tool_names:
+                        _tools_list.append(
+                            _make_verify_knowledge_tool(
+                                get_knowledge=lambda: self._knowledge,
+                                get_model=_get_model,
+                                get_budget_tracker=_get_bt,
+                                emit=self._emit_event,
+                            )
+                        )
         self._tools = _tools_list
         self._mcp_instances: list[Any] = mcp_instances
         self._guardrails_disabled: set[str] = set()
@@ -1763,7 +1820,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         """Run a tool by name with the given arguments. For custom loops.
 
         Why: Built-in loops call this automatically. Use when implementing a
-        custom Loop to execute tool calls.
+        custom Loop to execute tool calls. Supports both sync and async tools.
 
         Args:
             name: Tool name (must match a @tool-decorated function).
@@ -1775,7 +1832,12 @@ class Agent(Servable, metaclass=_AgentMeta):
         Example:
             >>> result = await agent.execute_tool("search", {"query": "syrin"})
         """
-        return self._execute_tool(name, arguments)
+        import asyncio
+
+        result = self._execute_tool(name, arguments)
+        if asyncio.iscoroutine(result):
+            return cast(str, await result)
+        return result
 
     def estimate_cost(
         self,
