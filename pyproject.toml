@@ -27,7 +27,7 @@ dependencies = [
     "uvicorn>=0.41.0",
     "fastapi>=0.134.0",
     "python-multipart>=0.0.22",
-    "openai>=1.0.0",  # Default LLM provider for ease of use
+    "openai>=2.26.0",  # Default LLM provider for ease of use
 ]
 
 [project.urls]
