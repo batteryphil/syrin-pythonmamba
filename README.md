@@ -188,7 +188,7 @@ syrin trace my_agent.py
 
 ---
 
-## 🔧 Syrin's Power: Grouped Features
+## 🔧 Syrin's Power
 
 ### 🎛️ **Budget & Cost Control** (Your #1 Problem Solved)
 
@@ -220,72 +220,6 @@ agent = Agent(
 ```
 
 **Result:** No surprise bills. Ever.
-
----
-
-### 🧠 **Memory & Knowledge** (Agents That Remember)
-
-**The Problem:** Agents forget everything between conversations
-**Syrin's Solution:** 4 memory types with semantic recall
-
-```python
-from syrin import Agent, Model, Memory
-from syrin.enums import MemoryType
-
-agent = Agent(
-    model=Model.Almock(),
-    memory=Memory(types=[MemoryType.CORE, MemoryType.EPISODIC]),
-)
-
-# Remember something
-agent.remember("User prefers short answers", memory_type=MemoryType.CORE)
-
-# Recall later (semantic search)
-entries = agent.recall("user preferences")
-# Returns relevant memories
-
-# Forget if needed
-agent.forget(memory_id=entries[0].id)
-```
-
-**Memory Types:**
-- **Core** — Long-term facts (user preferences, profile)
-- **Episodic** — Conversation history
-- **Semantic** — Knowledge chunks with embeddings
-- **Procedural** — How-to guides, patterns
-
----
-
-### 🔍 **Observability** (See Everything)
-
-**The Problem:** "What happened?" — no visibility into agent decisions
-**Syrin's Solution:** 72+ hooks, full traces, cost breakdown per response
-
-```python
-agent = Agent(model=Model.Almock(), budget=Budget(run=0.50))
-
-# Hook into every lifecycle event
-agent.events.on(Hook.LLM_REQUEST_START, lambda ctx: print(f"LLM call #{ctx.iteration}"))
-agent.events.on(Hook.TOOL_CALL_START, lambda ctx: print(f"Tool: {ctx.tool_name}"))
-agent.events.on(Hook.BUDGET_THRESHOLD, lambda ctx: print(f"Budget at {ctx.threshold_percent}%"))
-agent.events.on(Hook.CHECKPOINT_SAVED, lambda ctx: print(f"Checkpoint: {ctx.checkpoint_id}"))
-
-result = agent.response("Research AI trends")
-
-# One response gives you everything:
-print(f"Cost: ${result.cost}")                      # $0.0234
-print(f"Tokens: {result.tokens.total_tokens}")      # 1247
-print(f"Budget remaining: ${result.budget.remaining}") # $0.4766
-print(f"Guardrail passed: {result.report.guardrail.passed}") # True
-```
-
-**What You Get Per Response:**
-- Cost, tokens (input/output/total)
-- Budget status (used, remaining)
-- Guardrail results (passed/blocked)
-- Memory operations (stores/recalls/forgets)
-- Checkpoint saves/loads
-- Rate limit checks/exceeded
 
 ---
 
