@@ -1,4 +1,4 @@
-"""Context snapshot and breakdown — see exactly what is in the context window.
+"""Context snapshot and breakdown -- see exactly what is in the context window.
 
 This example shows Syrin's full visibility into context formation:
 - Token breakdown by component (system, tools, memory, messages)
@@ -7,26 +7,18 @@ This example shows Syrin's full visibility into context formation:
 - Context rot risk (low / medium / high from utilization)
 - Export via snapshot.to_dict() for dashboards or viz tools
 
-Run: python -m examples.11_context.context_snapshot_demo
+Run:
+    python examples/11_context/context_snapshot_demo.py
 """
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-from examples.models.models import almock, gpt4_mini
 from syrin import Agent, AgentConfig, tool
 from syrin.context import Context
 from syrin.context.snapshot import ContextSegmentSource
 from syrin.model import Model
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
-# Use real gpt-4o-mini when USE_REAL_MODEL=1
-_model: Model = gpt4_mini if os.environ.get("USE_REAL_MODEL") == "1" else almock
+_model = Model.Almock()
 
 
 @tool
@@ -47,7 +39,7 @@ def _source_label(source: ContextSegmentSource) -> str:
 
 def main() -> None:
     print("=" * 60)
-    print("CONTEXT SNAPSHOT & BREAKDOWN — What's in the context window?")
+    print("CONTEXT SNAPSHOT & BREAKDOWN -- What's in the context window?")
     print("=" * 60)
 
     agent = Agent(
@@ -66,7 +58,7 @@ def main() -> None:
     stats = agent.context_stats
 
     # --- Capacity ---
-    print("\n📊 CAPACITY")
+    print("\nCAPACITY")
     print(f"  Total tokens used:    {snap.total_tokens}")
     print(f"  Max tokens (window):  {snap.max_tokens}")
     print(f"  Tokens available:     {snap.tokens_available}")
@@ -74,42 +66,42 @@ def main() -> None:
     print(f"  Context rot risk:     {snap.context_rot_risk}")
 
     # --- Breakdown by component ---
-    print("\n📋 BREAKDOWN (tokens per component)")
+    print("\nBREAKDOWN (tokens per component)")
     b = snap.breakdown
     print(f"  System prompt:   {b.system_tokens:>6} tokens")
     print(f"  Tool definitions:{b.tools_tokens:>6} tokens")
     print(f"  Memory (recall): {b.memory_tokens:>6} tokens")
     print(f"  Messages:        {b.messages_tokens:>6} tokens")
-    print("  ─────────────────────────")
+    print("  -------------------------")
     print(f"  Total:           {b.total_tokens:>6} tokens")
 
     # Same breakdown is on stats (set after each prepare)
     assert stats.breakdown is not None
     if b.tools_tokens > 0:
-        print(f"\n  ✓ Tools are in context ({b.tools_tokens} tokens for tool definitions)")
+        print(f"\n  Tools are in context ({b.tools_tokens} tokens for tool definitions)")
     else:
-        print("\n  (No tools on this agent → tools_tokens = 0)")
+        print("\n  (No tools on this agent -> tools_tokens = 0)")
     print("  (agent.context_stats.breakdown has the same data for this run)")
 
     # --- Why each part is included ---
-    print("\n📌 WHY INCLUDED (human-readable)")
+    print("\nWHY INCLUDED (human-readable)")
     for reason in snap.why_included:
-        print(f"  • {reason}")
+        print(f"  - {reason}")
 
     # --- Message preview (role, snippet, tokens, source) ---
-    print("\n📝 MESSAGE PREVIEW (role | snippet | tokens | source)")
+    print("\nMESSAGE PREVIEW (role | snippet | tokens | source)")
     for i, p in enumerate(snap.message_preview[:12], 1):
         snippet = (
             p.content_snippet[:50] + "..." if len(p.content_snippet) > 50 else p.content_snippet
         )
         print(
-            f"  {i:2}. [{p.role:8}] {snippet:52} {p.token_count:>4} tok  ← {_source_label(p.source)}"
+            f"  {i:2}. [{p.role:8}] {snippet:52} {p.token_count:>4} tok  <- {_source_label(p.source)}"
         )
     if len(snap.message_preview) > 12:
         print(f"  ... and {len(snap.message_preview) - 12} more")
 
     # --- Provenance (for debugging / tooling) ---
-    print("\n🔗 PROVENANCE (segment_id | source | detail)")
+    print("\nPROVENANCE (segment_id | source | detail)")
     for prov in snap.provenance[:8]:
         detail = prov.source_detail or ""
         print(f"  {prov.segment_id:>4}  {prov.source.value:16}  {detail}")
@@ -118,7 +110,7 @@ def main() -> None:
 
     # --- Export for viz / logging ---
     exported = snap.to_dict()
-    print("\n📤 EXPORT (snapshot.to_dict()) — keys for dashboards / viz:")
+    print("\nEXPORT (snapshot.to_dict()) -- keys for dashboards / viz:")
     print(f"  {list(exported.keys())}")
 
     print("\n" + "=" * 60)

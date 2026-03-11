@@ -3,31 +3,27 @@
 Uses OpenRouterBuilder to create models with one key. Route between
 Claude, GPT, Gemini, etc. without separate API keys.
 
-Requires: OPENROUTER_API_KEY in env.
-Run: python -m examples.17_routing.openrouter_single_key
+Requires: OPENROUTER_API_KEY env var.
+Run: python examples/17_routing/openrouter_single_key.py
 """
 
 from __future__ import annotations
 
 import os
-from pathlib import Path
+import sys
 
-from dotenv import load_dotenv
+if not os.getenv("OPENROUTER_API_KEY"):
+    print("Skipped: set OPENROUTER_API_KEY to run this example.")
+    sys.exit(0)
 
 from syrin import Agent
 from syrin.model import OpenRouterBuilder
 from syrin.router import RoutingConfig, RoutingMode
 
-load_dotenv(Path(__file__).resolve().parent.parent.parent / "examples" / ".env")
-
-API_KEY = os.getenv("OPENROUTER_API_KEY")
+API_KEY = os.environ["OPENROUTER_API_KEY"]
 
 
 def main() -> None:
-    if not API_KEY:
-        print("Set OPENROUTER_API_KEY in examples/.env")
-        return
-
     builder = OpenRouterBuilder(api_key=API_KEY)
     claude = builder.model("anthropic/claude-sonnet-4-5")
     gpt = builder.model("openai/gpt-4o-mini")

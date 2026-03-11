@@ -11,9 +11,9 @@ No additional dependencies required. The memory system is built into Syrin.
 ## Quick Start
 
 ```python
-from Syrin import Agent, Model
-from Syrin.memory import Memory
-from Syrin.enums import MemoryType
+from syrin import Agent, Model
+from syrin.memory import Memory
+from syrin.enums import MemoryType
 
 # Agent now has persistent memory ENABLED BY DEFAULT
 agent = Agent(
@@ -50,8 +50,8 @@ agent = Agent(
 ### Memory Configuration
 
 ```python
-from Syrin.memory import Memory, Decay
-from Syrin.enums import MemoryType, InjectionStrategy
+from syrin.memory import Memory, Decay
+from syrin.enums import MemoryType, InjectionStrategy
 
 agent = Agent(
     # model=Model("openai/gpt-4o-mini"),
@@ -82,7 +82,7 @@ Syrin supports four types of memory, each with different characteristics:
 - Stores identity, preferences, key relationships
 
 ```python
-from Syrin.memory import CoreMemory
+from syrin.memory import CoreMemory
 
 core = CoreMemory(
     id="user-name",
@@ -103,7 +103,7 @@ core = CoreMemory(
 - Stores conversations, activities, experiences
 
 ```python
-from Syrin.memory import EpisodicMemory
+from syrin.memory import EpisodicMemory
 
 episodic = EpisodicMemory(
     id="event-1",
@@ -124,7 +124,7 @@ episodic = EpisodicMemory(
 - Should decay slowly
 
 ```python
-from Syrin.memory import SemanticMemory
+from syrin.memory import SemanticMemory
 
 semantic = SemanticMemory(
     id="fact-1",
@@ -145,7 +145,7 @@ semantic = SemanticMemory(
 - Stores instructions, procedures
 
 ```python
-from Syrin.memory import ProceduralMemory
+from syrin.memory import ProceduralMemory
 
 procedural = ProceduralMemory(
     id="skill-1",
@@ -161,8 +161,8 @@ procedural = ProceduralMemory(
 Use `create_memory()` for flexible memory creation:
 
 ```python
-from Syrin.memory import create_memory
-from Syrin.enums import MemoryType
+from syrin.memory import create_memory
+from syrin.enums import MemoryType
 
 # Create memory by type - uses type-specific defaults
 mem = create_memory(
@@ -180,8 +180,8 @@ mem = create_memory(
 `MemoryStore` provides a complete API for managing memories independently of agents:
 
 ```python
-from Syrin.memory import MemoryStore
-from Syrin.enums import MemoryType
+from syrin.memory import MemoryStore
+from syrin.enums import MemoryType
 
 # Create a store
 store = MemoryStore()
@@ -191,7 +191,7 @@ store.add(content="User prefers dark mode", memory_type=MemoryType.CORE)
 store.add(content="Yesterday had a meeting", memory_type=MemoryType.EPISODIC)
 
 # Add with full control
-from Syrin.memory import MemoryEntry
+from syrin.memory import MemoryEntry
 entry = MemoryEntry(
     id="my-id",
     content="Custom memory",
@@ -223,8 +223,8 @@ stats = store.get_stats()
 Memories naturally lose importance over time using Ebbinghaus-inspired forgetting curves:
 
 ```python
-from Syrin.memory import Decay, MemoryEntry
-from Syrin.enums import DecayStrategy
+from syrin.memory import Decay, MemoryEntry
+from syrin.enums import DecayStrategy
 from datetime import datetime, timedelta
 
 # Configure decay
@@ -266,8 +266,8 @@ print(entry.access_count)  # 1
 ### Using Decay with MemoryStore
 
 ```python
-from Syrin.memory import MemoryStore, Decay
-from Syrin.enums import DecayStrategy
+from syrin.memory import MemoryStore, Decay
+from syrin.enums import DecayStrategy
 
 store = MemoryStore(
     decay=Decay(
@@ -290,7 +290,7 @@ results = store.recall("recent info", apply_decay=True)
 Memory operations can respect budget constraints:
 
 ```python
-from Syrin.memory import MemoryStore, MemoryBudget
+from syrin.memory import MemoryStore, MemoryBudget
 from syrin.budget import warn_on_exceeded
 
 # Create budget constraints
@@ -317,9 +317,9 @@ store.add(content="Short fact")  # Under budget - succeeds
 The simplest way to use memory is with the Agent:
 
 ```python
-from Syrin import Agent, Model
-from Syrin.memory import Memory
-from Syrin.enums import MemoryType
+from syrin import Agent, Model
+from syrin.memory import Memory
+from syrin.enums import MemoryType
 
 # Create agent with persistent memory
 agent = Agent(
@@ -350,8 +350,8 @@ agent.forget(memory_type=MemoryType.EPISODIC)
 ### Configuration Options
 
 ```python
-from Syrin.memory import Memory
-from Syrin.enums import MemoryType, MemoryBackend, InjectionStrategy, WriteMode
+from syrin.memory import Memory
+from syrin.enums import MemoryType, MemoryBackend, InjectionStrategy, WriteMode
 
 memory = Memory(
     # Which memory types to store
@@ -449,7 +449,7 @@ Syrin supports multiple storage backends:
 ### In-Memory (Default)
 
 ```python
-from Syrin.enums import MemoryBackend
+from syrin.enums import MemoryBackend
 
 memory = Memory(
     backend=MemoryBackend.MEMORY,  # Default
@@ -462,7 +462,7 @@ memory = Memory(
 ### SQLite (Persistent)
 
 ```python
-from Syrin.enums import MemoryBackend
+from syrin.enums import MemoryBackend
 
 memory = Memory(
     backend=MemoryBackend.SQLITE,
@@ -476,7 +476,7 @@ memory = Memory(
 ### Qdrant (Vector/Semantic Search)
 
 ```bash
-pip install syrin[qdrant]  # or pip install qdrant-client
+pip install syrin[vector]  # or pip install qdrant-client
 ```
 
 ```python
@@ -514,7 +514,7 @@ memory = Memory(backend=MemoryBackend.QDRANT, path="./qdrant_data")
 ### Chroma (Lightweight Vector DB)
 
 ```bash
-pip install syrin[chroma]  # or pip install chromadb
+pip install syrin[vector]  # or pip install chromadb
 ```
 
 ```python
@@ -536,7 +536,7 @@ memory = Memory(
 ### Redis (Fast Cache)
 
 ```bash
-pip install syrin[redis]  # or pip install redis
+pip install syrin[vector]  # or pip install redis
 ```
 
 ```python
@@ -562,7 +562,7 @@ memory = Memory(
 ### PostgreSQL (Production)
 
 ```bash
-pip install syrin[postgres]  # or pip install psycopg2-binary
+pip install syrin[postgres]
 ```
 
 ```python
@@ -624,8 +624,8 @@ memory = Memory(
 For session-based memory (not persistent):
 
 ```python
-from Syrin import Agent, Model
-from Syrin.memory import BufferMemory, WindowMemory
+from syrin import Agent, Model
+from syrin.memory import BufferMemory, WindowMemory
 
 # BufferMemory - keeps all messages
 agent = Agent(
@@ -649,7 +649,7 @@ agent = Agent(
 Memory operations are automatically traced:
 
 ```python
-from Syrin.observability import set_debug, get_tracer
+from syrin.observability import set_debug, get_tracer
 
 # Enable debug mode for console output
 set_debug(True)
@@ -679,8 +679,8 @@ Each operation creates spans:
 Connect memory operations to your event system:
 
 ```python
-from Syrin.memory import MemoryStore
-from Syrin.events import Events, EventContext
+from syrin.memory import MemoryStore
+from syrin.events import Events, EventContext
 
 events = Events(lambda e, ctx: print(f"Event: {e}"))
 
@@ -699,8 +699,8 @@ store.recall("test")
 ## Memory Entry Reference
 
 ```python
-from Syrin.memory import MemoryEntry
-from Syrin.enums import MemoryType, MemoryScope
+from syrin.memory import MemoryEntry
+from syrin.enums import MemoryType, MemoryScope
 from datetime import datetime
 
 entry = MemoryEntry(
@@ -734,7 +734,7 @@ entry = MemoryEntry(
 
 ```python
 # Core classes
-from Syrin.memory import (
+from syrin.memory import (
     Memory,           # Agent memory configuration
     MemoryStore,      # Standalone storage
     MemoryEntry,      # Individual memory
@@ -743,7 +743,7 @@ from Syrin.memory import (
 )
 
 # Memory types
-from Syrin.memory import (
+from syrin.memory import (
     CoreMemory,
     EpisodicMemory,
     SemanticMemory,
@@ -752,7 +752,7 @@ from Syrin.memory import (
 )
 
 # Conversation memory
-from Syrin.memory import (
+from syrin.memory import (
     ConversationMemory,  # Base class
     BufferMemory,        # Keep all
     WindowMemory,       # Keep last K
@@ -776,7 +776,7 @@ from syrin.memory import (
 from syrin.memory import MemorySnapshot, MemorySnapshotEntry
 
 # Enums
-from Syrin.enums import (
+from syrin.enums import (
     MemoryType,        # CORE, EPISODIC, SEMANTIC, PROCEDURAL
     MemoryScope,       # SESSION, AGENT, USER, GLOBAL
     DecayStrategy,     # EXPONENTIAL, LINEAR, LOGARITHMIC, STEP, NONE
@@ -793,9 +793,9 @@ from Syrin.enums import (
 ### Example 1: Basic Agent Memory
 
 ```python
-from Syrin import Agent, Model
-from Syrin.memory import Memory
-from Syrin.enums import MemoryType
+from syrin import Agent, Model
+from syrin.memory import Memory
+from syrin.enums import MemoryType
 
 class Assistant(Agent):
     model = Model("openai/gpt-4o-mini")
@@ -816,9 +816,9 @@ print(result.content)
 ### Example 2: Multi-Type Memory
 
 ```python
-from Syrin import Agent, Model
-from Syrin.memory import Memory
-from Syrin.enums import MemoryType
+from syrin import Agent, Model
+from syrin.memory import Memory
+from syrin.enums import MemoryType
 
 agent = Agent(
     # model=Model("openai/gpt-4o-mini"),
@@ -844,8 +844,8 @@ facts = agent.recall(memory_type=MemoryType.SEMANTIC)
 ### Example 3: Standalone MemoryStore
 
 ```python
-from Syrin.memory import MemoryStore
-from Syrin.enums import MemoryType
+from syrin.memory import MemoryStore
+from syrin.enums import MemoryType
 
 # Create standalone store
 store = MemoryStore()
@@ -872,8 +872,8 @@ store.clear()
 ### Example 4: Custom Decay
 
 ```python
-from Syrin.memory import MemoryStore, Decay
-from Syrin.enums import DecayStrategy
+from syrin.memory import MemoryStore, Decay
+from syrin.enums import DecayStrategy
 
 # Fast decay for ephemeral info
 store = MemoryStore(
@@ -893,9 +893,9 @@ perm_store = MemoryStore(
 ### Example 5: Handoff with Memory Transfer
 
 ```python
-from Syrin import Agent, Model
-from Syrin.memory import Memory
-from Syrin.enums import MemoryType
+from syrin import Agent, Model
+from syrin.memory import Memory
+from syrin.enums import MemoryType
 
 class Analyzer(Agent):
     model = Model("openai/gpt-4o-mini")

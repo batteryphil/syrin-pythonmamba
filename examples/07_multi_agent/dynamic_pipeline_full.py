@@ -1,46 +1,54 @@
 """Dynamic Pipeline Full — Complex multi-agent system with full debugging.
 
 Demonstrates:
-- Orchestrator LLM plans which agents to spawn (real model required for valid JSON).
-- 4 specialized agents (tech, finance, healthcare, summarizer) + 5 tools.
-- Full observability with hooks at every stage.
+- Orchestrator LLM plans which agents to spawn
+- 4 specialized agents (tech, finance, healthcare, summarizer) + 5 tools
+- Full observability with hooks at every stage
+- DynamicPipeline.run() with parallel mode
 
-Uses a real model (OpenAI gpt-4o) by default so the planner returns a valid plan
-and agents are spawned. Set OPENAI_API_KEY in examples/.env.
-For key-less runs: set USE_ALMOCK=1 in .env (agents may not spawn; mock returns no plan).
+Uses Model.Almock() — no API key needed.
 
-Run from repo root:
-  python -m examples.07_multi_agent.dynamic_pipeline_full
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/07_multi_agent/dynamic_pipeline_full.py
 """
 
-import os
-import sys
+from __future__ import annotations
+
 import time
 from datetime import datetime
-from pathlib import Path
 
-# Allow running as script: add project root so "examples" package resolves
-if __name__ == "__main__":
-    _root = Path(__file__).resolve().parent.parent.parent
-    if str(_root) not in sys.path:
-        sys.path.insert(0, str(_root))
-
-from dotenv import load_dotenv
-
-from examples.models.models import almock, gpt4
-from syrin import Agent
+from syrin import Agent, Model
 from syrin.agent.multi_agent import DynamicPipeline
 from syrin.enums import Hook
 from syrin.tool import tool
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# ---------------------------------------------------------------------------
+# Model — Almock orchestrator returns a valid JSON plan so agents spawn
+# ---------------------------------------------------------------------------
 
-# Use a real model so the orchestrator can return a valid JSON plan and agents are spawned.
-# Set OPENAI_API_KEY in examples/.env. For key-less runs, set USE_ALMOCK=1 in .env.
-USE_ALMOCK = os.environ.get("USE_ALMOCK", "").strip().lower() in ("1", "true", "yes")
-MODEL = almock if USE_ALMOCK else gpt4
+orchestrator_model = Model.Almock(
+    latency_min=0.3,
+    latency_max=0.8,
+    response_mode="custom",
+    custom_response=(
+        '[{"type":"tech_researcher","task":"Research AI trends in healthcare"},'
+        '{"type":"finance_researcher","task":"Analyze healthcare market financials"},'
+        '{"type":"healthcare_researcher","task":"Investigate clinical AI adoption"},'
+        '{"type":"summarizer","task":"Synthesize all findings into a report"}]'
+    ),
+    pricing_tier="high",
+)
+
+agent_model = Model.Almock(
+    latency_min=0.3,
+    latency_max=0.8,
+    lorem_length=200,
+    pricing_tier="high",
+)
+
+# ---------------------------------------------------------------------------
+# Tools
+# ---------------------------------------------------------------------------
 
 
 @tool(name="search_web", description="Search the web for information")
@@ -69,10 +77,15 @@ def export_report(title: str, content: str) -> str:
     return f"[SIMULATED] Exported: {title}"
 
 
+# ---------------------------------------------------------------------------
+# Agents
+# ---------------------------------------------------------------------------
+
+
 class TechResearchAgent(Agent):
     _agent_name = "tech_researcher"
     _agent_description = "Researches technology trends"
-    model = MODEL
+    model = agent_model
     system_prompt = "You research technology trends."
     tools = [search_web, analyze_data]
 
@@ -80,7 +93,7 @@ class TechResearchAgent(Agent):
 class FinanceResearchAgent(Agent):
     _agent_name = "finance_researcher"
     _agent_description = "Researches financial markets"
-    model = MODEL
+    model = agent_model
     system_prompt = "You research financial markets."
     tools = [fetch_financial, analyze_data]
 
@@ -88,7 +101,7 @@ class FinanceResearchAgent(Agent):
 class HealthcareResearchAgent(Agent):
     _agent_name = "healthcare_researcher"
     _agent_description = "Researches healthcare industry"
-    model = MODEL
+    model = agent_model
     system_prompt = "You research healthcare industry."
     tools = [search_web, analyze_data]
 
@@ -96,21 +109,26 @@ class HealthcareResearchAgent(Agent):
 class SummarizerAgent(Agent):
     _agent_name = "summarizer"
     _agent_description = "Synthesizes research into clear reports"
-    model = MODEL
+    model = agent_model
     system_prompt = "You synthesize research into a clear report."
     tools = [generate_chart, export_report]
+
+
+# ---------------------------------------------------------------------------
+# Debugger — logs every hook with timestamp
+# ---------------------------------------------------------------------------
 
 
 class PipelineDebugger:
     def __init__(self, verbose: bool = True):
         self.verbose = verbose
-        self.events_log = []
+        self.events_log: list[dict] = []
 
     def log(self, hook: Hook, ctx: dict) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         self.events_log.append({"timestamp": timestamp, "hook": hook.value, "data": dict(ctx)})
         if self.verbose:
-            print(f"{timestamp} {hook.value}")
+            print(f"  [{timestamp}] {hook.value}")
 
     def print_summary(self) -> None:
         print("\n" + "=" * 70)
@@ -119,11 +137,16 @@ class PipelineDebugger:
         print(f"Total events: {len(self.events_log)}")
 
 
+# ---------------------------------------------------------------------------
+# Pipeline setup
+# ---------------------------------------------------------------------------
+
 pipeline = DynamicPipeline(
     agents=[TechResearchAgent, FinanceResearchAgent, HealthcareResearchAgent, SummarizerAgent],
-    model=MODEL,
+    model=orchestrator_model,
     max_parallel=4,
 )
+
 debugger = PipelineDebugger(verbose=True)
 pipeline.events.on(
     Hook.DYNAMIC_PIPELINE_START, lambda ctx: debugger.log(Hook.DYNAMIC_PIPELINE_START, ctx)
@@ -140,14 +163,22 @@ pipeline.events.on(
     Hook.DYNAMIC_PIPELINE_END, lambda ctx: debugger.log(Hook.DYNAMIC_PIPELINE_END, ctx)
 )
 
+# ---------------------------------------------------------------------------
+# Run
+# ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
     task = "Conduct market research on AI in Healthcare. Provide a consolidated report."
+    print(f"Task: {task}\n")
+
     start = time.time()
     result = pipeline.run(task, mode="parallel")
     elapsed = time.time() - start
+
     debugger.print_summary()
     print(f"\nExecution time: {elapsed:.2f}s")
     print(f"Total cost: ${result.cost:.4f}")
     print(f"Preview: {result.content[:300]}...")
-    print("Serving at http://localhost:8000/playground")
-    pipeline.serve(port=8000, enable_playground=True, debug=True)
+
+    # Optional: serve the pipeline with the playground UI
+    # pipeline.serve(port=8000, enable_playground=True, debug=True)

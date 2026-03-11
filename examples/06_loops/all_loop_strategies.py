@@ -1,6 +1,6 @@
 """Loop Strategies Example.
 
-Demonstrates:
+Demonstrates all built-in loop strategies in Syrin:
 - SingleShotLoop — one LLM call, no tool iteration
 - ReactLoop — Think, Act, Observe (default)
 - HumanInTheLoop — human approval for tool calls
@@ -8,19 +8,12 @@ Demonstrates:
 - CodeActionLoop — LLM writes Python to execute
 - Custom loop — implement your own strategy
 
-Run: python -m examples.06_loops.all_loop_strategies
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run: python examples/06_loops/all_loop_strategies.py
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent
+from syrin import Agent, Model
 from syrin.loop import (
     CodeActionLoop,
     HumanInTheLoop,
@@ -30,7 +23,7 @@ from syrin.loop import (
     SingleShotLoop,
 )
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+model = Model.Almock()
 
 
 def example_single_shot() -> None:
@@ -38,18 +31,18 @@ def example_single_shot() -> None:
     print("\n--- SingleShotLoop ---")
     print("Use case: Simple Q&A without tools")
 
-    agent = Agent(model=almock, custom_loop=SingleShotLoop())
+    agent = Agent(model=model, custom_loop=SingleShotLoop())
     result = agent.response("What is the capital of France?")
     print("Q: What is the capital of France?")
     print(f"A: {result.content[:80]}...")
 
 
 def example_react() -> None:
-    """ReactLoop — Think → Act → Observe."""
+    """ReactLoop — Think -> Act -> Observe."""
     print("\n--- ReactLoop ---")
     print("Use case: Multi-step tasks with tools")
 
-    agent = Agent(model=almock, custom_loop=ReactLoop(max_iterations=5))
+    agent = Agent(model=model, custom_loop=ReactLoop(max_iterations=5))
     result = agent.response("What is 5 + 3?")
     print("Q: What is 5 + 3?")
     print(f"A: {result.content[:80]}...")
@@ -68,7 +61,7 @@ def example_human_in_the_loop() -> None:
         print(f"  Tool '{tool_name}' requested — auto-approved")
         return True
 
-    agent = Agent(model=almock, custom_loop=HumanInTheLoop(approve=approve, max_iterations=5))
+    agent = Agent(model=model, custom_loop=HumanInTheLoop(approve=approve, max_iterations=5))
     result = agent.response("What is the square root of 144?")
     print(f"A: {result.content[:80]}...")
     print(f"Tools evaluated: {approved_count}")
@@ -80,7 +73,7 @@ def example_plan_execute() -> None:
     print("Use case: Complex multi-step tasks")
 
     agent = Agent(
-        model=almock,
+        model=model,
         custom_loop=PlanExecuteLoop(max_plan_iterations=3, max_execution_iterations=10),
     )
     result = agent.response("Research programming languages and summarize pros/cons")
@@ -93,7 +86,7 @@ def example_code_action() -> None:
     print("\n--- CodeActionLoop ---")
     print("Use case: Math, data processing, code execution")
 
-    agent = Agent(model=almock, custom_loop=CodeActionLoop(max_iterations=5, timeout_seconds=30))
+    agent = Agent(model=model, custom_loop=CodeActionLoop(max_iterations=5, timeout_seconds=30))
     result = agent.response("What is the sum of even numbers from 1 to 100?")
     print(f"A: {result.content[:80]}...")
     print(f"Iterations: {result.iterations}")
@@ -121,15 +114,17 @@ def example_custom_loop() -> None:
                 iterations=1,
             )
 
-    agent = Agent(model=almock, custom_loop=MyLoop())
+    agent = Agent(model=model, custom_loop=MyLoop())
     result = agent.response("Hello!")
     print(f"A: {result.content[:80]}...")
 
 
 class LoopDemoAgent(Agent):
+    """Agent subclass with ReactLoop — for serving via playground."""
+
     _agent_name = "loop-demo"
     _agent_description = "Agent with ReactLoop (Think, Act, Observe)"
-    model = almock
+    model = Model.Almock()
     system_prompt = "You are a helpful assistant. Use tools when needed."
     loop = ReactLoop(max_iterations=5)
 
@@ -142,6 +137,6 @@ if __name__ == "__main__":
     example_code_action()
     example_custom_loop()
 
-    agent = LoopDemoAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+    # Optional: serve for interactive playground
+    # agent = LoopDemoAgent()
+    # agent.serve(port=8000, enable_playground=True, debug=True)

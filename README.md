@@ -28,14 +28,14 @@
 ## 🚀 Installation
 
 ```bash
-# Basic install
+# Install Syrin with OpenAI support (default)
 pip install syrin
 
-# With serving (playground, HTTP API)
-pip install syrin[serve]
+# Install with Anthropic support
+pip install syrin[anthropic]
 
-# With all features
-pip install syrin[serve,anthropic,voice]
+# Install with voice capabilities
+pip install syrin[voice]
 ```
 
 ---
@@ -174,9 +174,6 @@ Run your agent script with the `--trace` flag for full observability without cod
 ```bash
 # Enable full tracing
 python my_agent.py --trace
-
-# Or use the Syrin CLI
-syrin trace my_agent.py
 ```
 
 **What you get:**

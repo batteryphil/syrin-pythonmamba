@@ -1,25 +1,21 @@
-"""Pipeline Example.
+"""Pipeline -- run multiple agents in sequence, passing output forward.
 
 Demonstrates:
-- Sequential pipeline execution
-- Parallel pipeline execution
-- Pipeline with budget
+- Pipeline() for sequential multi-agent execution
+- @prompt for per-agent dynamic system prompts
+- Pipeline result with content and cost
 
-Run: python -m examples.07_multi_agent.pipeline
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/07_multi_agent/pipeline.py
 """
 
-from __future__ import annotations
+from syrin import Agent, Model, Pipeline, prompt
 
-from pathlib import Path
+model = Model.Almock()
 
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent, Pipeline, prompt
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# ---------------------------------------------------------------------------
+# 1. Define agents with dynamic prompts
+# ---------------------------------------------------------------------------
 
 
 @prompt
@@ -35,27 +31,34 @@ def writer_prompt(style: str) -> str:
 class Researcher(Agent):
     _agent_name = "researcher"
     _agent_description = "Researches topics and gathers information"
-    model = almock
+    model = model
     system_prompt = researcher_prompt(domain="technology")
 
 
 class Writer(Agent):
     _agent_name = "writer"
     _agent_description = "Writes content in professional style"
-    model = almock
+    model = model
     system_prompt = writer_prompt(style="professional")
 
 
-pipeline = Pipeline()
+# ---------------------------------------------------------------------------
+# 2. Run the pipeline
+# ---------------------------------------------------------------------------
+print("-- Pipeline: Researcher -> Writer --")
 
-if __name__ == "__main__":
-    result = pipeline.run(
-        [
-            (Researcher, "Find information about renewable energy"),
-            (Writer, "Write about renewable energy"),
-        ]
-    )
-    print(f"Pipeline result: {result.content[:100]}...")
-    print(f"Cost: ${result.cost:.6f}")
-    print("Serving at http://localhost:8000/playground")
-    pipeline.serve(port=8000, enable_playground=True, debug=True)
+pipeline = Pipeline()
+result = pipeline.run(
+    [
+        (Researcher, "Find information about renewable energy"),
+        (Writer, "Write about renewable energy"),
+    ]
+)
+
+print(f"  Result: {result.content[:100]}...")
+print(f"  Cost:   ${result.cost:.6f}")
+
+# ---------------------------------------------------------------------------
+# Optional: serve with playground UI (requires syrin[serve])
+# ---------------------------------------------------------------------------
+# pipeline.serve(port=8000, enable_playground=True, debug=True)

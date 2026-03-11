@@ -15,7 +15,7 @@ Serving is built-in — one line to run your agent. No extra wiring.
 
 **Tip:** Use `debug=True` when serving, or run scripts with `--trace`, to see LLM calls, tool calls, and costs in the console.
 
-**Requires:** `uv pip install syrin[serve]` (fastapi, uvicorn)
+
 
 ## Quick Start
 

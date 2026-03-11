@@ -1,57 +1,85 @@
-"""All Model Providers Example.
+"""Model Providers -- every way to configure a model in Syrin.
 
 Demonstrates:
+- Model.Almock for testing (no API key needed)
 - Model.OpenAI, Model.Anthropic, Model.Google, Model.Ollama, Model.LiteLLM
 - Model.Custom for third-party OpenAI-compatible APIs
-- Model.Almock for testing without API keys
 - Model settings: temperature, max_tokens, context_window
-- api_key and api_base configuration
+- Structured output with a Pydantic schema
+- Fallback chains for resilience
+- Using a model with an Agent
 
-Run: python -m examples.13_models.all_providers
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/13_models/all_providers.py
 """
 
-from __future__ import annotations
+from pydantic import BaseModel
 
-import os
-from pathlib import Path
+from syrin import Agent, Model
 
-from dotenv import load_dotenv
+# ---------------------------------------------------------------------------
+# 1. Almock -- mock model for testing (no API key required)
+# ---------------------------------------------------------------------------
+print("-- 1. Almock (mock model) --")
 
-from syrin import Model
+mock = Model.Almock(latency_seconds=0.01, lorem_length=50)
+agent = Agent(model=mock, system_prompt="You are helpful.")
+r = agent.response("Hello!")
+print(f"  Response: {r.content[:80]}...")
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# ---------------------------------------------------------------------------
+# 2. Provider namespaces (shows how to configure each provider)
+# ---------------------------------------------------------------------------
+print("\n-- 2. Provider namespaces --")
 
+# Each provider takes an API key. Here we use placeholder keys for demo.
+# In production, pass real keys or set the corresponding env vars.
+openai_model = Model.OpenAI("gpt-4o", api_key="sk-test")
+print(f"  OpenAI:    provider={openai_model.provider}, model={openai_model.model_id}")
 
-# 1. Provider namespaces
-model = Model.OpenAI("gpt-4o", api_key=os.getenv("OPENAI_API_KEY", "sk-test"))
-print(f"OpenAI: {model.provider}, {model.model_id}")
-model = Model.Anthropic("claude-sonnet-4-5", api_key=os.getenv("ANTHROPIC_API_KEY", "sk-test"))
-model = Model.Google("gemini-2.0-flash", api_key=os.getenv("GOOGLE_API_KEY", "test"))
-model = Model.Ollama("llama3")
-model = Model.LiteLLM("openai/gpt-4o", api_key=os.getenv("OPENAI_API_KEY", "sk-test"))
-model = Model.Almock(latency_seconds=0.01, lorem_length=50)
+anthropic_model = Model.Anthropic("claude-sonnet-4-5", api_key="sk-test")
+print(f"  Anthropic: provider={anthropic_model.provider}, model={anthropic_model.model_id}")
 
-# 2. Model configuration
-model = Model.OpenAI(
+google_model = Model.Google("gemini-2.0-flash", api_key="test")
+print(f"  Google:    provider={google_model.provider}, model={google_model.model_id}")
+
+ollama_model = Model.Ollama("llama3")
+print(f"  Ollama:    provider={ollama_model.provider}, model={ollama_model.model_id}")
+
+litellm_model = Model.LiteLLM("openai/gpt-4o", api_key="sk-test")
+print(f"  LiteLLM:   provider={litellm_model.provider}, model={litellm_model.model_id}")
+
+# ---------------------------------------------------------------------------
+# 3. Model configuration (temperature, max_tokens, context_window)
+# ---------------------------------------------------------------------------
+print("\n-- 3. Model configuration --")
+
+configured = Model.OpenAI(
     "gpt-4o",
-    api_key=os.getenv("OPENAI_API_KEY", "sk-test"),
+    api_key="sk-test",
     temperature=0.7,
     max_tokens=2048,
     context_window=128000,
 )
+print(f"  temperature={configured.settings.temperature}, max_tokens={configured.settings.max_output_tokens}")
 
-# 3. Model.Custom (third-party APIs)
-model = Model.Custom(
+# ---------------------------------------------------------------------------
+# 4. Model.Custom for third-party OpenAI-compatible APIs
+# ---------------------------------------------------------------------------
+print("\n-- 4. Custom provider (OpenAI-compatible API) --")
+
+custom = Model.Custom(
     "deepseek-chat",
     api_base="https://api.deepseek.com/v1",
-    api_key=os.getenv("DEEPSEEK_API_KEY", "sk-test"),
+    api_key="sk-test",
     context_window=128_000,
 )
+print(f"  Custom: model={custom.model_id}, api_base={custom.api_base}")
 
-# 4. Structured output
-from pydantic import BaseModel
+# ---------------------------------------------------------------------------
+# 5. Structured output with a Pydantic model
+# ---------------------------------------------------------------------------
+print("\n-- 5. Structured output --")
 
 
 class SentimentAnalysis(BaseModel):
@@ -59,33 +87,23 @@ class SentimentAnalysis(BaseModel):
     confidence: float
 
 
-model = Model.OpenAI(
-    "gpt-4o",
-    output=SentimentAnalysis,
-    api_key=os.getenv("OPENAI_API_KEY", "sk-test"),
-)
+structured = Model.OpenAI("gpt-4o", output=SentimentAnalysis, api_key="sk-test")
+print(f"  Output schema: {structured.output_type}")
 
-# 5. Fallback chains
-key = os.getenv("OPENAI_API_KEY", "sk-test")
-model = Model.Anthropic(
-    "claude-sonnet-4-5",
-    api_key=os.getenv("ANTHROPIC_API_KEY", "sk-test"),
-).with_fallback(
-    Model.OpenAI("gpt-4o", api_key=key),
-    Model.OpenAI("gpt-4o-mini", api_key=key),
+# ---------------------------------------------------------------------------
+# 6. Fallback chains
+# ---------------------------------------------------------------------------
+print("\n-- 6. Fallback chain --")
+
+primary = Model.Anthropic("claude-sonnet-4-5", api_key="sk-test").with_fallback(
+    Model.OpenAI("gpt-4o", api_key="sk-test"),
+    Model.OpenAI("gpt-4o-mini", api_key="sk-test"),
     Model.Ollama("llama3"),
 )
-print(f"Fallbacks: {len(model.fallback)}")
+print(f"  Primary: {primary.model_id}, fallbacks: {len(primary.fallback)}")
 
-if __name__ == "__main__":
-    from syrin import Agent
-
-    class ProvidersDemoAgent(Agent):
-        _agent_name = "providers-demo"
-        _agent_description = "Agent with Almock (model providers demo)"
-        model = Model.Almock(latency_seconds=0.01, lorem_length=50)
-        system_prompt = "You are a helpful assistant."
-
-    agent = ProvidersDemoAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+# ---------------------------------------------------------------------------
+# Optional: serve with playground UI (requires syrin[serve])
+# ---------------------------------------------------------------------------
+# agent = Agent(model=Model.Almock(), system_prompt="You are helpful.")
+# agent.serve(port=8000, enable_playground=True, debug=True)

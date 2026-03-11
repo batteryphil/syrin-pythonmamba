@@ -32,8 +32,8 @@ Streaming Response Example
 Copy this code and run it!
 """
 
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class StreamingAgent(Agent):
@@ -81,8 +81,8 @@ if __name__ == "__main__":
 ### Normal Response (Blocking)
 
 ```python
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 class Agent1(Agent):
     model = Model.OpenAI("gpt-4o-mini")
@@ -100,8 +100,8 @@ print("Done!")
 ### Streaming Response (Real-time)
 
 ```python
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 class Agent2(Agent):
     model = Model.OpenAI("gpt-4o-mini")
@@ -123,8 +123,8 @@ Simple Chat with Streaming
 Like ChatGPT!
 """
 
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class ChatAgent(Agent):
@@ -176,8 +176,8 @@ if __name__ == "__main__":
 Each streamed chunk has information:
 
 ```python
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class DetailedStreamAgent(Agent):
@@ -226,9 +226,9 @@ Stream responses even when using tools:
 Streaming with Tool Usage
 """
 
-from Syrin import Agent
-from Syrin.model import Model
-from Syrin.tool import tool
+from syrin import Agent
+from syrin.model import Model
+from syrin.tool import tool
 
 
 @tool
@@ -277,8 +277,8 @@ Show user a progress indicator:
 Streaming with Progress Indicator
 """
 
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 import time
 
 
@@ -330,8 +330,8 @@ For high-performance applications
 """
 
 import asyncio
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class AsyncStreamAgent(Agent):
@@ -383,8 +383,8 @@ Process chunks as they arrive:
 Streaming with Custom Callbacks
 """
 
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class CallbackStreamAgent(Agent):
@@ -436,8 +436,8 @@ Stream with Buffering
 Collect chunks and display in batches
 """
 
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class BufferingStreamAgent(Agent):
@@ -481,8 +481,8 @@ Stream and translate simultaneously:
 Real-time Translation Streaming
 """
 
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class TranslationStreamAgent(Agent):

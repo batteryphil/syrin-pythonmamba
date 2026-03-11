@@ -1,38 +1,25 @@
-"""Chatbot Example — Full-featured chatbot with context, memory, guardrails, and routing.
+"""Chatbot Example -- Full-featured chatbot with context, memory, guardrails, and routing.
 
 Demonstrates: Context, Memory (SQLite), guardrails, checkpoints, multi-model routing,
 multimodal input, image/video generation.
 
-Run: python -m examples.16_serving.chatbot
+Run:  python -m examples.16_serving.chatbot
 Visit: http://localhost:8000/playground
 """
 
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 
-_root = Path(__file__).resolve().parents[2]
-if str(_root) not in sys.path:
-    sys.path.insert(0, str(_root))
-
-from dotenv import load_dotenv
-
-_DIR = Path(__file__).resolve().parent
-for _p in [_DIR.parent / ".env", _root / ".env", Path.cwd() / ".env"]:
-    if _p.exists():
-        load_dotenv(_p, override=True)
-        break
-
-from examples.models.models import almock, gpt4, gpt4_mini
-from syrin import Agent, Budget, CheckpointConfig, CheckpointTrigger, Decay, Memory, RateLimit, tool
+from syrin import Agent, Budget, CheckpointConfig, CheckpointTrigger, Decay, Memory, Model, RateLimit, tool
 from syrin.context import Context
 from syrin.enums import DecayStrategy, Media, MemoryBackend, MemoryType, WriteMode
 from syrin.generation import ImageGenerator, VideoGenerator
 from syrin.guardrails import ContentFilter, LengthGuardrail
 from syrin.router import RoutingConfig, RoutingMode, TaskType
 
+_DIR = Path(__file__).resolve().parent
 MEMORY_DB = _DIR / "chatbot_memory.db"
 MAP_PATH = _DIR / "chatbot_context_map.json"
 
@@ -99,7 +86,9 @@ def repeat_back(phrase: str) -> str:
 def _model_and_config():
     """Model list + RoutingConfig when OPENAI_API_KEY set; else single Almock."""
     if not os.getenv("OPENAI_API_KEY"):
-        return [almock], None
+        return [Model.Almock()], None
+    gpt4_mini = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+    gpt4 = Model.OpenAI("gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))
     models = [
         gpt4_mini.with_routing(
             profile_name="general",

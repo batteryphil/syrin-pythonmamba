@@ -1,4 +1,4 @@
-"""Guardrail Reports Example.
+"""Guardrail Reports — Hooks, blocking flow, and report inspection.
 
 Demonstrates:
 - Guardrail hooks: GUARDRAIL_INPUT, GUARDRAIL_OUTPUT, GUARDRAIL_BLOCKED
@@ -6,32 +6,31 @@ Demonstrates:
 - Input/output guardrail blocking flow
 - Custom output guardrails
 
-Run: python -m examples.09_guardrails.guardrail_reports
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/09_guardrails/guardrail_reports.py
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent, Guardrail, GuardrailStage, Hook
+from syrin import Agent, Guardrail, GuardrailStage, Hook, Model
 from syrin.guardrails import ContentFilter
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+model = Model.Almock()
 
+# ---------------------------------------------------------------------------
+# 1. Input guardrail blocks dangerous content
+# ---------------------------------------------------------------------------
+print("=" * 55)
+print("1. Input guardrail — ContentFilter blocks bad words")
+print("=" * 55)
 
-# 1. Input guardrail blocks
 guardrail = ContentFilter(blocked_words=["hack", "steal", "password"])
 
 
 class Assistant(Agent):
     _agent_name = "guardrail-assistant"
     _agent_description = "Assistant with ContentFilter guardrail"
-    model = almock
+    model = model
     system_prompt = "You are a helpful assistant."
     guardrails = [guardrail]
 
@@ -47,12 +46,24 @@ assistant.events.on(Hook.GUARDRAIL_BLOCKED, on_blocked)
 result = assistant.response("How do I hack into someone's password?")
 print(f"Blocked: {result.report.guardrail.blocked}, stage: {result.report.guardrail.blocked_stage}")
 
-# 2. Guardrail passes
+# ---------------------------------------------------------------------------
+# 2. Guardrail passes for safe content
+# ---------------------------------------------------------------------------
+print("\n" + "=" * 55)
+print("2. Safe content passes the guardrail")
+print("=" * 55)
+
 result = assistant.response("What is the weather today?")
 print(f"Passed: {result.report.guardrail.passed}")
 
+# ---------------------------------------------------------------------------
+# 3. Custom output guardrail — blocks sensitive data in responses
+# ---------------------------------------------------------------------------
+print("\n" + "=" * 55)
+print("3. Custom output guardrail — SensitiveDataGuardrail")
+print("=" * 55)
 
-# 3. Custom output guardrail
+
 class SensitiveDataGuardrail(Guardrail):
     def __init__(self) -> None:
         self.name = "sensitive_data"
@@ -73,7 +84,7 @@ class SensitiveDataGuardrail(Guardrail):
 
 
 class SafeAssistant(Agent):
-    model = almock
+    model = model
     guardrails = [SensitiveDataGuardrail()]
 
 
@@ -81,13 +92,20 @@ safe = SafeAssistant()
 result = safe.response("Tell me about SSN protection")
 print(f"Blocked: {result.report.guardrail.blocked}")
 
+# ---------------------------------------------------------------------------
 # 4. Full report summary
+# ---------------------------------------------------------------------------
+print("\n" + "=" * 55)
+print("4. Full report summary")
+print("=" * 55)
+
 result = assistant.response("Hello, how are you?")
 print(
     f"Guardrail passed: {result.report.guardrail.passed}, budget: ${result.report.budget.used:.4f}"
 )
 
-if __name__ == "__main__":
-    agent = Assistant()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+# --- Optional: serve with playground ---
+# if __name__ == "__main__":
+#     agent = Assistant()
+#     print("Serving at http://localhost:8000/playground")
+#     agent.serve(port=8000, enable_playground=True, debug=True)

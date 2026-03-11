@@ -1,56 +1,39 @@
-"""Handoff Example.
+"""Handoff — Delegate tasks between agents.
 
-Demonstrates:
-- Agent handoff between specialized agents
-- Context transfer via memory
-- Budget transfer between agents
+One agent analyzes, then hands off to another agent to present the results.
 
-Run: python -m examples.07_multi_agent.handoff
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/07_multi_agent/handoff.py
 """
 
-from __future__ import annotations
+from syrin import Agent, Model
 
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent, prompt
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
-
-@prompt
-def analyzer_prompt() -> str:
-    return "You are an analyzer agent. Analyze information and provide key findings."
-
-
-@prompt
-def presenter_prompt() -> str:
-    return "You are a presenter agent. Present information clearly and concisely."
+model = Model.Almock()
 
 
 class Analyzer(Agent):
-    _agent_name = "analyzer"
-    _agent_description = "Analyzes information and provides key findings"
-    model = almock
-    system_prompt = analyzer_prompt()
+    model = model
+    system_prompt = "You are an analyzer agent. Analyze information and provide key findings."
 
 
 class Presenter(Agent):
-    _agent_name = "presenter"
-    _agent_description = "Presents information clearly and concisely"
-    model = almock
-    system_prompt = presenter_prompt()
+    model = model
+    system_prompt = "You are a presenter agent. Present information clearly and concisely."
 
 
-if __name__ == "__main__":
-    analyzer = Analyzer()
-    result1 = analyzer.response("Analyze the benefits of renewable energy")
-    print(f"Analyzer: {result1.content[:80]}...")
-    result2 = analyzer.handoff(Presenter, "Present the analysis")
-    print(f"Presenter: {result2.content[:80]}...")
-    print("Serving at http://localhost:8000/playground")
-    analyzer.serve(port=8000, enable_playground=True, debug=True)
+# Step 1: Analyzer processes the request
+analyzer = Analyzer()
+result = analyzer.response("Analyze the benefits of renewable energy")
+print(f"=== Analyzer ===")
+print(f"{result.content[:120]}...")
+print(f"Cost: ${result.cost:.6f}")
+print()
+
+# Step 2: Hand off to Presenter
+handoff_result = analyzer.handoff(Presenter, "Present the analysis")
+print(f"=== Presenter (via handoff) ===")
+print(f"{handoff_result.content[:120]}...")
+print(f"Cost: ${handoff_result.cost:.6f}")
+
+# --- Serve (uncomment to try playground) ---
+# analyzer.serve(port=8000, enable_playground=True)

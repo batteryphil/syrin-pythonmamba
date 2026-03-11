@@ -30,9 +30,9 @@ Multi-Agent Team Example
 Copy this code and run it!
 """
 
-from Syrin import Agent
-from Syrin.model import Model
-from Syrin.tool import tool
+from syrin import Agent
+from syrin.model import Model
+from syrin.tool import tool
 
 
 # Define shared tools
@@ -136,8 +136,8 @@ Process tasks one after another:
 Sequential Pipeline: One Agent After Another
 """
 
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class ResearcherAgent(Agent):
@@ -201,8 +201,8 @@ Run agents at the same time:
 Parallel Processing: Multiple Agents at Once
 """
 
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 import asyncio
 
 
@@ -266,8 +266,8 @@ Each agent focuses on one thing:
 Specialized Agents: Each Expert in Their Field
 """
 
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class CodeReviewerAgent(Agent):
@@ -353,9 +353,9 @@ One agent delegating to others:
 Delegating Agent: Asks Other Agents for Help
 """
 
-from Syrin import Agent
-from Syrin.model import Model
-from Syrin.tool import tool
+from syrin import Agent
+from syrin.model import Model
+from syrin.tool import tool
 
 
 # Helper agents
@@ -415,9 +415,9 @@ Customer Support Multi-Agent System
 Different agents handle different types of requests
 """
 
-from Syrin import Agent
-from Syrin.model import Model
-from Syrin.tool import tool
+from syrin import Agent
+from syrin.model import Model
+from syrin.tool import tool
 
 
 @tool
@@ -518,8 +518,8 @@ Team Budget: All agents share one budget
 """
 
 from syrin import Agent, Budget, raise_on_exceeded
-from Syrin.model import Model
-from Syrin.threshold import BudgetThreshold
+from syrin.model import Model
+from syrin.threshold import BudgetThreshold
 
 
 shared_budget = Budget(

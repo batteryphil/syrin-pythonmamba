@@ -1,42 +1,32 @@
-"""Handoff and spawn context visibility.
+"""Handoff and Spawn Context Visibility.
 
-Demonstrates:
+Demonstrates how Syrin exposes context metadata during handoffs and spawns:
 - HANDOFF_START / HANDOFF_BLOCKED include handoff_context (ContextSnapshot)
 - SPAWN_START includes context_inherited, initial_context_tokens, parent_context_tokens
 - Using handoff_context for logging and audit (total_tokens, context_rot_risk, to_dict())
 
-Run: python -m examples.07_multi_agent.handoff_spawn_context_visibility
+Run: python examples/07_multi_agent/handoff_spawn_context_visibility.py
 """
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from syrin import Agent, Hook, Model
 
-_root = Path(__file__).resolve().parents[2]
-if str(_root) not in sys.path:
-    sys.path.insert(0, str(_root))
-
-from dotenv import load_dotenv
-
-from examples.models.models import gpt4_mini
-from syrin import Agent, Hook
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+model = Model.Almock()
 
 
 class Researcher(Agent):
-    model = gpt4_mini
+    model = Model.Almock()
     system_prompt = "You are a researcher. Answer briefly."
 
 
 class Writer(Agent):
-    model = gpt4_mini
+    model = Model.Almock()
     system_prompt = "You write clearly."
 
 
 class ChildAgent(Agent):
-    model = gpt4_mini
+    model = Model.Almock()
     system_prompt = "You are a helper."
 
 
@@ -53,13 +43,15 @@ def main_handoff_context() -> None:
             print(f"    utilization_pct={handoff_context.utilization_pct:.1f}%")
             print(f"    context_rot_risk={handoff_context.context_rot_risk}")
             print(
-                f"    breakdown: system={handoff_context.breakdown.system_tokens}, messages={handoff_context.breakdown.messages_tokens}"
+                f"    breakdown: system={handoff_context.breakdown.system_tokens}, "
+                f"messages={handoff_context.breakdown.messages_tokens}"
             )
             # Export for audit / JSON
             d = handoff_context.to_dict()
             print(f"    (to_dict keys: {list(d.keys())[:6]}...)")
         print(
-            f"  source_agent={ctx.source_agent} → target_agent={ctx.target_agent}, task={ctx.task[:40]}...\n"
+            f"  source_agent={ctx.source_agent} -> target_agent={ctx.target_agent}, "
+            f"task={ctx.task[:40]}...\n"
         )
 
     source.events.on(Hook.HANDOFF_START, on_handoff_start)
@@ -85,7 +77,7 @@ def main_spawn_context_metadata() -> None:
     parent = Researcher()
 
     def on_spawn_start(ctx) -> None:
-        print(f"  SPAWN_START: {ctx.source_agent} → child {ctx.child_agent}")
+        print(f"  SPAWN_START: {ctx.source_agent} -> child {ctx.child_agent}")
         print(f"    context_inherited={ctx.get('context_inherited')}")
         print(f"    initial_context_tokens={ctx.get('initial_context_tokens')}")
         print(f"    parent_context_tokens={ctx.get('parent_context_tokens')}")
@@ -99,7 +91,6 @@ def main_spawn_context_metadata() -> None:
     print(f"Result: {result.content}\n")
 
     # 2) Spawn after parent ran response(): parent_context_tokens > 0
-    # Child does not receive parent's conversation (context_inherited=False), so give a self-contained task.
     print("2) Spawn after parent ran response() (parent_context_tokens from last prepare):\n")
     parent.response("What is 2+2? Answer with one number.")
     result2 = parent.spawn(ChildAgent, task="Reply with the number 4.")

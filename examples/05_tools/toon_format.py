@@ -1,30 +1,23 @@
-"""TOON Format Example.
+"""TOON Format Example -- Token-efficient tool schemas.
 
 Demonstrates:
 - TOON (Token-Oriented Object Notation) tool schema format
-- Why TOON uses ~40% fewer tokens than JSON
+- Why TOON uses ~40% fewer tokens than JSON for tool definitions
 - ToolSpec.schema_to_toon() and ToolSpec.to_format()
-- DocFormat.TOON vs DocFormat.JSON
-- Efficiency comparison across multiple tools
+- Side-by-side comparison of TOON vs JSON efficiency
 
-Run: python -m examples.05_tools.toon_format
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run: python examples/05_tools/toon_format.py
 """
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent, tool
+from syrin import Agent, Model, tool
 from syrin.enums import DocFormat
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+# --- Define some tools ---
 
 @tool
 def calculate(a: float, b: float, operation: str = "add") -> str:
@@ -63,37 +56,65 @@ def send_email(to: str, subject: str, body: str, priority: str = "normal") -> st
     return f"Email sent to {to}"
 
 
-# 1. TOON vs JSON comparison (use method on tool spec)
-tool_spec = calculate
-json_schema = json.dumps(tool_spec.parameters_schema, indent=2)
-toon_schema = tool_spec.schema_to_toon()
-savings = ((len(json_schema) - len(toon_schema)) / len(json_schema)) * 100
-print(
-    f"Tool: {tool_spec.name}; JSON {len(json_schema)} chars, TOON {len(toon_schema)} chars; savings {savings:.1f}%"
-)
+# --- 1. TOON vs JSON comparison for a single tool ---
 
-# 2. Format conversion (use method on tool spec)
+print("=" * 50)
+print("1. TOON vs JSON -- single tool")
+print("=" * 50)
+
+json_schema = json.dumps(calculate.parameters_schema, indent=2)
+toon_schema = calculate.schema_to_toon()
+savings = ((len(json_schema) - len(toon_schema)) / len(json_schema)) * 100
+
+print(f"  Tool: {calculate.name}")
+print(f"  JSON: {len(json_schema)} chars")
+print(f"  TOON: {len(toon_schema)} chars")
+print(f"  Savings: {savings:.1f}%")
+
+
+# --- 2. Format conversion ---
+
+print("\n" + "=" * 50)
+print("2. Format conversion (TOON vs JSON)")
+print("=" * 50)
+
 for fmt in [DocFormat.TOON, DocFormat.JSON]:
     schema = search_web.to_format(fmt)
-    print(f"{fmt.value}: {json.dumps(schema)[:80]}...")
+    print(f"  {fmt.value}: {json.dumps(schema)[:80]}...")
 
-# 3. Multi-tool efficiency
+
+# --- 3. Multi-tool efficiency ---
+
+print("\n" + "=" * 50)
+print("3. Multi-tool efficiency comparison")
+print("=" * 50)
+
 tools = [calculate, search_web, send_email]
 total_json = sum(len(json.dumps(t.parameters_schema)) for t in tools)
 total_toon = sum(len(t.schema_to_toon()) for t in tools)
-total_sv = ((total_json - total_toon) / total_json) * 100
-print(f"3 tools: JSON {total_json}ch, TOON {total_toon}ch, savings {total_sv:.1f}%")
+total_savings = ((total_json - total_toon) / total_json) * 100
+
+print(f"  3 tools combined:")
+print(f"  JSON: {total_json} chars")
+print(f"  TOON: {total_toon} chars")
+print(f"  Savings: {total_savings:.1f}%")
 
 
-class ToolDemoAgent(Agent):
-    _agent_name = "tool-demo"
-    _agent_description = "Agent with TOON-format tools (calculate, search_web, send_email)"
-    model = almock
-    system_prompt = "You are a helpful assistant. Use tools when needed."
-    tools = [calculate, search_web, send_email]
+# --- 4. Use the tools with an agent ---
 
+print("\n" + "=" * 50)
+print("4. Agent with TOON-format tools")
+print("=" * 50)
+
+agent = Agent(
+    model=Model.Almock(),
+    system_prompt="You are a helpful assistant. Use tools when needed.",
+    tools=[calculate, search_web, send_email],
+)
+result = agent.response("What is 2 + 3?")
+print(f"  Response: {result.content[:120]}")
 
 if __name__ == "__main__":
-    agent = ToolDemoAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+    pass
+    # Optional: serve with playground UI
+    # agent.serve(port=8000, enable_playground=True, debug=True)

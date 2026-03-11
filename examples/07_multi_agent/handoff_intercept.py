@@ -1,44 +1,32 @@
 """Handoff Interception Example.
 
-Demonstrates:
+Demonstrates handoff lifecycle hooks and error handling:
 - HANDOFF_START / HANDOFF_END hooks — observe what is passed
 - HANDOFF_BLOCKED — when handoff is blocked by before-handler
 - HandoffBlockedError — raise in before-handler to block
 - HandoffRetryRequested — target signals invalid data, caller retries
 
-Run: python -m examples.07_multi_agent.handoff_intercept
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run: python examples/07_multi_agent/handoff_intercept.py
 """
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from syrin import Agent, HandoffBlockedError, HandoffRetryRequested, Hook, Model, Response
 
-_root = Path(__file__).resolve().parents[2]
-if str(_root) not in sys.path:
-    sys.path.insert(0, str(_root))
-
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent, HandoffBlockedError, HandoffRetryRequested, Hook, Response
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+model = Model.Almock()
 
 
 class SourceAgent(Agent):
     _agent_name = "source"
     _agent_description = "Researcher that hands off to presenter"
-    model = almock
+    model = Model.Almock()
     system_prompt = "You are a researcher. Provide brief findings."
 
 
 class TargetAgent(Agent):
     _agent_name = "target"
     _agent_description = "Presents findings clearly"
-    model = almock
+    model = Model.Almock()
     system_prompt = "You present findings clearly."
 
 
@@ -49,7 +37,7 @@ def main_observability() -> None:
     source = SourceAgent()
 
     def on_start(ctx) -> None:
-        print(f"  HANDOFF_START: {ctx.source_agent} → {ctx.target_agent}")
+        print(f"  HANDOFF_START: {ctx.source_agent} -> {ctx.target_agent}")
         print(f"    task: {ctx.task[:50]}...")
         print(f"    mem_count: {ctx.mem_count}, xfer_budget: {ctx.transfer_budget}")
 
@@ -71,13 +59,13 @@ def main_block() -> None:
     class BlockSourceAgent(Agent):
         _agent_name = "block-source"
         _agent_description = "Source for block demo"
-        model = almock
+        model = Model.Almock()
         system_prompt = "You research."
 
     class BlockTargetAgent(Agent):
         _agent_name = "block-target"
         _agent_description = "Target for block demo"
-        model = almock
+        model = Model.Almock()
         system_prompt = "You present."
 
     source = BlockSourceAgent()
@@ -112,13 +100,13 @@ def main_retry() -> None:
     class RetrySourceAgent(Agent):
         _agent_name = "retry-source"
         _agent_description = "Source for retry demo"
-        model = almock
+        model = Model.Almock()
         system_prompt = "You format data."
 
     class RetryTargetAgent(Agent):
         _agent_name = "retry-target"
         _agent_description = "Target for retry demo"
-        model = almock
+        model = Model.Almock()
         system_prompt = "You expect JSON with 'title' and 'items'."
 
         _retry_count = 0
@@ -159,6 +147,6 @@ if __name__ == "__main__":
     main_block()
     main_retry()
 
-    agent = SourceAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+    # Optional: serve for interactive playground
+    # agent = SourceAgent()
+    # agent.serve(port=8000, enable_playground=True, debug=True)

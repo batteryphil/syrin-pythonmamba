@@ -1,38 +1,76 @@
-"""Basic Memory Example.
+"""Basic Memory — Make your agent remember things.
 
-Demonstrates:
-- Creating an agent with Memory (4-type persistent memory)
-- remember() and recall() operations
-- Memory types: CORE, EPISODIC, SEMANTIC, PROCEDURAL
+Shows the 4 memory types: Core, Episodic, Semantic, Procedural.
+Memory persists across conversations and decays over time.
 
-Run: python -m examples.04_memory.basic_memory
-Visit: http://localhost:8000/playground
-
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/04_memory/basic_memory.py
 """
 
-from __future__ import annotations
+from syrin import Agent, Memory, MemoryType, Model
 
-from pathlib import Path
+model = Model.Almock()
 
-from dotenv import load_dotenv
+# Create an agent with memory
+agent = Agent(
+    model=model,
+    system_prompt="You are a helpful assistant that remembers user preferences.",
+    memory=Memory(),
+)
 
-from examples.models.models import almock
-from syrin import Agent, Memory, MemoryType
+# ============================================================
+# 1. Store memories (4 types)
+# ============================================================
+# CORE: permanent facts (never decays) — user identity, preferences
+agent.remember("The user's name is Alice.", memory_type=MemoryType.CORE, importance=1.0)
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# EPISODIC: past events (decays over time) — what happened in conversations
+agent.remember("User asked about machine learning yesterday.", memory_type=MemoryType.EPISODIC)
 
+# SEMANTIC: knowledge and facts — learned information
+agent.remember("Alice prefers Python over JavaScript.", memory_type=MemoryType.SEMANTIC)
 
-class Assistant(Agent):
-    _agent_name = "assistant"
-    _agent_description = "Assistant with persistent memory (remember/recall/forget)"
-    model = almock
-    system_prompt = "You are a helpful assistant that remembers user preferences."
+# PROCEDURAL: how-to knowledge — processes and workflows
+agent.remember(
+    "When Alice asks for code, use type hints and docstrings.",
+    memory_type=MemoryType.PROCEDURAL,
+)
 
+print("Stored 4 memories (one of each type)")
+print()
 
-if __name__ == "__main__":
-    assistant = Assistant(memory=Memory())
-    assistant.remember("The user's name is Alice.", memory_type=MemoryType.CORE, importance=1.0)
-    assistant.remember("User asked about machine learning", memory_type=MemoryType.EPISODIC)
-    print("Serving at http://localhost:8000/playground")
-    assistant.serve(port=8000, enable_playground=True, debug=True)
+# ============================================================
+# 2. Recall memories by query
+# ============================================================
+results = agent.recall("What do I know about Alice?")
+print(f"=== Recall 'Alice' ({len(results)} results) ===")
+for entry in results:
+    print(f"  [{entry.type}] {entry.content}")
+print()
+
+# Recall by type
+core_memories = agent.recall(memory_type=MemoryType.CORE)
+print(f"=== Core memories ({len(core_memories)}) ===")
+for entry in core_memories:
+    print(f"  {entry.content}")
+print()
+
+# ============================================================
+# 3. Forget memories
+# ============================================================
+deleted = agent.forget(query="machine learning")
+print(f"Forgot {deleted} memory(ies) matching 'machine learning'")
+
+# Verify it's gone
+remaining = agent.recall("machine learning")
+print(f"Remaining matches: {len(remaining)}")
+print()
+
+# ============================================================
+# 4. Use memory in conversation
+# ============================================================
+response = agent.response("What's my name?")
+print(f"Agent says: {response.content}")
+
+# --- Serve (uncomment to try playground) ---
+# agent.serve(port=8000, enable_playground=True)

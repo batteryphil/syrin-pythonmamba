@@ -19,7 +19,7 @@ from syrin.knowledge.loaders import (
 
 
 def main() -> None:
-    # Document is immutable; required: content, source, source_type
+    # Document is mutable; required: content, source, source_type
     doc = Document(
         content="I have 8 years of Python experience.",
         source="user_provided",
@@ -27,6 +27,11 @@ def main() -> None:
         metadata={"index": 0},
     )
     print("Document:", doc.content[:40], "...", "source=", doc.source)
+
+    # Documents can be modified (mutable)
+    doc.metadata["updated"] = True
+    doc.content += " Specializing in ML."
+    print("Updated document:", doc.content[:60], "...")
 
     # Raw text (no file): single or multiple
     raw = RawTextLoader("One fact.")

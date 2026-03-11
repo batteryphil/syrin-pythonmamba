@@ -65,8 +65,8 @@ pip install syrin
 ### Basic Usage
 
 ```python
-from Syrin import Agent, Model
-from Syrin.guardrails import ContentFilter, PIIScanner
+from syrin import Agent, Model
+from syrin.guardrails import ContentFilter, PIIScanner
 
 # Simple setup
 agent = Agent(
@@ -85,7 +85,7 @@ agent = Agent(
 
 ```python
 import asyncio
-from Syrin.guardrails import Guardrail, GuardrailContext, GuardrailDecision
+from syrin.guardrails import Guardrail, GuardrailContext, GuardrailDecision
 
 class MyGuardrail(Guardrail):
     async def evaluate(self, context: GuardrailContext) -> GuardrailDecision:
@@ -116,8 +116,8 @@ asyncio.run(main())
 The `GuardrailContext` provides all information needed for evaluation:
 
 ```python
-from Syrin.guardrails import GuardrailContext
-from Syrin.enums import GuardrailStage
+from syrin.guardrails import GuardrailContext
+from syrin.enums import GuardrailStage
 
 context = GuardrailContext(
     text="The text being evaluated",
@@ -141,8 +141,8 @@ context = GuardrailContext(
 The `GuardrailDecision` provides comprehensive evaluation results:
 
 ```python
-from Syrin.guardrails import GuardrailDecision
-from Syrin.enums import DecisionAction
+from syrin.guardrails import GuardrailDecision
+from syrin.enums import DecisionAction
 
 decision = GuardrailDecision(
     passed=False,  # Did it pass?
@@ -167,7 +167,7 @@ decision = GuardrailDecision(
 All guardrails inherit from `Guardrail`:
 
 ```python
-from Syrin.guardrails import Guardrail, GuardrailContext, GuardrailDecision
+from syrin.guardrails import Guardrail, GuardrailContext, GuardrailDecision
 
 class MyGuardrail(Guardrail):
     def __init__(self, param1, name=None):
@@ -199,7 +199,7 @@ class MyGuardrail(Guardrail):
 Blocks text containing specific words or phrases.
 
 ```python
-from Syrin.guardrails import ContentFilter
+from syrin.guardrails import ContentFilter
 
 guardrail = ContentFilter(
     blocked_words=["password", "secret", "api_key"],
@@ -223,7 +223,7 @@ if not result.passed:
 Detects and optionally redacts personally identifiable information.
 
 ```python
-from Syrin.guardrails import PIIScanner
+from syrin.guardrails import PIIScanner
 
 guardrail = PIIScanner(
     redact=True,  # Replace PII with ***
@@ -258,7 +258,7 @@ if not result.passed:
 ### Simple Custom Guardrail
 
 ```python
-from Syrin.guardrails import Guardrail, GuardrailContext, GuardrailDecision
+from syrin.guardrails import Guardrail, GuardrailContext, GuardrailDecision
 
 class LengthGuardrail(Guardrail):
     """Check message length."""
@@ -364,7 +364,7 @@ class RateLimitGuardrail(Guardrail):
 All guardrails run at the same time. Fastest overall latency.
 
 ```python
-from Syrin.guardrails import ParallelEvaluationEngine
+from syrin.guardrails import ParallelEvaluationEngine
 
 engine = ParallelEvaluationEngine(
     timeout=5.0,  # Max time to wait
@@ -385,7 +385,7 @@ result = await engine.evaluate(context, [guardrail1, guardrail2, guardrail3])
 Guardrails run one at a time. Stops on first failure.
 
 ```python
-from Syrin.guardrails import GuardrailChain
+from syrin.guardrails import GuardrailChain
 
 chain = GuardrailChain([
     cheap_check(),  # Run first
@@ -474,7 +474,7 @@ json_str = result.to_json()
 React to guardrail events:
 
 ```python
-from Syrin import Agent, Hook
+from syrin import Agent, Hook
 
 agent = Agent(...)
 
@@ -516,8 +516,8 @@ Automatically tracked:
 ### Basic Integration
 
 ```python
-from Syrin import Agent, Model
-from Syrin.guardrails import ContentFilter, PIIScanner
+from syrin import Agent, Model
+from syrin.guardrails import ContentFilter, PIIScanner
 
 agent = Agent(
     # model=Model.OpenAI("gpt-4o"),
@@ -534,7 +534,7 @@ agent = Agent(
 ### Stage-Specific Guardrails
 
 ```python
-from Syrin import GuardrailConfig
+from syrin import GuardrailConfig
 
 agent = Agent(
     # model=Model.OpenAI("gpt-4o"),
@@ -974,7 +974,7 @@ The Authority Layer provides structural authorization controls for AI agents.
 Validates user permissions before allowing actions.
 
 ```python
-from Syrin.guardrails import AuthorityCheck
+from syrin.guardrails import AuthorityCheck
 
 # Single permission
 guardrail = AuthorityCheck(requires="finance:transfer")
@@ -1009,7 +1009,7 @@ guardrail = AuthorityCheck(
 Enforces budget limits on actions.
 
 ```python
-from Syrin.guardrails import BudgetEnforcer
+from syrin.guardrails import BudgetEnforcer
 
 # Simple limit
 guardrail = BudgetEnforcer(max_amount=1000)
@@ -1042,7 +1042,7 @@ guardrail = BudgetEnforcer(
 Implements K-of-N consensus for critical actions.
 
 ```python
-from Syrin.guardrails import ThresholdApproval
+from syrin.guardrails import ThresholdApproval
 
 # Require 2 of 3 approvers
 guardrail = ThresholdApproval(k=2, n=3)
@@ -1075,7 +1075,7 @@ result = await guardrail.evaluate(context)
 Requires explicit human approval.
 
 ```python
-from Syrin.guardrails import HumanApproval
+from syrin.guardrails import HumanApproval
 
 # Simple approval
 guardrail = HumanApproval(approver="admin@example.com")
@@ -1105,7 +1105,7 @@ guardrail.approve(
 Consumable permission tokens.
 
 ```python
-from Syrin.guardrails import CapabilityToken, CapabilityIssuer
+from syrin.guardrails import CapabilityToken, CapabilityIssuer
 
 # Issue a token
 issuer = CapabilityIssuer()
@@ -1137,7 +1137,7 @@ can_read = token.can("finance:read")  # True
 Guardrail using capability tokens.
 
 ```python
-from Syrin.guardrails import CapabilityGuardrail
+from syrin.guardrails import CapabilityGuardrail
 
 # Check for capability
 guardrail = CapabilityGuardrail(
@@ -1157,8 +1157,8 @@ The Intelligence Layer adds contextual awareness, adaptive behavior, and securit
 Tracks conversation history and detects patterns across multiple turns.
 
 ```python
-from Syrin.guardrails.intelligence import ContextAwareGuardrail
-from Syrin.guardrails import GuardrailContext
+from syrin.guardrails.intelligence import ContextAwareGuardrail
+from syrin.guardrails import GuardrailContext
 
 # Create context-aware guardrail
 context = GuardrailContext(
@@ -1185,7 +1185,7 @@ result = await ContextAwareGuardrail(
 Detects violation spikes and progressive attack patterns.
 
 ```python
-from Syrin.guardrails.intelligence import EscalationDetector
+from syrin.guardrails.intelligence import EscalationDetector
 
 # Monitor for escalation patterns
 detector = EscalationDetector(
@@ -1212,7 +1212,7 @@ guardrails = [
 Auto-tunes thresholds based on feedback to reduce false positives.
 
 ```python
-from Syrin.guardrails.intelligence import AdaptiveThresholdGuardrail
+from syrin.guardrails.intelligence import AdaptiveThresholdGuardrail
 
 # Starts with initial threshold
 adaptive = AdaptiveThresholdGuardrail(
@@ -1245,8 +1245,8 @@ elif not detected and was_violation:
 Generates attack attempts to test guardrail strength.
 
 ```python
-from Syrin.guardrails.intelligence import AttackSimulator, RedTeamEvaluator
-from Syrin.guardrails import ContentFilter
+from syrin.guardrails.intelligence import AttackSimulator, RedTeamEvaluator
+from syrin.guardrails import ContentFilter
 
 # Create simulator
 simulator = AttackSimulator()
@@ -1285,7 +1285,7 @@ bypasses = simulator.test_bypass_patterns(
 Evaluates guardrail strength against simulated attacks.
 
 ```python
-from Syrin.guardrails.intelligence import RedTeamEvaluator
+from syrin.guardrails.intelligence import RedTeamEvaluator
 
 # Evaluate your guardrail
 evaluator = RedTeamEvaluator(
@@ -1314,7 +1314,7 @@ print(f"Vulnerable to: {report['vulnerable_to']}")
 Mutation-based fuzzing to find edge cases.
 
 ```python
-from Syrin.guardrails.intelligence import FuzzingEngine
+from syrin.guardrails.intelligence import FuzzingEngine
 
 # Create fuzzer for your guardrail
 fuzzer = FuzzingEngine(seed_text="Hello world")
@@ -1343,8 +1343,8 @@ for mutation in mutations:
 ### Complete Intelligence Pipeline
 
 ```python
-from Syrin.guardrails import ParallelEvaluationEngine
-from Syrin.guardrails.intelligence import (
+from syrin.guardrails import ParallelEvaluationEngine
+from syrin.guardrails.intelligence import (
     ContextAwareGuardrail,
     EscalationDetector,
     AdaptiveThresholdGuardrail,
@@ -1384,7 +1384,7 @@ simulator = AttackSimulator()
 attacks = simulator.generate_jailbreak_attempts(count=50)
 
 # Run red team evaluation
-from Syrin.guardrails.intelligence import RedTeamEvaluator
+from syrin.guardrails.intelligence import RedTeamEvaluator
 evaluator = RedTeamEvaluator(
     guardrails=intelligence_guardrails + content_guardrails,
     iterations=100
@@ -1399,8 +1399,8 @@ print(f"System security score: {(1 - report['success_rate']) * 100:.0f}/100")
 ### Example 1: Financial Services
 
 ```python
-from Syrin import Agent, Model
-from Syrin.guardrails import GuardrailConfig
+from syrin import Agent, Model
+from syrin.guardrails import GuardrailConfig
 
 agent = Agent(
     # model=Model.OpenAI("gpt-4o"),
@@ -1433,7 +1433,7 @@ agent = Agent(
 ### Example 3: Content Moderation
 
 ```python
-from Syrin.guardrails import ParallelEvaluationEngine
+from syrin.guardrails import ParallelEvaluationEngine
 
 engine = ParallelEvaluationEngine(timeout=1.0)
 
@@ -1449,7 +1449,7 @@ result = await engine.evaluate(context, guardrails)
 ### Example 4: Complete Authority Workflow
 
 ```python
-from Syrin.guardrails import (
+from syrin.guardrails import (
     AuthorityCheck, BudgetEnforcer, ThresholdApproval,
     HumanApproval, ParallelEvaluationEngine
 )
@@ -1477,7 +1477,7 @@ result = await engine.evaluate(context, guardrails)
 ### Example 5: Context-Aware Protection
 
 ```python
-from Syrin.guardrails.intelligence import ContextAwareGuardrail, EscalationDetector
+from syrin.guardrails.intelligence import ContextAwareGuardrail, EscalationDetector
 
 # Detect topic escalation across conversation
 context_guardrail = ContextAwareGuardrail(
@@ -1498,7 +1498,7 @@ guardrails = [context_guardrail, escalation_detector]
 ### Example 6: Adaptive Threshold Tuning
 
 ```python
-from Syrin.guardrails.intelligence import AdaptiveThresholdGuardrail
+from syrin.guardrails.intelligence import AdaptiveThresholdGuardrail
 
 # Start with initial threshold
 adaptive = AdaptiveThresholdGuardrail(
@@ -1526,10 +1526,10 @@ print(f"Current threshold: {adaptive.current_threshold:.2f}")
 ### Example 7: Red Team Security Testing
 
 ```python
-from Syrin.guardrails.intelligence import (
+from syrin.guardrails.intelligence import (
     AttackSimulator, RedTeamEvaluator, FuzzingEngine
 )
-from Syrin.guardrails import ContentFilter
+from syrin.guardrails import ContentFilter
 
 # Your production guardrail
 guardrail = ContentFilter(blocked_words=["harmful", "dangerous"])
@@ -1555,9 +1555,9 @@ for mutation in mutations:
 ### Example 8: Complete Intelligent System
 
 ```python
-from Syrin import Agent, Model
-from Syrin.guardrails import ContentFilter, PIIScanner, GuardrailConfig
-from Syrin.guardrails.intelligence import (
+from syrin import Agent, Model
+from syrin.guardrails import ContentFilter, PIIScanner, GuardrailConfig
+from syrin.guardrails.intelligence import (
     ContextAwareGuardrail,
     EscalationDetector,
     AdaptiveThresholdGuardrail
@@ -1629,7 +1629,7 @@ if budget.remaining < 0.10:
 ### Old API
 
 ```python
-from Syrin.guardrails import ContentFilter
+from syrin.guardrails import ContentFilter
 
 guardrail = ContentFilter(blocked_words=["bad"])
 result = guardrail.check(text, stage)
@@ -1638,7 +1638,7 @@ result = guardrail.check(text, stage)
 ### New API
 
 ```python
-from Syrin.guardrails import ContentFilter
+from syrin.guardrails import ContentFilter
 
 guardrail = ContentFilter(blocked_words=["bad"])
 context = GuardrailContext(text=text, stage=stage)

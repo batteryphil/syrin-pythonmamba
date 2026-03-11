@@ -4,26 +4,21 @@ Shows store_output_chunks=True: long assistant replies are chunked by paragraph
 and stored; only chunks relevant to the current query are retrieved and added
 to context. Keeps context lean when prior answers were long.
 
-Run: python -m examples.11_context.context_output_chunks_demo
+Run:
+    python examples/11_context/context_output_chunks_demo.py
 """
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-from examples.models.models import almock, gpt4_mini
 from syrin import Agent, AgentConfig, Context
 from syrin.memory import Memory
+from syrin.model import Model
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-_model = gpt4_mini if os.environ.get("USE_REAL_MODEL") == "1" else almock
+_model = Model.Almock()
 
 
 def _main() -> None:
-    print("=== Stored output chunks (long answers → relevant chunks only) ===\n")
+    print("=== Stored output chunks (long answers -> relevant chunks only) ===\n")
 
     agent = Agent(
         model=_model,
@@ -45,7 +40,7 @@ def _main() -> None:
     # First turn: long answer about Syrin memory (multiple paragraphs)
     agent.response("Explain Syrin's memory system in 3 short paragraphs.")
 
-    # Second turn: ask about relevance — only relevant paragraphs should be in context
+    # Second turn: ask about relevance -- only relevant paragraphs should be in context
     result = agent.response("What about the relevance threshold?")
     snap = agent.context.snapshot()
     print(f"Response: {result.content}")

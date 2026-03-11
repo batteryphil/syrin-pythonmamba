@@ -1,49 +1,54 @@
-"""Input/Output Guardrails Example.
+"""Input/Output Guardrails -- block unwanted content before it reaches the model.
 
 Demonstrates:
-- ContentFilter for blocked words
-- GuardrailChain combining multiple guardrails
-- Agent with guardrails= parameter
+- ContentFilter: block messages containing specific words
+- GuardrailChain: combine multiple guardrails into one pipeline
+- Attaching guardrails to an Agent via the guardrails= parameter
+- Testing the chain directly with GuardrailStage.INPUT
 
-Run: python -m examples.09_guardrails.input_output_guardrails
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/09_guardrails/input_output_guardrails.py
 """
 
-from pathlib import Path
+from syrin import Agent, ContentFilter, GuardrailChain, GuardrailStage, Model
 
-from dotenv import load_dotenv
+# ---------------------------------------------------------------------------
+# 1. Build a content filter guardrail
+# ---------------------------------------------------------------------------
 
-from examples.models.models import almock
-from syrin import Agent
-from syrin.enums import GuardrailStage
-from syrin.guardrails import ContentFilter, GuardrailChain
+spam_filter = ContentFilter(blocked_words=["spam", "scam"], name="NoSpam")
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# ---------------------------------------------------------------------------
+# 2. Test the chain directly (no agent needed)
+# ---------------------------------------------------------------------------
 
-chain = GuardrailChain(
-    [
-        ContentFilter(blocked_words=["spam", "scam"], name="NoSpam"),
-    ]
-)
+chain = GuardrailChain([spam_filter])
+
+clean = chain.check("Hello, legitimate message", GuardrailStage.INPUT)
+print(f"Clean text  -> passed={clean.passed}")
+
+blocked = chain.check("This is spam", GuardrailStage.INPUT)
+print(f"Blocked text -> passed={blocked.passed}, reason={blocked.reason}")
+
+# ---------------------------------------------------------------------------
+# 3. Attach guardrails to an Agent (pass a list, not a chain)
+# ---------------------------------------------------------------------------
 
 
-class IOGuardrailAgent(Agent):
-    _agent_name = "io-guardrail"
-    _agent_description = "Agent with ContentFilter guardrail chain"
-    model = almock
+class GuardedAgent(Agent):
+    _agent_name = "guarded-agent"
+    _agent_description = "Agent with ContentFilter guardrail"
+    model = Model.Almock()
     system_prompt = "You are helpful."
-    guardrails = chain
+    guardrails = [spam_filter]
 
 
-if __name__ == "__main__":
-    result = chain.check("Hello, legitimate message", GuardrailStage.INPUT)
-    print(f"Clean text: passed={result.passed}")
-    result = chain.check("This is spam", GuardrailStage.INPUT)
-    print(f"Blocked text: passed={result.passed}, reason={result.reason}")
+agent = GuardedAgent()
 
-    agent = IOGuardrailAgent()
-    r = agent.response("Hello")
-    print(f"Agent response: {r.content[:50]}...")
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+response = agent.response("Hello, how are you?")
+print(f"\nAgent response: {response.content[:80]}...")
+
+# ---------------------------------------------------------------------------
+# Optional: serve with playground UI (requires syrin[serve])
+# ---------------------------------------------------------------------------
+# agent.serve(port=8000, enable_playground=True, debug=True)

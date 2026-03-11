@@ -13,7 +13,7 @@ Use `mcp.select("tool1", "tool2")` to whitelist specific tools.
 1. **Group tools** — Create an MCP class with multiple `@tool` methods. Keeps related tools organized.
 2. **Use MCP in agents** — Put the MCP instance in `tools=[ProductMCP()]`. Agent can call all MCP tools. When serving, `/mcp` is auto-mounted alongside `/chat`.
 
-**Requires:** `uv pip install syrin[serve]` for HTTP serving; `httpx` for MCPClient (included with syrin).
+**Note:** `httpx` is included with syrin.
 
 ## syrin.MCP — Declarative MCP Server (group your tools)
 

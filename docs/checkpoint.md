@@ -12,7 +12,7 @@ Syrin provides a checkpoint system for saving and restoring agent state. This is
 ## Quick Start
 
 ```python
-from Syrin import Agent, Model, CheckpointConfig
+from syrin import Agent, Model, CheckpointConfig
 
 agent = Agent(
     # model=Model("gpt-4o"),
@@ -41,7 +41,7 @@ agent.load_checkpoint(checkpoints[-1])
 ### Checkpoint Triggers
 
 ```python
-from Syrin import CheckpointTrigger
+from syrin import CheckpointTrigger
 
 CheckpointTrigger.MANUAL   # Only save explicitly
 CheckpointTrigger.STEP     # After each agent step
@@ -119,7 +119,7 @@ checkpoints = agent.checkpointer.list_checkpoints("my_agent")
 ### Checkpointer Class
 
 ```python
-from Syrin import Checkpointer
+from syrin import Checkpointer
 
 checkpointer = Checkpointer()
 checkpoint_id = checkpointer.save("agent_name", {"key": "value"})
@@ -131,7 +131,7 @@ checkpointer.delete(checkpoint_id)
 ### CheckpointState
 
 ```python
-from Syrin import CheckpointState
+from syrin import CheckpointState
 
 state = CheckpointState(
     agent_name="my_agent",
@@ -159,7 +159,7 @@ result.report.checkpoints.loads  # Number of loads
 Checkpoint operations emit hooks:
 
 ```python
-from Syrin import Hook
+from syrin import Hook
 
 agent.events.on(Hook.CHECKPOINT_SAVE, lambda ctx: print(f"Saved: {ctx.checkpoint_id}"))
 agent.events.on(Hook.CHECKPOINT_LOAD, lambda ctx: print(f"Loaded: {ctx.checkpoint_id}"))

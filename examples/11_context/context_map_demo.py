@@ -4,21 +4,18 @@ Shows map_backend="file", inject_map_summary=True: durable session index
 (topics, decisions, summary) survives resets. Map summary is injected at prepare
 when non-empty.
 
-Run: python -m examples.11_context.context_map_demo
+Run:
+    python examples/11_context/context_map_demo.py
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-
-from examples.models.models import almock, gpt4_mini
 from syrin import Agent, AgentConfig, Context
+from syrin.model import Model
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-_model = gpt4_mini if os.environ.get("USE_REAL_MODEL") == "1" else almock
+_model = Model.Almock()
 
 
 def _main() -> None:

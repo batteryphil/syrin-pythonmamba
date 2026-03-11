@@ -24,7 +24,6 @@ src/syrin/
 ├── model/           # Model, providers, structured output
 ├── observability/   # Tracer, Span, Session, exporters
 ├── output.py        # Output type wrapper
-├── pipe.py          # Pipe, pipe()
 ├── prompt/          # Prompt, prompt(), validated()
 ├── providers/       # Provider protocol, registry, OpenAI/Anthropic/LiteLLM
 ├── ratelimit/       # Rate limit manager, backends

@@ -11,4 +11,4 @@ Run any example and visit **http://localhost:8000/playground** to test the Syrin
 | Checkpoints | `python -m examples.16_serving.playground_checkpoints` | Step checkpoints, state persistence |
 | Original | `python -m examples.16_serving.playground_serve` | Same as playground_single |
 
-**Requirements:** `uv pip install syrin[serve]`
+

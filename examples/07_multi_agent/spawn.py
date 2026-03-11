@@ -1,49 +1,58 @@
-"""Spawn Example.
+"""Agent Spawning -- a parent agent creates child agents on demand.
 
 Demonstrates:
-- Agent spawn: parent spawns child agent
-- spawn(task="...") returns Response
-- spawn() without task returns child Agent instance
+- parent.spawn(ChildClass, task="...") to spawn and immediately get a response
+- parent.spawn(ChildClass) to get a reusable child Agent instance
+- Parent-child agent relationships
 
-Run: python -m examples.07_multi_agent.spawn
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/07_multi_agent/spawn.py
 """
 
-from __future__ import annotations
+from syrin import Agent, Model
 
-from pathlib import Path
+model = Model.Almock()
 
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# ---------------------------------------------------------------------------
+# 1. Define parent and child agents
+# ---------------------------------------------------------------------------
 
 
 class Parent(Agent):
     _agent_name = "parent"
     _agent_description = "Coordinator that spawns specialist agents"
-    model = almock
+    model = model
     system_prompt = "You are a coordinator."
 
 
 class Child(Agent):
     _agent_name = "child"
     _agent_description = "Specialist agent spawned by parent"
-    model = almock
+    model = model
     system_prompt = "You are a specialist."
 
 
-if __name__ == "__main__":
-    parent = Parent()
-    result = parent.spawn(Child, task="What is AI?")
-    print(f"spawn(task=...): {result.content[:80]}...")
+# ---------------------------------------------------------------------------
+# 2. Spawn with a task -- returns a Response directly
+# ---------------------------------------------------------------------------
+print("-- 1. spawn(task=...) returns a Response --")
 
-    child = parent.spawn(Child)
-    assert child is not None
-    r = child.response("Summarize machine learning")
-    print(f"spawn() child: {r.content[:80]}...")
-    print("Serving at http://localhost:8000/playground")
-    parent.serve(port=8000, enable_playground=True, debug=True)
+parent = Parent()
+result = parent.spawn(Child, task="What is AI?")
+print(f"  Response: {result.content[:80]}...")
+
+# ---------------------------------------------------------------------------
+# 3. Spawn without a task -- returns a reusable child Agent
+# ---------------------------------------------------------------------------
+print("\n-- 2. spawn() returns a child Agent --")
+
+child = parent.spawn(Child)
+assert child is not None
+
+r = child.response("Summarize machine learning")
+print(f"  Child response: {r.content[:80]}...")
+
+# ---------------------------------------------------------------------------
+# Optional: serve with playground UI (requires syrin[serve])
+# ---------------------------------------------------------------------------
+# parent.serve(port=8000, enable_playground=True, debug=True)

@@ -1,4 +1,4 @@
-"""Authority Layer Example.
+"""Authority Layer — Permission checks, budget enforcement, and approval flows.
 
 Demonstrates:
 - AuthorityCheck — permission-based authorization
@@ -7,20 +7,17 @@ Demonstrates:
 - ThresholdApproval — K-of-N threshold consensus
 - CapabilityToken and CapabilityIssuer
 
-Run: python -m examples.09_guardrails.authority_layer
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/09_guardrails/authority_layer.py
 """
 
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from unittest.mock import Mock
 
-from dotenv import load_dotenv
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+from syrin import Agent, Model
+from syrin.guardrails import ContentFilter
 
 
 async def example_authority_check() -> None:
@@ -159,17 +156,15 @@ async def _run() -> None:
 
 if __name__ == "__main__":
     asyncio.run(_run())
-    from examples.models.models import almock
-    from syrin import Agent
-    from syrin.guardrails import ContentFilter
 
-    class AuthorityDemoAgent(Agent):
-        _agent_name = "authority-demo"
-        _agent_description = "Agent with authority layer guardrails demo"
-        model = almock
-        system_prompt = "You are a helpful assistant."
-        guardrails = [ContentFilter(blocked_words=["unauthorized"])]
-
-    agent = AuthorityDemoAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+    # --- Optional: serve with playground ---
+    # class AuthorityDemoAgent(Agent):
+    #     _agent_name = "authority-demo"
+    #     _agent_description = "Agent with authority layer guardrails demo"
+    #     model = Model.Almock()
+    #     system_prompt = "You are a helpful assistant."
+    #     guardrails = [ContentFilter(blocked_words=["unauthorized"])]
+    #
+    # agent = AuthorityDemoAgent()
+    # print("Serving at http://localhost:8000/playground")
+    # agent.serve(port=8000, enable_playground=True, debug=True)

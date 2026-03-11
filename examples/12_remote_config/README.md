@@ -2,7 +2,7 @@
 
 Use **syrin.init()** to enable remote config so a backend (Syrin Cloud or your own) can push configuration overrides to running agents without code deploys. When you serve an agent, config routes are available for dashboards or `curl`.
 
-**Requires:** `uv pip install syrin[serve]` for config routes (GET/PATCH /config, GET /config/stream).
+
 
 ## Examples
 

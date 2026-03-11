@@ -1,4 +1,4 @@
-"""PII Detection and Parallel Evaluation Example.
+"""PII Detection and Parallel Evaluation — Content filters, PII scanning, and chains.
 
 Demonstrates:
 - ContentFilter for blocked words
@@ -8,20 +8,15 @@ Demonstrates:
 - Custom guardrails
 - GuardrailDecision inspection (confidence, alternatives, metadata)
 
-Run: python -m examples.09_guardrails.pii_and_evaluation
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/09_guardrails/pii_and_evaluation.py
 """
 
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent
+from syrin import Agent, Model
 from syrin.enums import GuardrailStage
 from syrin.guardrails import (
     ContentFilter,
@@ -33,7 +28,7 @@ from syrin.guardrails import (
     PIIScanner,
 )
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+model = Model.Almock()
 
 
 async def example_content_filter() -> None:
@@ -177,16 +172,19 @@ async def _run() -> None:
     await example_decision_inspection()
 
 
+# Agent with guardrails applied as a list
 class GuardrailDemoAgent(Agent):
     _agent_name = "guardrail-demo"
     _agent_description = "Agent with ContentFilter and PIIScanner guardrails"
-    model = almock
+    model = model
     system_prompt = "You are a helpful assistant."
     guardrails = [ContentFilter(blocked_words=["password", "secret"]), PIIScanner()]
 
 
 if __name__ == "__main__":
     asyncio.run(_run())
-    agent = GuardrailDemoAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+
+    # --- Optional: serve with playground ---
+    # agent = GuardrailDemoAgent()
+    # print("Serving at http://localhost:8000/playground")
+    # agent.serve(port=8000, enable_playground=True, debug=True)

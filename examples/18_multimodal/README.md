@@ -36,7 +36,7 @@ python -m examples.18_multimodal.<script_name>
 
 - **Image + text input, content parts, routing**: vision-capable model (e.g. OpenAI `gpt-4o`) or Almock for structure. Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for real models.
 - **Standalone image/video generation**: `pip install syrin[generation]`, `GOOGLE_API_KEY` (or `GEMINI_API_KEY`).
-- **PDF text extraction**: `pip install syrin[pdf]` (pypdf).
+- **PDF text extraction**: `pip install syrin[pdf]`
 
 ## Feature map
 

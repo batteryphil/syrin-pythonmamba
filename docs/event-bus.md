@@ -46,15 +46,21 @@ Agent runs → budget threshold crossed → emits BudgetThresholdReached
 
 ```python
 from syrin import Agent, Budget, Model
-from syrin.domain_events import EventBus, BudgetThresholdReached, ContextCompacted
+from syrin.domain_events import (
+    EventBus,
+    AgentRunStarted,
+    AgentRunEnded,
+    BudgetThresholdReached,
+    ToolCallCompleted,
+)
 
 bus = EventBus()
 
-# Subscribe to budget threshold events (subscribe() or on() — alias)
+# Subscribe to typed events — IDE autocomplete works on all fields
+bus.subscribe(AgentRunStarted, lambda e: print(f"Starting with model={e.model}"))
+bus.subscribe(AgentRunEnded, lambda e: print(f"Done! cost=${e.cost:.4f}, tokens={e.tokens}"))
 bus.subscribe(BudgetThresholdReached, lambda e: print(f"Budget at {e.percentage}%"))
-
-# Subscribe to context compaction events
-bus.subscribe(ContextCompacted, lambda e: print(f"Compacted: {e.method}"))
+bus.subscribe(ToolCallCompleted, lambda e: print(f"Tool {e.tool_name} took {e.duration_ms:.0f}ms"))
 
 agent = Agent(
     # model=Model("openai/gpt-4o-mini"),
@@ -80,13 +86,75 @@ agent = (
 
 ## Event Types
 
+All domain events are immutable `@dataclass(frozen=True)` classes. Every field has IDE autocomplete.
+
+### AgentRunStarted
+
+Emitted when an agent begins processing user input.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `input` | str | User input text |
+| `model` | str | Model ID being used |
+| `iteration` | int | Current iteration count |
+
+### AgentRunEnded
+
+Emitted when an agent finishes and returns a response.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `content` | str | Response content text |
+| `cost` | float | Total cost in USD |
+| `tokens` | int | Total tokens consumed |
+| `duration` | float | Wall-clock time in seconds |
+| `stop_reason` | str | Why the run stopped (end_turn, tool_use, etc.) |
+| `iteration` | int | Final iteration count |
+
+### LLMRequestStarted
+
+Emitted before an LLM API call is sent.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `iteration` | int | Current iteration |
+| `tool_count` | int | Number of tools available |
+
+### LLMRequestCompleted
+
+Emitted after an LLM API response is received.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `content` | str | Response content |
+| `iteration` | int | Current iteration |
+
+### ToolCallCompleted
+
+Emitted after a tool executes successfully.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `tool_name` | str | Name of the tool |
+| `duration_ms` | float | Execution time in milliseconds |
+
+### ToolCallFailed
+
+Emitted when a tool execution raises an error.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `tool_name` | str | Name of the tool |
+| `error` | str | Error message |
+| `iteration` | int | Current iteration |
+
 ### BudgetThresholdReached
 
 Emitted when a budget threshold is crossed (e.g. 80% of run budget).
 
 | Field | Type | Description |
-|-------|------|-------------|
-| `percentage` | int | Utilization (0–100) that triggered the threshold |
+| ----- | ---- | ----------- |
+| `percentage` | int | Utilization (0-100) that triggered the threshold |
 | `current_value` | float | Current cost or token count |
 | `limit_value` | float | Limit or cap |
 | `metric` | str | `"cost"` or `"tokens"` |
@@ -96,12 +164,50 @@ Emitted when a budget threshold is crossed (e.g. 80% of run budget).
 bus.subscribe(BudgetThresholdReached, lambda e: log(f"Budget at {e.percentage}%: ${e.current_value:.2f}"))
 ```
 
+### BudgetExceeded
+
+Emitted when a hard budget limit is exceeded.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `used` | float | Amount used (cost or tokens) |
+| `limit` | float | The limit that was exceeded |
+| `exceeded_by` | float | How much over the limit |
+
+### GuardrailBlocked
+
+Emitted when a guardrail blocks input or output.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `stage` | str | `"input"` or `"output"` |
+| `reason` | str | Human-readable reason |
+| `guardrail_names` | list[str] | Names of guardrails that triggered |
+
+### HandoffStarted
+
+Emitted when an agent begins delegating to another agent.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `target_agent` | str | Name of the target agent |
+| `task` | str | Task being delegated |
+
+### HandoffCompleted
+
+Emitted when a handoff finishes and the result is received.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `target_agent` | str | Name of the target agent |
+| `success` | bool | Whether the handoff succeeded |
+
 ### ContextCompacted
 
 Emitted when the context window is compacted (truncation or summarization).
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ----- | ---- | ----------- |
 | `method` | str | Compaction method (e.g. `"middle_out"`, `"truncate"`) |
 | `tokens_before` | int | Token count before compaction |
 | `tokens_after` | int | Token count after compaction |

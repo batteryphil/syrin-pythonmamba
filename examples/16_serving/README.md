@@ -2,7 +2,7 @@
 
 Serve Syrin agents over HTTP.
 
-**Requires:** `uv pip install syrin[serve]` (fastapi, uvicorn)
+
 
 ## Examples
 

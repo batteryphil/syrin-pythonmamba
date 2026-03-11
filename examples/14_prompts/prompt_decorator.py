@@ -3,91 +3,88 @@
 Demonstrates:
 - @prompt decorator for parameterized system prompts
 - Creating specialized agents from a single template
-- Prompt composition via function calls
+- Dynamic prompt resolution at runtime via template_variables
 
-Run: python -m examples.14_prompts.prompt_decorator
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run: python examples/14_prompts/prompt_decorator.py
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+from syrin import Agent, Model, prompt
 
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent, prompt
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+mock = Model.Almock(latency_seconds=0.01, lorem_length=50)
 
 
 @prompt
 def expert_prompt(domain: str, tone: str = "professional") -> str:
-    """Generate system prompt for expert agents."""
+    """Generate a system prompt for expert agents."""
     return f"You are an expert in {domain}. Provide accurate, detailed, and {tone} responses."
 
 
 @prompt
 def role_prompt(role: str, specialization: str = "") -> str:
-    """Generate role-based system prompt."""
+    """Generate a role-based system prompt."""
     base = f"You are a {role}."
     if specialization:
         base += f" You specialize in {specialization}."
     return base
 
 
-# 1. @prompt for parameterized prompts
+# --- 1. Parameterized prompts assigned at class level ---
+
 class ScienceExpert(Agent):
-    model = almock
+    model = mock
     system_prompt = expert_prompt(domain="quantum physics", tone="academic")
 
 
 class BusinessExpert(Agent):
-    model = almock
+    model = mock
     system_prompt = expert_prompt(domain="business strategy", tone="practical")
 
 
-# 2. Different agents from same template
-science = ScienceExpert()
-business = BusinessExpert()
-question = "What is innovation?"
-r1 = science.response(question)
-r2 = business.response(question)
-print(f"Science: {r1.content[:60]}...")
-print(f"Business: {r2.content[:60]}...")
+# --- 2. Role-based prompts ---
 
-
-# 3. Role-based prompts
 class Researcher(Agent):
-    model = almock
+    model = mock
     system_prompt = role_prompt(role="researcher", specialization="machine learning")
 
 
 class Writer(Agent):
-    model = almock
+    model = mock
     system_prompt = role_prompt(role="technical writer")
 
 
-# 4. Dynamic prompt at runtime (pass template_variables; Prompt resolves per call)
-for domain in ["Python", "JavaScript", "Rust"]:
-    agent = Agent(
-        model=almock,
-        system_prompt=expert_prompt,
-        template_variables={"domain": domain, "tone": "concise"},
-    )
-    result = agent.response(f"What is {domain} best for?")
-    print(f"{domain}: {result.content[:50]}...")
-
-
-class PromptDemoAgent(Agent):
-    _agent_name = "prompt-demo"
-    _agent_description = "Agent with @prompt parameterized system prompts"
-    model = almock
-    system_prompt = expert_prompt(domain="general", tone="concise")
-
-
 if __name__ == "__main__":
-    agent = PromptDemoAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+    print("--- Prompt Decorator Example ---\n")
+
+    # Different agents from the same template
+    science = ScienceExpert()
+    business = BusinessExpert()
+    question = "What is innovation?"
+
+    r1 = science.response(question)
+    r2 = business.response(question)
+    print(f"Science expert:  {r1.content[:80]}")
+    print(f"Business expert: {r2.content[:80]}")
+
+    # Role-based prompts
+    researcher = Researcher()
+    writer = Writer()
+    print(f"\nResearcher prompt: {researcher._system_prompt}")
+    print(f"Writer prompt:     {writer._system_prompt}")
+
+    # Dynamic prompt at runtime using template_variables
+    print("\n--- Dynamic prompts per domain ---")
+    for domain in ["Python", "JavaScript", "Rust"]:
+        agent = Agent(
+            model=mock,
+            system_prompt=expert_prompt,
+            template_variables={"domain": domain, "tone": "concise"},
+        )
+        result = agent.response(f"What is {domain} best for?")
+        print(f"  {domain}: {result.content[:60]}")
+
+    print("\nDone.")
+
+    # Optional: serve the agent with playground UI
+    # agent.serve(port=8000, enable_playground=True, debug=True)

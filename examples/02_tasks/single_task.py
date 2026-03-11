@@ -1,34 +1,26 @@
-"""Single Task Example — @syrin.task for named entry points.
+"""Single Task Example -- Using @task to define named entry points.
 
 Demonstrates:
-- Using @syrin.task to define a named task method
-- Researcher agent with research(topic: str) task
-- Invoking tasks via agent.task_name(args)
+- Defining a named task with the @task decorator
+- A Researcher agent with a research(topic) task method
+- Invoking the task and printing the result
 
-Run: python -m examples.02_tasks.single_task
-Visit: http://localhost:8000/playground
-
-Requires: uv pip install syrin[serve]
+Run: python examples/02_tasks/single_task.py
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+from syrin import Agent, Model, task
 
-from dotenv import load_dotenv
 
-from examples.models.models import almock
-from syrin import Agent, task
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
+# --- Define the agent with a single task ---
 
 class Researcher(Agent):
-    """Agent that researches topics. Uses @syrin.task for a named API."""
+    """Agent that researches topics. Uses @task for a named API."""
 
     _agent_name = "researcher"
     _agent_description = "Research assistant with research(topic) task"
-    model = almock
+    model = Model.Almock()
     system_prompt = "You are a research assistant. Provide concise, factual summaries."
 
     @task
@@ -38,8 +30,15 @@ class Researcher(Agent):
         return response.content or ""
 
 
+# --- Run it ---
+
 if __name__ == "__main__":
     researcher = Researcher()
-    print("Serving at http://localhost:8000/playground")
-    researcher.serve(port=8000, enable_playground=True, debug=True)
-    # researcher.serve(protocol=ServeProtocol.CLI)
+
+    # Call the task directly and print output
+    result = researcher.research("quantum computing")
+    print("Research result:")
+    print(result)
+
+    # Optional: serve with playground UI
+    # researcher.serve(port=8000, enable_playground=True, debug=True)

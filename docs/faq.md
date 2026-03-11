@@ -33,7 +33,7 @@ Start with these:
 - **claude-sonnet** - Great for complex reasoning
 
 ```python
-from Syrin.model import Model
+from syrin.model import Model
 
 agent = Agent(
     # model=Model.OpenAI("gpt-4o-mini"),  # Cheap
@@ -69,7 +69,7 @@ agent = Agent(model=Model.Custom(
 Use the `@tool` decorator:
 
 ```python
-from Syrin import tool
+from syrin import tool
 
 @tool
 def search(query: str) -> str:
@@ -149,8 +149,8 @@ Add `enable_playground=True` for the web playground at http://localhost:8000/pla
 ### How do I use memory?
 
 ```python
-from Syrin import Agent, Memory
-from Syrin.enums import MemoryType
+from syrin import Agent, Memory
+from syrin.enums import MemoryType
 
 agent = Agent(
     # model=Model.OpenAI("gpt-4o-mini"),
@@ -170,8 +170,8 @@ result = agent.response("What's my name?")  # "Your name is John"
 Yes! Use decay strategies:
 
 ```python
-from Syrin.memory import Decay
-from Syrin.enums import DecayStrategy
+from syrin.memory import Decay
+from syrin.enums import DecayStrategy
 
 memory = Memory(
     types=[MemoryType.CORE],
@@ -189,8 +189,8 @@ memory = Memory(
 ### How do I set a budget?
 
 ```python
-from Syrin import Budget
-from Syrin.enums import RateWindow
+from syrin import Budget
+from syrin.enums import RateWindow
 
 budget = Budget(
     total_limit=10.0,      # $10 max
@@ -251,7 +251,7 @@ Use agent teams when:
 ### How do agents communicate?
 
 ```python
-from Syrin.agent import AgentTeam, sequential, parallel
+from syrin.agent import AgentTeam, sequential, parallel
 
 # Sequential: output of one feeds into next
 team = AgentTeam(
@@ -278,7 +278,7 @@ Yes! Use `arun()` or `response_async()`:
 
 ```python
 import asyncio
-from Syrin import Agent
+from syrin import Agent
 
 async def main():
     agent = Agent(
@@ -353,7 +353,7 @@ agent = Agent(
 ### How do I trace execution?
 
 ```python
-from Syrin.observability import trace, span
+from syrin.observability import trace, span
 
 @trace
 def my_function():
@@ -383,7 +383,7 @@ for call in result.tool_calls:
 ### How do I handle errors gracefully?
 
 ```python
-from Syrin import BudgetExceededError, RateLimitError
+from syrin import BudgetExceededError, RateLimitError
 
 try:
     result = agent.response("Hello")
@@ -400,7 +400,7 @@ except Exception as e:
 Yes! Use checkpointing:
 
 ```python
-from Syrin.checkpoint import Checkpointer
+from syrin.checkpoint import Checkpointer
 
 checkpointer = Checkpointer()
 
@@ -427,7 +427,7 @@ agent.events.on_budget(log_budget)
 
 2. Export traces:
 ```python
-from Syrin.observability import get_tracer, JSONLExporter
+from syrin.observability import get_tracer, JSONLExporter
 tracer = get_tracer()
 tracer.add_exporter(JSONLExporter("traces.jsonl"))
 ```
@@ -454,8 +454,8 @@ agent.events.after(Hook.LLM_REQUEST_END, log_response)
 ### How do I create a guardrail?
 
 ```python
-from Syrin.guardrails import Guardrail, GuardrailResult
-from Syrin.enums import GuardrailStage
+from syrin.guardrails import Guardrail, GuardrailResult
+from syrin.enums import GuardrailStage
 
 class MyGuardrail(Guardrail):
     def check(self, text: str, stage: GuardrailStage) -> GuardrailResult:
@@ -480,7 +480,7 @@ Yes! Choose from:
 - `CodeActionLoop` - Generate and execute Python code
 
 ```python
-from Syrin.loop import PlanExecuteLoop, CodeActionLoop
+from syrin.loop import PlanExecuteLoop, CodeActionLoop
 
 # Plan then execute - good for complex multi-step tasks
 agent = Agent(
@@ -503,7 +503,7 @@ Syrin supports observability integrations:
 
 ```python
 # Check docs for specific integration
-from Syrin.observability import LangfuseExporter  # If available
+from syrin.observability import LangfuseExporter  # If available
 ```
 
 ---

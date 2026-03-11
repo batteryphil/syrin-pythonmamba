@@ -1,43 +1,38 @@
-"""Response Object Example.
+"""Response Object — Everything you get back from an agent.
 
-Demonstrates:
-- All Response object attributes: content, raw, cost, tokens, model, duration
-- Trace steps (execution log)
-- Budget information (budget_remaining, budget_used)
-- Structured output (result.data, result.structured)
-- Boolean check
-- Serving to inspect response in playground
+Shows all the fields on the Response object.
 
-Run: python -m examples.01_minimal.response_object
-Visit: http://localhost:8000/playground
-
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/01_minimal/response_object.py
 """
 
-from __future__ import annotations
+from syrin import Agent, Budget, Model
 
-from pathlib import Path
+model = Model.Almock()
 
-from dotenv import load_dotenv
+agent = Agent(
+    model=model,
+    system_prompt="You are a helpful assistant. Be concise.",
+    budget=Budget(run=0.50),
+)
 
-from examples.models.models import almock
-from syrin import Agent, Budget
+response = agent.response("What are the three primary colors?")
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# --- Core fields ---
+print("=== Response Object ===")
+print(f"Content:    {response.content}")         # The answer text
+print(f"Cost:       ${response.cost:.6f}")        # USD spent
+print(f"Tokens:     {response.tokens}")           # Total tokens used
+print(f"Model:      {response.model}")            # Model that responded
+print(f"Duration:   {response.duration:.2f}s")    # Wall-clock time
+print(f"Success:    {bool(response)}")            # True if response has content
+print()
 
-
-class ResponseDemoAgent(Agent):
-    """Agent to demo response attributes in playground."""
-
-    _agent_name = "response-demo"
-    _agent_description = "Agent for exploring response object (content, cost, tokens, etc.)"
-    model = almock
-    system_prompt = "You are a helpful assistant. Be concise."
-    budget = Budget(run=0.10)
-
-
-if __name__ == "__main__":
-    agent = ResponseDemoAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
-    # assistant.serve(protocol=ServeProtocol.CLI)
+# --- Budget info (only if budget is set) ---
+state = agent.budget_state
+if state:
+    print("=== Budget State ===")
+    print(f"Limit:      ${state.limit:.4f}")
+    print(f"Spent:      ${state.spent:.6f}")
+    print(f"Remaining:  ${state.remaining:.6f}")
+    print(f"Used:       {state.percent_used:.1f}%")

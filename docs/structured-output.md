@@ -11,8 +11,8 @@ No additional dependencies required. Structured output validation is built into 
 ## Quick Start
 
 ```python
-from Syrin import Agent, Model, Output
-from Syrin.model import structured
+from syrin import Agent, Model, Output
+from syrin.model import structured
 
 # Define your expected output schema using @structured decorator
 @structured
@@ -55,7 +55,7 @@ Use Pydantic `BaseModel` with `Output` when you need advanced validation feature
 
 ```python
 from pydantic import BaseModel, field_validator
-from Syrin import Agent, Model, Output
+from syrin import Agent, Model, Output
 
 class RestrictedUser(BaseModel):
     name: str
@@ -87,8 +87,8 @@ agent = Agent(
 Define your output schema using Syrin's `@structured` decorator:
 
 ```python
-from Syrin import Agent, Model, Output
-from Syrin.model import structured
+from syrin import Agent, Model, Output
+from syrin.model import structured
 
 @structured
 class UserInfo:
@@ -138,7 +138,7 @@ When you need advanced validation with dynamic context, use Pydantic:
 
 ```python
 from pydantic import BaseModel, field_validator
-from Syrin import Agent, Model, Output
+from syrin import Agent, Model, Output
 
 class RestrictedUser(BaseModel):
     name: str
@@ -323,8 +323,8 @@ if not result.structured.is_valid:
 Create custom validation logic with the `OutputValidator` protocol:
 
 ```python
-from Syrin.types.validation import OutputValidator, ValidationResult, ValidationContext
-from Syrin.enums import ValidationAction
+from syrin.types.validation import OutputValidator, ValidationResult, ValidationContext
+from syrin.enums import ValidationAction
 
 class BusinessValidator(OutputValidator):
     max_retries = 3
@@ -399,8 +399,8 @@ pipeline = ValidationPipeline(
 ### Simple Validation with @structured
 
 ```python
-from Syrin.model import structured
-from Syrin.validation import ValidationPipeline
+from syrin.model import structured
+from syrin.validation import ValidationPipeline
 
 @structured
 class User:
@@ -414,8 +414,8 @@ parsed, attempts, error = pipeline.validate('{"name": "John", "age": 30}')
 ### With Agent
 
 ```python
-from Syrin import Agent, Model, Output
-from Syrin.model import structured
+from syrin import Agent, Model, Output
+from syrin.model import structured
 
 @structured
 class UserInfo:
@@ -450,8 +450,8 @@ if not result.structured.is_valid:
 Monitor validation lifecycle with hooks:
 
 ```python
-from Syrin import Agent, Model, Output
-from Syrin.enums import Hook
+from syrin import Agent, Model, Output
+from syrin.enums import Hook
 
 agent = Agent(
     model=Model.OpenAI("gpt-4o"),

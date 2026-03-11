@@ -27,6 +27,7 @@ dependencies = [
     "uvicorn>=0.41.0",
     "fastapi>=0.134.0",
     "python-multipart>=0.0.22",
+    "openai>=1.0.0",  # Default LLM provider for ease of use
 ]
 
 [project.urls]
@@ -36,43 +37,32 @@ Homepage = "https://syrin.ai/"
 "PyPI" = "https://pypi.org/project/syrin/"
 
 [project.optional-dependencies]
-litellm = ["litellm"]
+# LLM Providers (OpenAI is included by default)
 anthropic = ["anthropic"]
-openai = ["openai"]
-serve = ["fastapi", "uvicorn", "python-multipart"]
-qdrant = ["qdrant-client"]
-chroma = ["chromadb"]
-redis = ["redis"]
-postgres = ["psycopg2-binary"]
-classifier-embeddings = ["sentence-transformers"]
-pdf = ["pypdf"]
-knowledge = ["chonkie>=1.0", "openai"]
-knowledge-postgres = ["asyncpg>=0.29", "pgvector>=0.3"]
-knowledge-sqlite = ["sqlite-vec>=0.1"]
-generation = [
-    "google-genai",
-]
+litellm = ["litellm"]
+
+# Knowledge & Memory Backends
+vector = ["qdrant-client", "chromadb", "redis"]
+postgres = ["asyncpg>=0.29", "pgvector>=0.3"]
+sqlite = ["sqlite-vec>=0.1"]
+knowledge = ["chonkie>=1.0"]
+
+# Generation & Voice
+generation = ["google-genai"]
 voice = ["elevenlabs>=1.0", "deepgram-sdk>=3.0", "cartesia>=1.0"]
-voice-openai = ["openai"]
+
+# Documents
+pdf = ["pypdf"]
+
+# Development
 dev = [
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
     "ruff",
     "mypy",
-    "python-dotenv",
-    "fastapi",
-    "uvicorn",
-    "chromadb",
-    "qdrant-client",
-    "chonkie>=1.0",
-    "openai",
     "numpy",
-    "google-genai",
 ]
-
-[project.scripts]
-syrin = "syrin.cli:main"
 
 [build-system]
 requires = ["hatchling"]

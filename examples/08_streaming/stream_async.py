@@ -1,43 +1,47 @@
-"""Stream Async — Async streaming with astream().
+"""Async Streaming -- Token-by-token output with astream().
 
 Demonstrates:
-- agent.astream(input) for async token-by-token output
+- agent.astream(input) for async streaming
 - async for chunk in agent.astream(...)
+- Collecting chunks into full text
 
-Run: python -m examples.08_streaming.stream_async
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run: python examples/08_streaming/stream_async.py
 """
 
 import asyncio
-from pathlib import Path
 
-from dotenv import load_dotenv
+from syrin import Agent, Model
 
-from examples.models.models import almock
-from syrin import Agent
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
+# --- Define an async streaming agent ---
 
 class AsyncStreamAgent(Agent):
     _agent_name = "async-stream-agent"
     _agent_description = "Async token-by-token streaming"
-    model = almock
+    model = Model.Almock()
     system_prompt = "You are a helpful assistant."
 
 
-async def _run() -> None:
+# --- Stream asynchronously and collect output ---
+
+async def main() -> None:
     agent = AsyncStreamAgent()
+
+    print("Async streaming response:")
+    print("-" * 40)
+
     full_text = ""
     async for chunk in agent.astream("Explain machine learning in one sentence"):
         full_text += chunk.text
+
     print(full_text)
-    print(f"Length: {len(full_text)}")
+    print("-" * 40)
+    print(f"Length: {len(full_text)} chars")
 
 
 if __name__ == "__main__":
-    asyncio.run(_run())
-    agent = AsyncStreamAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+    asyncio.run(main())
+
+    # Optional: serve with playground UI
+    # agent = AsyncStreamAgent()
+    # agent.serve(port=8000, enable_playground=True, debug=True)

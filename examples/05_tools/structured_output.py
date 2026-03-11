@@ -1,26 +1,21 @@
-"""Structured Output Example.
+"""Structured Output Example -- Getting typed, validated responses from agents.
 
 Demonstrates:
 - @structured decorator for output schemas
-- Output(output_type, validation_retries) config (use Output(MyModel) or Output(MyModel, ...))
+- Output(output_type, validation_retries) configuration
+- Pydantic models as output types
 - Custom OutputValidator with ValidationResult
-- Accessing result.data, result.structured.parsed
 - Validation hooks (OUTPUT_VALIDATION_START, etc.)
+- Pydantic field validators for restricted values
 
-Run: python -m examples.05_tools.structured_output
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run: python examples/05_tools/structured_output.py
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+from pydantic import BaseModel, field_validator
 
-from dotenv import load_dotenv
-from pydantic import BaseModel
-
-from examples.models.models import almock
-from syrin import Agent, Output
+from syrin import Agent, Model, Output
 from syrin.enums import Hook
 from syrin.model import structured
 from syrin.types.validation import (
@@ -30,10 +25,13 @@ from syrin.types.validation import (
     ValidationResult,
 )
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+# --- 1. Basic @structured class ---
 
-# 1. Basic @structured
+print("=" * 50)
+print("1. Basic @structured class")
+print("=" * 50)
+
 @structured
 class UserInfo:
     name: str
@@ -42,14 +40,19 @@ class UserInfo:
     city: str
 
 
-agent = Agent(model=almock, output=Output(UserInfo, validation_retries=3))
+agent = Agent(model=Model.Almock(), output=Output(UserInfo, validation_retries=3))
 result = agent.response("Extract: John Doe, 35, john@example.com, San Francisco")
-print(f"is_valid: {result.structured.is_valid}")
+print(f"  is_valid: {result.structured.is_valid}")
 if result.structured.parsed:
-    print(f"parsed.name: {result.structured.parsed.name}")
+    print(f"  parsed.name: {result.structured.parsed.name}")
 
 
-# 2. Pydantic model as output
+# --- 2. Pydantic model as output ---
+
+print("\n" + "=" * 50)
+print("2. Pydantic model as output")
+print("=" * 50)
+
 class ProductInfo(BaseModel):
     name: str
     price: float
@@ -57,14 +60,19 @@ class ProductInfo(BaseModel):
     category: str
 
 
-agent = Agent(model=almock, output=Output(ProductInfo, validation_retries=3))
+agent = Agent(model=Model.Almock(), output=Output(ProductInfo, validation_retries=3))
 result = agent.response("Product: Widget, $29.99, in stock, electronics")
-print(f"is_valid: {result.structured.is_valid}")
+print(f"  is_valid: {result.structured.is_valid}")
 if result.structured.parsed:
-    print(f"parsed: {result.structured.parsed}")
+    print(f"  parsed: {result.structured.parsed}")
 
 
-# 3. Validation hooks
+# --- 3. Validation hooks ---
+
+print("\n" + "=" * 50)
+print("3. Validation hooks")
+print("=" * 50)
+
 @structured
 class SentimentResult:
     sentiment: str
@@ -72,7 +80,7 @@ class SentimentResult:
     explanation: str
 
 
-agent = Agent(model=almock, output=Output(SentimentResult, validation_retries=3))
+agent = Agent(model=Model.Almock(), output=Output(SentimentResult, validation_retries=3))
 
 
 def on_start(ctx: object) -> None:
@@ -91,10 +99,15 @@ agent.events.on(Hook.OUTPUT_VALIDATION_START, on_start)
 agent.events.on(Hook.OUTPUT_VALIDATION_SUCCESS, on_success)
 agent.events.on(Hook.OUTPUT_VALIDATION_FAILED, on_failed)
 result = agent.response("Analyze: 'This product is amazing!'")
-print(f"is_valid: {result.structured.is_valid}")
+print(f"  is_valid: {result.structured.is_valid}")
 
 
-# 4. Custom validator
+# --- 4. Custom validator ---
+
+print("\n" + "=" * 50)
+print("4. Custom validator")
+print("=" * 50)
+
 class ReviewResult(BaseModel):
     rating: int
     sentiment: str
@@ -132,15 +145,18 @@ class RatingValidator(OutputValidator):
 
 
 agent = Agent(
-    model=almock,
+    model=Model.Almock(),
     output=Output(ReviewResult, validator=RatingValidator(), validation_retries=3),
 )
 result = agent.response("Review: 'Terrible product.' rating 1, negative")
-print(f"is_valid: {result.structured.is_valid}")
+print(f"  is_valid: {result.structured.is_valid}")
 
-# 5. Output with validation context
-from pydantic import field_validator
 
+# --- 5. Pydantic field validator for restricted values ---
+
+print("\n" + "=" * 50)
+print("5. Pydantic field validator")
+print("=" * 50)
 
 class RestrictedUser(BaseModel):
     name: str
@@ -157,7 +173,7 @@ class RestrictedUser(BaseModel):
 
 
 agent = Agent(
-    model=almock,
+    model=Model.Almock(),
     output=Output(
         RestrictedUser,
         validation_retries=3,
@@ -165,18 +181,21 @@ agent = Agent(
     ),
 )
 result = agent.response("Create user: John, john@company.com, admin")
-print(f"is_valid: {result.structured.is_valid}")
+print(f"  is_valid: {result.structured.is_valid}")
 
+
+# --- Optional: serve as a class-based agent ---
 
 class StructuredOutputAgent(Agent):
     _agent_name = "structured-output"
     _agent_description = "Agent with structured output (UserInfo extraction)"
-    model = almock
+    model = Model.Almock()
     system_prompt = "You extract user information from text. Return valid UserInfo."
     output = Output(UserInfo, validation_retries=3)
 
 
 if __name__ == "__main__":
-    agent = StructuredOutputAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+    pass
+    # To serve with playground UI:
+    # agent = StructuredOutputAgent()
+    # agent.serve(port=8000, enable_playground=True, debug=True)

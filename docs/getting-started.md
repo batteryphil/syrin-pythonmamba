@@ -116,10 +116,10 @@ Use for local dev and interactive testing.
 
 ### Web playground (easiest way to test)
 
-Install `syrin[serve]` and add one line:
+Serving is included by default. Just add one line:
 
 ```bash
-uv pip install syrin[serve]
+uv pip install syrin
 ```
 
 ```python
@@ -129,15 +129,6 @@ agent.serve(port=8000, enable_playground=True)
 ```
 
 Visit **http://localhost:8000/playground** to chat with your agent, see cost per message, and (when `debug=True`) inspect traces in real time.
-
-### CLI REPL (terminal testing)
-
-```python
-from syrin.enums import ServeProtocol
-
-agent.serve(protocol=ServeProtocol.CLI)
-# Interactive prompt in the terminal — type messages, see responses and cost
-```
 
 ### See what’s happening: `debug=True` or `--trace`
 

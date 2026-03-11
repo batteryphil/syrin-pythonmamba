@@ -35,9 +35,9 @@ Research Agent with Tools
 Copy this code and run it!
 """
 
-from Syrin import Agent
-from Syrin.model import Model
-from Syrin.tool import tool
+from syrin import Agent
+from syrin.model import Model
+from syrin.tool import tool
 
 
 # Define your tools (special functions the agent can call)
@@ -154,7 +154,7 @@ if __name__ == "__main__":
 A tool is a Python function with a `@tool` decorator:
 
 ```python
-from Syrin.tool import tool
+from syrin.tool import tool
 
 @tool
 def my_tool(parameter: str) -> dict:
@@ -189,7 +189,7 @@ def search_google(                       # Function name
 ### Example 1: Search Tool
 
 ```python
-from Syrin.tool import tool
+from syrin.tool import tool
 import requests
 
 @tool
@@ -220,7 +220,7 @@ print(response.content)
 ### Example 2: Data Lookup Tool
 
 ```python
-from Syrin.tool import tool
+from syrin.tool import tool
 
 @tool
 def lookup_customer(customer_id: str) -> dict:
@@ -266,7 +266,7 @@ print(response.content)
 ### Example 3: API Integration Tool
 
 ```python
-from Syrin.tool import tool
+from syrin.tool import tool
 
 @tool
 def convert_currency(from_currency: str, to_currency: str, amount: float) -> dict:
@@ -321,7 +321,7 @@ print(response.content)
 Your tools can accept different types:
 
 ```python
-from Syrin.tool import tool
+from syrin.tool import tool
 from typing import Optional, Union
 
 @tool
@@ -353,7 +353,7 @@ def complex_tool(
 Tools might fail sometimes. Here's how to handle it:
 
 ```python
-from Syrin.tool import tool
+from syrin.tool import tool
 
 @tool
 def divide(a: float, b: float) -> dict:
@@ -469,9 +469,9 @@ def my_tool(param: str) -> dict:
 ## Multiple Agents with Different Tools
 
 ```python
-from Syrin import Agent
-from Syrin.model import Model
-from Syrin.tool import tool
+from syrin import Agent
+from syrin.model import Model
+from syrin.tool import tool
 
 
 @tool
@@ -525,7 +525,7 @@ print(chef_agent.response("What's a good Italian recipe?"))
 You can **group related tools in an MCP** and **use the MCP inside your agent's tools**. Define an MCP with `@tool` (same as Agent), then add the MCP to `tools=[]`:
 
 ```python
-from Syrin import MCP, Agent, tool
+from syrin import MCP, Agent, tool
 
 class ProductMCP(MCP):
     """MCP that groups product catalog tools."""

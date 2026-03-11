@@ -281,7 +281,7 @@ agent.serve(protocol=ServeProtocol.STDIO)  # STDIO: JSON lines on stdin/stdout
 agent.serve(port=8000, enable_playground=True)  # Web playground at /playground
 ```
 
-**Requires:** `uv pip install syrin[serve]`. See [Serving](serving.md).
+See [Serving](serving.md).
 
 ---
 

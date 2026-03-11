@@ -19,7 +19,7 @@ Without observability, you have no idea what happened. With Syrin's observabilit
 The fastest way to get visibility into your agent:
 
 ```python
-from Syrin import Agent, Model
+from syrin import Agent, Model
 
 class MyAgent(Agent):
     model = Model("openai/gpt-4o-mini")
@@ -60,7 +60,7 @@ That's it! With one parameter, you get complete visibility.
 A **span** represents a single operation in your agent's execution. Spans form a tree hierarchy - an agent span might contain LLM spans, which contain tool spans.
 
 ```python
-from Syrin.observability import Span, SpanKind, SpanStatus
+from syrin.observability import Span, SpanKind, SpanStatus
 
 # Spans have:
 span.name        # Name of the operation
@@ -136,7 +136,7 @@ Use `Hook.ROUTING_DECISION` for custom logging. See [Events & Hooks](agent/event
 A **session** groups related spans together - typically a multi-turn conversation:
 
 ```python
-from Syrin.observability import session
+from syrin.observability import session
 
 # All spans within this block share the same session_id
 with session("conversation_001", user="alice"):
@@ -151,7 +151,7 @@ with session("conversation_001", user="alice"):
 Semantic attributes are standardized keys that make your traces queryable and analyzable:
 
 ```python
-from Syrin.observability import SemanticAttributes
+from syrin.observability import SemanticAttributes
 
 # Instead of arbitrary keys, use standardized ones:
 span.set_attribute(SemanticAttributes.LLM_MODEL, "gpt-4o")
@@ -180,7 +180,7 @@ span.set_attribute(SemanticAttributes.BUDGET_REMAINING, 0.50)
 For custom workflows, create your own spans:
 
 ```python
-from Syrin.observability import span, SpanKind
+from syrin.observability import span, SpanKind
 
 # Basic span
 with span("my_workflow") as s:
@@ -236,7 +236,7 @@ Syrin provides quick ways to create spans for common operations:
 ### `llm_span()` - LLM Operations
 
 ```python
-from Syrin.observability import llm_span
+from syrin.observability import llm_span
 
 with llm_span("gpt-4o", prompt="Hello world") as s:
     response = openai.ChatCompletion.create(
@@ -249,7 +249,7 @@ with llm_span("gpt-4o", prompt="Hello world") as s:
 ### `tool_span()` - Tool Operations
 
 ```python
-from Syrin.observability import tool_span
+from syrin.observability import tool_span
 
 with tool_span("calculator", input={"expression": "2+2"}) as s:
     result = eval("2+2")
@@ -260,7 +260,7 @@ with tool_span("calculator", input={"expression": "2+2"}) as s:
 ### `memory_span()` - Memory Operations
 
 ```python
-from Syrin.observability import memory_span
+from syrin.observability import memory_span
 
 with memory_span("recall", memory_type="episodic", query="user preferences") as s:
     results = memory.retrieve("user preferences")
@@ -270,7 +270,7 @@ with memory_span("recall", memory_type="episodic", query="user preferences") as 
 ### `budget_span()` - Budget Operations
 
 ```python
-from Syrin.observability import budget_span
+from syrin.observability import budget_span
 
 with budget_span("check", limit=10.0, used=5.0) as s:
     remaining = limit - used
@@ -280,7 +280,7 @@ with budget_span("check", limit=10.0, used=5.0) as s:
 ### `guardrail_span()` - Guardrail Operations
 
 ```python
-from Syrin.observability import guardrail_span
+from syrin.observability import guardrail_span
 
 with guardrail_span("content_filter", stage="input") as s:
     result = guardrail.check(user_input)
@@ -290,7 +290,7 @@ with guardrail_span("content_filter", stage="input") as s:
 ### `handoff_span()` - Agent Handoffs
 
 ```python
-from Syrin.observability import handoff_span
+from syrin.observability import handoff_span
 
 with handoff_span("triage_agent", "specialist_agent") as s:
     s.set_attribute(SemanticAttributes.HANDOFF_MEMORIES_TRANSFERRED, 5)
@@ -299,7 +299,7 @@ with handoff_span("triage_agent", "specialist_agent") as s:
 ### `agent_span()` - Agent Operations
 
 ```python
-from Syrin.observability import agent_span
+from syrin.observability import agent_span
 
 with agent_span("research_agent", user_id="user_123") as s:
     result = agent.response("Research AI")
@@ -313,8 +313,8 @@ with agent_span("research_agent", user_id="user_123") as s:
 Syrin automatically instruments guardrails when you add them to your agent:
 
 ```python
-from Syrin import Agent, Model
-from Syrin.guardrails import ContentFilter
+from syrin import Agent, Model
+from syrin.guardrails import ContentFilter
 
 # Create guardrail
 blocked = ContentFilter(
@@ -354,9 +354,9 @@ The guardrail blocks the request and the span shows:
 Memory operations (when using persistent memory) are automatically instrumented:
 
 ```python
-from Syrin import Agent, Model
+from syrin import Agent, Model
 from syrin.memory import Memory
-from Syrin.enums import MemoryType
+from syrin.enums import MemoryType
 
 class MemoryAgent(Agent):
     model = Model("openai/gpt-4o-mini")
@@ -409,8 +409,8 @@ memory: memory.forget
 Syrin automatically aggregates metrics from spans. Get insights into cost, latency, and performance:
 
 ```python
-from Syrin.observability.metrics import get_metrics
-from Syrin import Agent, Model
+from syrin.observability.metrics import get_metrics
+from syrin import Agent, Model
 
 # Clear previous metrics
 metrics = get_metrics()
@@ -466,7 +466,7 @@ Pass a `timedelta` as `window` to restrict aggregation to recent data.
 You can also manually record metrics:
 
 ```python
-from Syrin.observability.metrics import get_metrics
+from syrin.observability.metrics import get_metrics
 
 metrics = get_metrics()
 
@@ -498,7 +498,7 @@ For high-volume agents, you don't want to record every trace. Sampling lets you 
 Sample a percentage of traces:
 
 ```python
-from Syrin.observability.sampling import (
+from syrin.observability.sampling import (
     SamplingPolicy, ProbabilisticSampler, get_tracer
 )
 
@@ -530,7 +530,7 @@ policy = SamplingPolicy(
 Same trace ID always gets the same sampling decision:
 
 ```python
-from Syrin.observability.sampling import DeterministicSampler
+from syrin.observability.sampling import DeterministicSampler
 
 policy = SamplingPolicy(rate=0.5)  # 50%
 sampler = DeterministicSampler(policy)
@@ -541,7 +541,7 @@ sampler = DeterministicSampler(policy)
 Limit samples per second:
 
 ```python
-from Syrin.observability.sampling import RateLimitingSampler
+from syrin.observability.sampling import RateLimitingSampler
 
 # Max 10 samples per second
 sampler = RateLimitingSampler(
@@ -555,7 +555,7 @@ sampler = RateLimitingSampler(
 Automatically adjusts sampling based on error rate:
 
 ```python
-from Syrin.observability.sampling import AdaptiveSampler
+from syrin.observability.sampling import AdaptiveSampler
 
 sampler = AdaptiveSampler(
     SamplingPolicy(target_error_rate=0.1),
@@ -571,7 +571,7 @@ sampler = AdaptiveSampler(
 Use the factory for quick creation:
 
 ```python
-from Syrin.observability.sampling import create_sampler
+from syrin.observability.sampling import create_sampler
 
 sampler = create_sampler(
     "probabilistic",
@@ -591,7 +591,7 @@ Spans can be sent to multiple destinations. Syrin provides several built-in expo
 The default exporter for debug mode - prints human-readable traces:
 
 ```python
-from Syrin.observability import ConsoleExporter, get_tracer
+from syrin.observability import ConsoleExporter, get_tracer
 
 tracer = get_tracer()
 tracer.add_exporter(ConsoleExporter(colors=True))
@@ -612,7 +612,7 @@ agent: MyAgent.response
 Store spans in memory for testing or analysis:
 
 ```python
-from Syrin.observability import InMemoryExporter, get_tracer
+from syrin.observability import InMemoryExporter, get_tracer
 
 exporter = InMemoryExporter()
 tracer = get_tracer()
@@ -630,7 +630,7 @@ exporter.clear()  # Clear for next run
 Append spans to a JSONL file:
 
 ```python
-from Syrin.observability import JSONLExporter, get_tracer
+from syrin.observability import JSONLExporter, get_tracer
 
 tracer = get_tracer()
 tracer.add_exporter(JSONLExporter("traces.jsonl"))
@@ -643,7 +643,7 @@ Each line is a JSON object representing a span.
 Create your own exporter for any backend:
 
 ```python
-from Syrin.observability import Span, SpanExporter
+from syrin.observability import Span, SpanExporter
 
 class MyExporter(SpanExporter):
     def __init__(self):
@@ -666,8 +666,8 @@ Send spans to any OpenTelemetry-compatible backend:
 
 ```python
 # Requires: pip install opentelemetry-exporter-otlp
-from Syrin.observability.otlp import OTLPExporter
-from Syrin.observability import get_tracer
+from syrin.observability.otlp import OTLPExporter
+from syrin.observability import get_tracer
 
 exporter = OTLPExporter(
     endpoint="http://localhost:4318/v1/traces",
@@ -694,8 +694,8 @@ Export to Langfuse for AI-native observability:
 
 ```python
 # Requires: pip install langfuse
-from Syrin.observability.langfuse import LangfuseExporter
-from Syrin.observability import get_tracer
+from syrin.observability.langfuse import LangfuseExporter
+from syrin.observability import get_tracer
 
 exporter = LangfuseExporter(
     public_key="pk-...",
@@ -720,8 +720,8 @@ Local debugging with Phoenix:
 
 ```python
 # Requires: pip install arize-phoenix
-from Syrin.observability.phoenix import PhoenixExporter
-from Syrin.observability import get_tracer
+from syrin.observability.phoenix import PhoenixExporter
+from syrin.observability import get_tracer
 
 exporter = PhoenixExporter(
     project_name="my-agent",
@@ -741,8 +741,8 @@ Then open http://localhost:6006 to see your traces in the Phoenix UI.
 Bridge the Events system with spans:
 
 ```python
-from Syrin.observability.hooks import observe_hooks
-from Syrin import Agent, Model
+from syrin.observability.hooks import observe_hooks
+from syrin import Agent, Model
 
 class MyAgent(Agent):
     model = Model("openai/gpt-4o-mini")
@@ -768,16 +768,16 @@ Events are automatically added to spans as events, giving you unified observabil
 Here's a complete production-ready setup:
 
 ```python
-from Syrin import Agent, Model
-from Syrin.guardrails import ContentFilter
-from Syrin.observability import (
+from syrin import Agent, Model
+from syrin.guardrails import ContentFilter
+from syrin.observability import (
     ConsoleExporter,
     InMemoryExporter,
     session,
     get_tracer,
 )
-from Syrin.observability.metrics import get_metrics
-from Syrin.observability.sampling import create_sampler
+from syrin.observability.metrics import get_metrics
+from syrin.observability.sampling import create_sampler
 
 # 1. Configure tracer
 tracer = get_tracer()
@@ -1027,14 +1027,7 @@ See `examples/advanced/observability_comprehensive.py` for complete working exam
 
 ---
 
-## CLI & WorkflowDebugger (NEW)
-
-Syrin now includes built-in CLI features and a `WorkflowDebugger` class that make it easy
-to debug and monitor your agents without writing custom logging code.
-
-### Quick Start
-
-**Auto-tracing with --trace flag:**
+## Auto-tracing with --trace flag
 
 When you run any Syrin script with `--trace`, observability is automatically
 enabled and you'll see detailed execution logs in your terminal.
@@ -1047,36 +1040,6 @@ python my_agent.py
 python my_agent.py --trace
 ```
 
-**Using the CLI:**
-
-```bash
-# Check installation
-syrin doctor
-
-# Run a script
-syrin run my_agent.py
-
-# Run with tracing enabled
-syrin trace my_agent.py
-# or
-syrin run my_agent.py --trace
-```
-
-### WorkflowDebugger
-
-The easiest way to debug your agents is using the built-in `WorkflowDebugger`:
-
-```python
-from Syrin import Agent
-from Syrin.cli import WorkflowDebugger
-
-# Create debugger
-debugger = WorkflowDebugger(verbose=True)
-
-# Create and attach to your agent
-agent = Agent(...)
-debugger.attach(agent)
-
 # Run - all events will be captured and printed
 result = agent.response("Hello")
 
@@ -1087,9 +1050,9 @@ debugger.print_summary()
 **Example with an Agent:**
 
 ```python
-from Syrin import Agent, Model
-from Syrin.cli import WorkflowDebugger
-from Syrin.tool import tool
+from syrin import Agent, Model
+from syrin.cli import WorkflowDebugger
+from syrin.tool import tool
 
 @tool(name="calculator", description="Perform calculations")
 def calculator(expression: str) -> str:
@@ -1122,8 +1085,8 @@ debugger.print_summary()
 **Example with DynamicPipeline:**
 
 ```python
-from Syrin.agent.multi_agent import DynamicPipeline
-from Syrin.cli import WorkflowDebugger
+from syrin.agent.multi_agent import DynamicPipeline
+from syrin.cli import WorkflowDebugger
 
 # Create debugger
 debugger = WorkflowDebugger(verbose=True)
@@ -1179,48 +1142,17 @@ result = agent.response("Hello")
 debugger.export_jsonl("/tmp/debug_trace.jsonl")
 ```
 
-### CLI Commands
-
-#### `syrin doctor`
-
-Check your Syrin installation and dependencies:
-
-```bash
-$ syrin doctor
-
-Syrin Doctor
-
-✓ Python version            3.11.0
-✓ Syrin import              v0.1.0
-✓ pydantic installed        ✓
-✓ typing_extensions         ✓
-✓ openai SDK                ✓
-✓ anthropic SDK             ✓
-
-All checks passed!
-```
-
-#### `syrin run`
-
-Run a Python script with optional tracing:
+### Running Scripts with Tracing
 
 ```bash
 # Run normally
-syrin run my_agent.py
+python my_agent.py
 
 # Run with tracing
-syrin run my_agent.py --trace
+python my_agent.py --trace
 
 # Pass arguments to script
-syrin run my_agent.py --trace -- --arg1 --arg2
-```
-
-#### `syrin trace`
-
-Shortcut for `syrin run --trace`:
-
-```bash
-syrin trace my_agent.py
+python my_agent.py --trace -- --arg1 --arg2
 ```
 
 ### What Gets Captured
@@ -1317,7 +1249,7 @@ pipeline.events.on(Hook.DYNAMIC_PIPELINE_PLAN, lambda ctx: debugger.log(...))
 **After (with built-in WorkflowDebugger):**
 
 ```python
-from Syrin.cli import WorkflowDebugger
+from syrin.cli import WorkflowDebugger
 
 # Usage - just attach and go!
 debugger = WorkflowDebugger()

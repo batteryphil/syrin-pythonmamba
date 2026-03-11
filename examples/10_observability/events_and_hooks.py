@@ -1,99 +1,100 @@
-"""Events and Hooks Example.
+"""Events and Hooks — Observe everything your agent does.
 
-Demonstrates:
-- Full Hook enum — all lifecycle events
-- agent.events.on() / on_all() API
-- EventContext with full state (budget, model, iteration)
-- Chaining multiple event handlers
-- Hook categories: agent, guardrail, budget, memory, output, context
+Hooks fire at every lifecycle moment: LLM calls, tool usage, budget checks, etc.
+Use them for logging, metrics, debugging, and custom behavior.
 
-Run: python -m examples.10_observability.events_and_hooks
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/10_observability/events_and_hooks.py
 """
 
-from __future__ import annotations
-
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent, Budget, Hook, Memory, warn_on_exceeded
+from syrin import Agent, Budget, Hook, Memory, Model, warn_on_exceeded
 from syrin.enums import MemoryType
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+model = Model.Almock()
 
-
-# 1. Basic event handlers
+# ============================================================
+# 1. Basic event handlers — track what happens during a run
+# ============================================================
 events_log: list[str] = []
+
 agent = Agent(
-    model=almock,
+    model=model,
     budget=Budget(run=1.0, on_exceeded=warn_on_exceeded),
     memory=Memory(),
 )
-agent.events.on(Hook.AGENT_RUN_START, lambda _ctx: events_log.append("run_start"))
-agent.events.on(Hook.AGENT_RUN_END, lambda _ctx: events_log.append("run_end"))
-agent.events.on(Hook.LLM_REQUEST_START, lambda _ctx: events_log.append("llm_start"))
-agent.events.on(Hook.LLM_REQUEST_END, lambda _ctx: events_log.append("llm_end"))
+agent.events.on(Hook.AGENT_RUN_START, lambda ctx: events_log.append("run_start"))
+agent.events.on(Hook.AGENT_RUN_END, lambda ctx: events_log.append("run_end"))
+agent.events.on(Hook.LLM_REQUEST_START, lambda ctx: events_log.append("llm_start"))
+agent.events.on(Hook.LLM_REQUEST_END, lambda ctx: events_log.append("llm_end"))
+
 agent.response("Hello!")
 print(f"Events fired: {events_log}")
+print()
 
-# 2. Hook categories
-agent_hooks = [h for h in Hook if h.value.startswith("agent")]
-print(f"Agent hooks (sample): {[h.value for h in agent_hooks[:5]]}")
-print(f"Total hooks: {len(list(Hook))}")
+# ============================================================
+# 2. Shortcut methods — common hooks have shortcuts
+# ============================================================
+agent2 = Agent(model=model)
+agent2.events.on_start(lambda ctx: print(f"  [start] input={ctx.get('input', '')[:30]}"))
+agent2.events.on_complete(lambda ctx: print(f"  [done]  cost=${ctx.get('cost', 0):.6f}"))
+agent2.events.on_tool(lambda ctx: print(f"  [tool]  {ctx.get('tool_name', '')}"))
 
-# 3. Multiple handlers on same event
-agent2 = Agent(model=almock)
-calls = []
-agent2.events.on(Hook.AGENT_RUN_START, lambda _: calls.append("handler_1"))
-agent2.events.on(Hook.AGENT_RUN_START, lambda _: calls.append("handler_2"))
-agent2.events.on(Hook.AGENT_RUN_START, lambda _: calls.append("handler_3"))
-agent2.response("Hi")
+print("=== Shortcut handlers ===")
+agent2.response("Hi there!")
+print()
+
+# ============================================================
+# 3. Multiple handlers on the same hook
+# ============================================================
+agent3 = Agent(model=model)
+calls: list[str] = []
+agent3.events.on(Hook.AGENT_RUN_START, lambda _: calls.append("handler_1"))
+agent3.events.on(Hook.AGENT_RUN_START, lambda _: calls.append("handler_2"))
+agent3.events.on(Hook.AGENT_RUN_START, lambda _: calls.append("handler_3"))
+agent3.response("Hi")
 print(f"All 3 handlers fired: {calls}")
+print()
 
-# 4. Cost tracking via events
-total_cost = {"value": 0.0}
-total_tokens = {"value": 0}
-
-
-def track_cost(ctx: dict) -> None:
-    total_cost["value"] += ctx.get("cost", 0)
+# ============================================================
+# 4. Cost tracking across multiple calls
+# ============================================================
+total_cost = 0.0
 
 
-def track_tokens(ctx: dict) -> None:
-    tokens = ctx.get("tokens", {})
-    total_tokens["value"] += tokens.get("total_tokens", 0) if isinstance(tokens, dict) else 0
+def track_cost(ctx):
+    global total_cost
+    total_cost += ctx.get("cost", 0)
 
 
-agent3 = Agent(model=almock)
-agent3.events.on(Hook.LLM_REQUEST_END, track_cost)
-agent3.events.on(Hook.LLM_REQUEST_END, track_tokens)
+agent4 = Agent(model=model)
+agent4.events.on(Hook.AGENT_RUN_END, track_cost)
+
 for i in range(3):
-    agent3.response(f"Question {i + 1}")
-print(f"Total cost: ${total_cost['value']:.6f}, tokens: {total_tokens['value']}")
+    agent4.response(f"Question {i + 1}")
 
+print(f"Total cost across 3 calls: ${total_cost:.6f}")
+print()
+
+# ============================================================
 # 5. Memory events
+# ============================================================
 memory_ops: list[str] = []
-agent4 = Agent(model=almock, memory=Memory())
-agent4.events.on(Hook.MEMORY_STORE, lambda _: memory_ops.append("store"))
-agent4.events.on(Hook.MEMORY_RECALL, lambda _: memory_ops.append("recall"))
-agent4.remember("Python is great", memory_type=MemoryType.CORE)
-agent4.recall("Python")
+agent5 = Agent(model=model, memory=Memory())
+agent5.events.on(Hook.MEMORY_STORE, lambda _: memory_ops.append("store"))
+agent5.events.on(Hook.MEMORY_RECALL, lambda _: memory_ops.append("recall"))
+
+agent5.remember("Python is great", memory_type=MemoryType.CORE)
+agent5.recall("Python")
 print(f"Memory operations: {memory_ops}")
+print()
 
-
-class EventsDemoAgent(Agent):
-    _agent_name = "events-demo"
-    _agent_description = "Agent with events and hooks"
-    model = almock
-    system_prompt = "You are a helpful assistant."
-    budget = Budget(run=1.0, on_exceeded=warn_on_exceeded)
-    memory = Memory()
-
-
-if __name__ == "__main__":
-    agent = EventsDemoAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+# ============================================================
+# 6. All hooks at a glance
+# ============================================================
+print(f"Total available hooks: {len(list(Hook))}")
+categories = {}
+for h in Hook:
+    cat = h.value.split(".")[0]
+    categories[cat] = categories.get(cat, 0) + 1
+for cat, count in sorted(categories.items()):
+    print(f"  {cat}: {count} hooks")

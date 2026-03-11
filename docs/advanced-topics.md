@@ -57,8 +57,8 @@ Syrin emits events at key moments:
 ### Basic Hook Usage
 
 ```python
-from Syrin import Agent, Model
-from Syrin.enums import Hook
+from syrin import Agent, Model
+from syrin.enums import Hook
 
 # Create agent
 agent = Agent(
@@ -85,8 +85,8 @@ result = agent.response("What is Python?")
 You can modify data *before* an event or take action *after*:
 
 ```python
-from Syrin import Agent, Model
-from Syrin.enums import Hook
+from syrin import Agent, Model
+from syrin.enums import Hook
 
 agent = Agent(
     # model=Model.OpenAI("gpt-4o-mini"),
@@ -133,7 +133,7 @@ agent.events.on_budget(lambda ctx: print(f"Budget: {ctx.remaining}"))
 ### Listening to All Events
 
 ```python
-from Syrin.enums import Hook
+from syrin.enums import Hook
 
 def handle_all(hook: Hook, ctx):
     print(f"Event: {hook.name}")
@@ -171,7 +171,7 @@ Syrin provides built-in tracing to understand exactly what your agent is doing.
 ### Spans and Traces
 
 ```python
-from Syrin.observability import get_tracer, span, current_span
+from syrin.observability import get_tracer, span, current_span
 
 # Get the tracer
 tracer = get_tracer()
@@ -201,7 +201,7 @@ with span("outer"):
 Sessions group related operations:
 
 ```python
-from Syrin.observability import get_tracer, session, current_session
+from syrin.observability import get_tracer, session, current_session
 
 # Get the tracer
 tracer = get_tracer()
@@ -224,7 +224,7 @@ if current:
 Export traces to different destinations. First, get the tracer and add exporters:
 
 ```python
-from Syrin.observability import get_tracer, ConsoleExporter, JSONLExporter, InMemoryExporter
+from syrin.observability import get_tracer, ConsoleExporter, JSONLExporter, InMemoryExporter
 
 # Get the tracer
 tracer = get_tracer()
@@ -256,7 +256,7 @@ agent = Agent(
 Automatically connect hooks to observability:
 
 ```python
-from Syrin.observability.hooks import observe_hooks
+from syrin.observability.hooks import observe_hooks
 
 # Connect events to spans
 observe_hooks(agent)
@@ -275,8 +275,8 @@ Save and restore agent state for long-running tasks, recovery, or resumption.
 ### Basic Checkpointing
 
 ```python
-from Syrin import Agent, Model
-from Syrin.checkpoint import Checkpointer, CheckpointState
+from syrin import Agent, Model
+from syrin.checkpoint import Checkpointer, CheckpointState
 
 # Create checkpointer
 checkpointer = Checkpointer()
@@ -324,7 +324,7 @@ checkpointer.delete("my_agent_2")
 Implement your own storage:
 
 ```python
-from Syrin.checkpoint import CheckpointBackendProtocol, CheckpointState
+from syrin.checkpoint import CheckpointBackendProtocol, CheckpointState
 
 class FileCheckpointBackend(CheckpointBackendProtocol):
     """Save checkpoints to files."""
@@ -380,8 +380,8 @@ Guardrails validate input/output/action to enforce policies, block unwanted cont
 ### Quick Start
 
 ```python
-from Syrin import Agent, Model
-from Syrin.guardrails import ContentFilter, PIIScanner
+from syrin import Agent, Model
+from syrin.guardrails import ContentFilter, PIIScanner
 
 # Simple content filtering
 agent = Agent(
@@ -398,7 +398,7 @@ agent = Agent(
 
 ```python
 import asyncio
-from Syrin.guardrails import Guardrail, GuardrailContext, GuardrailDecision
+from syrin.guardrails import Guardrail, GuardrailContext, GuardrailDecision
 
 class EmailGuardrail(Guardrail):
     """Async guardrail with rich context and decisions."""
@@ -432,7 +432,7 @@ asyncio.run(main())
 ### Authority Layer Example
 
 ```python
-from Syrin.guardrails import AuthorityCheck, BudgetEnforcer, ThresholdApproval
+from syrin.guardrails import AuthorityCheck, BudgetEnforcer, ThresholdApproval
 
 # Combine authority guardrails
 guardrails = [
@@ -445,7 +445,7 @@ guardrails = [
 ### Intelligence Layer Example
 
 ```python
-from Syrin.guardrails.intelligence import (
+from syrin.guardrails.intelligence import (
     ContextAwareGuardrail,
     EscalationDetector,
     AttackSimulator,
@@ -471,8 +471,8 @@ Control how your agent iterates when handling tasks.
 One LLM call only - no tool iteration:
 
 ```python
-from Syrin import Agent, Model
-from Syrin.loop import SingleShotLoop
+from syrin import Agent, Model
+from syrin.loop import SingleShotLoop
 
 agent = Agent(
     # model=Model.OpenAI("gpt-4o-mini"),
@@ -490,8 +490,8 @@ result = agent.response("What is 2+2?")
 Think → Act → Observe (default for tools):
 
 ```python
-from Syrin import Agent, Model
-from Syrin.loop import ReactLoop
+from syrin import Agent, Model
+from syrin.loop import ReactLoop
 
 agent = Agent(
     # model=Model.OpenAI("gpt-4o-mini"),
@@ -507,8 +507,8 @@ agent = Agent(
 Require human approval for tool calls:
 
 ```python
-from Syrin import Agent, Model
-from Syrin.loop import HumanInTheLoop
+from syrin import Agent, Model
+from syrin.loop import HumanInTheLoop
 
 # Define approval function
 async def approve_tool(tool_name: str, arguments: dict) -> bool:
@@ -532,7 +532,7 @@ result = agent.response("Do the sensitive thing")
 The `PlanExecuteLoop` is a 3-phase loop that first generates a plan, then executes each step, and finally reviews the results. Best for complex multi-step tasks.
 
 ```python
-from Syrin.loop import PlanExecuteLoop
+from syrin.loop import PlanExecuteLoop
 
 agent = Agent(
     # model=Model.OpenAI("gpt-4o-mini"),
@@ -553,7 +553,7 @@ print(f"Iterations: {result.iterations}")  # Total iterations used
 The `CodeActionLoop` generates Python code, executes it, and interprets the results. Best for mathematical computations and data processing.
 
 ```python
-from Syrin.loop import CodeActionLoop
+from syrin.loop import CodeActionLoop
 
 agent = Agent(
     # model=Model.OpenAI("gpt-4o-mini"),
@@ -573,7 +573,7 @@ print(result.content)  # "The sum is 2550"
 Create your own iteration strategy:
 
 ```python
-from Syrin.loop import Loop, LoopResult
+from syrin.loop import Loop, LoopResult
 
 class MyCustomLoop(Loop):
     name = "my_custom"
@@ -607,7 +607,7 @@ Detailed execution tracing for debugging and analysis.
 ### Basic Tracing
 
 ```python
-from Syrin.tracing import ConsoleTracer, TraceStep
+from syrin.tracing import ConsoleTracer, TraceStep
 
 tracer = ConsoleTracer(level="verbose")
 
@@ -628,7 +628,7 @@ tracer.add_tool_step(
 )
 
 # Export to console
-from Syrin.tracing import ConsoleExporter
+from syrin.tracing import ConsoleExporter
 exporter = ConsoleExporter()
 exporter.export(tracer.steps)
 ```
@@ -640,12 +640,12 @@ exporter.export(tracer.steps)
 Putting it all together:
 
 ```python
-from Syrin import Agent, Model, Budget
-from Syrin.checkpoint import Checkpointer
-from Syrin.guardrails import GuardrailChain, ContentFilter
-from Syrin.loop import ReactLoop
-from Syrin.observability import trace, ConsoleExporter
-from Syrin.enums import Hook, RateWindow
+from syrin import Agent, Model, Budget
+from syrin.checkpoint import Checkpointer
+from syrin.guardrails import GuardrailChain, ContentFilter
+from syrin.loop import ReactLoop
+from syrin.observability import trace, ConsoleExporter
+from syrin.enums import Hook, RateWindow
 
 # 1. Configure budget
 from syrin import raise_on_exceeded
@@ -660,7 +660,7 @@ guardrails = GuardrailChain([
 ])
 
 # 3. Configure observability - add exporters to tracer
-from Syrin.observability import get_tracer
+from syrin.observability import get_tracer
 tracer = get_tracer()
 tracer.add_exporter(ConsoleExporter())
 

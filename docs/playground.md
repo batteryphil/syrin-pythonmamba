@@ -2,7 +2,7 @@
 
 A built-in web UI for testing and debugging Syrin agents locally. Chat with your agent, see cost and budget in real time, and observe hook events when debug mode is on.
 
-**Requires:** `uv pip install syrin[serve]` (fastapi, uvicorn)
+
 
 ## Enable the Playground
 

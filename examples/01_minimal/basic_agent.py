@@ -1,42 +1,38 @@
-"""Basic Agent Example.
+"""Basic Agent — Your first Syrin agent.
 
-Demonstrates:
-- Creating an Agent with a model
-- Making a simple response call
-- Accessing response properties (content, cost, tokens)
+Creates an agent and asks it a question. No API key needed (uses Almock).
 
-Run: python -m examples.01_minimal.basic_agent
-Visit: http://localhost:8000/playground
-
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/01_minimal/basic_agent.py
 """
 
-from __future__ import annotations
+from syrin import Agent, Model
 
-import sys
-from pathlib import Path
-
-_root = Path(__file__).resolve().parents[2]
-if str(_root) not in sys.path:
-    sys.path.insert(0, str(_root))
-
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# Create a model — Almock is a built-in mock (no API key needed)
+# Replace with Model.OpenAI("gpt-4o-mini") for real usage
+model = Model.Almock()
 
 
+# Define your agent as a class
 class Assistant(Agent):
-    _agent_name = "assistant"
-    _agent_description = "Basic helpful assistant"
-    model = almock
-    system_prompt = "You are a helpful assistant."
+    model = model
+    system_prompt = "You are a helpful assistant. Be concise."
 
 
-if __name__ == "__main__":
-    assistant = Assistant()
-    print("Serving at http://localhost:8000/playground")
-    assistant.serve(port=8000, enable_playground=True, debug=True)
-    # assistant.serve(protocol=ServeProtocol.CLI)
+# Use the agent
+agent = Assistant()
+response = agent.response("What is Python?")
+
+print(f"Answer:  {response.content}")
+print(f"Cost:    ${response.cost:.6f}")
+print(f"Tokens:  {response.tokens}")
+print(f"Model:   {response.model}")
+
+# --- Or use the builder pattern (no class needed) ---
+agent2 = Agent.builder(model).with_system_prompt("You are helpful.").build()
+response2 = agent2.response("What is 2 + 2?")
+print(f"\nBuilder agent says: {response2.content}")
+
+# --- Serve with web playground (uncomment to try) ---
+# agent.serve(port=8000, enable_playground=True)
+# Visit http://localhost:8000/playground

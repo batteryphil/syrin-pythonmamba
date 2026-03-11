@@ -1,25 +1,21 @@
-"""Dynamic System Prompt Example.
+"""Dynamic Prompts -- inject runtime variables into system prompts.
 
 Demonstrates:
-- @prompt with template_variables for runtime variable injection
-- Per-call template_variables override
-- effective_template_variables() and get_prompt_builtins() for introspection
+- @prompt decorator with template_variables for runtime injection
+- Class-level template_variables on an Agent
+- Instance-level overrides (constructor)
+- Per-call overrides via response(template_variables=...)
+- effective_template_variables() for introspection
 
-Run: python -m examples.14_prompts.dynamic_prompt
-Visit: http://localhost:8000/playground
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/14_prompts/dynamic_prompt.py
 """
 
-from __future__ import annotations
+from syrin import Agent, Model, prompt
 
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-from examples.models.models import almock
-from syrin import Agent, prompt
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# ---------------------------------------------------------------------------
+# 1. Define a dynamic prompt with @prompt
+# ---------------------------------------------------------------------------
 
 
 @prompt
@@ -31,28 +27,50 @@ def persona_prompt(
     return f"You assist {user_name or 'the user'}. Be {tone}."
 
 
+# ---------------------------------------------------------------------------
+# 2. Agent with class-level template_variables
+# ---------------------------------------------------------------------------
+
+
 class PersonaAgent(Agent):
     _agent_name = "persona-agent"
     _agent_description = "Agent with dynamic template_variables"
-    model = almock
+    model = Model.Almock()
     system_prompt = persona_prompt
     template_variables = {"tone": "friendly"}
 
 
-# Instance template_variables override class
+# ---------------------------------------------------------------------------
+# 3. Instance override -- constructor template_variables replace class ones
+# ---------------------------------------------------------------------------
+print("-- 1. Instance override --")
+
 alice = PersonaAgent(template_variables={"user_name": "Alice", "tone": "casual"})
 vars_ = alice.effective_template_variables()
-print(f"Effective vars: user_name={vars_['user_name']}, tone={vars_['tone']}")
+print(f"  Effective vars: user_name={vars_['user_name']}, tone={vars_['tone']}")
 
 r1 = alice.response("What can you help me with?")
-print(f"Alice: {r1.content[:80]}...")
+print(f"  Alice response: {r1.content[:80]}...")
 
-# Per-call override (same agent, different user)
+# ---------------------------------------------------------------------------
+# 4. Per-call override -- same agent, different user
+# ---------------------------------------------------------------------------
+print("\n-- 2. Per-call override --")
+
 r2 = alice.response("Hi", template_variables={"user_name": "Bob"})
-print(f"Bob (per-call): {r2.content[:80]}...")
+print(f"  Bob response (per-call): {r2.content[:80]}...")
 
+# ---------------------------------------------------------------------------
+# 5. Fresh agent with different defaults
+# ---------------------------------------------------------------------------
+print("\n-- 3. Fresh agent --")
 
-if __name__ == "__main__":
-    agent = PersonaAgent(template_variables={"user_name": "Demo", "tone": "concise"})
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+demo = PersonaAgent(template_variables={"user_name": "Demo", "tone": "concise"})
+r3 = demo.response("Summarize your role.")
+print(f"  Demo response: {r3.content[:80]}...")
+
+# ---------------------------------------------------------------------------
+# Optional: serve with playground UI (requires syrin[serve])
+# ---------------------------------------------------------------------------
+# agent = PersonaAgent(template_variables={"user_name": "Demo", "tone": "concise"})
+# agent.serve(port=8000, enable_playground=True, debug=True)

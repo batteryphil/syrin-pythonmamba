@@ -1,43 +1,52 @@
-"""Agent with Budget Example.
+"""Agent with Budget — Control AI spending.
 
-Demonstrates:
-- Creating an Agent with a Budget
-- Budget tracking via response.cost and agent.budget_state
-- Budget limits and exceeded handling
+Set a dollar limit so your agent never overspends.
 
-Run: python -m examples.01_minimal.agent_with_budget
-Visit: http://localhost:8000/playground
-
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/01_minimal/agent_with_budget.py
 """
 
-from __future__ import annotations
+from syrin import Agent, Budget, Model, raise_on_exceeded, warn_on_exceeded
+from syrin.exceptions import BudgetExceededError
 
-import sys
-from pathlib import Path
+model = Model.Almock()
 
-_root = Path(__file__).resolve().parents[2]
-if str(_root) not in sys.path:
-    sys.path.insert(0, str(_root))
+# --- Example 1: Budget with warning ---
+# warn_on_exceeded: logs a warning but keeps running
+agent = Agent(
+    model=model,
+    system_prompt="Be concise.",
+    budget=Budget(run=0.50, on_exceeded=warn_on_exceeded),
+)
 
-from dotenv import load_dotenv
+response = agent.response("What is machine learning?")
+print(f"Answer: {response.content[:80]}...")
+print(f"Cost:   ${response.cost:.6f}")
+print(f"Budget: {agent.budget_state}")
+print()
 
-from examples.models.models import almock
-from syrin import Agent, Budget, ServeProtocol, warn_on_exceeded
+# --- Example 2: Budget with hard stop ---
+# raise_on_exceeded: raises BudgetExceededError when limit hit
+agent2 = Agent(
+    model=model,
+    system_prompt="Be concise.",
+    budget=Budget(run=0.0001, on_exceeded=raise_on_exceeded),
+)
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+try:
+    agent2.response("This might exceed the budget")
+except BudgetExceededError as e:
+    print(f"Budget exceeded (expected): {e}")
+print()
+
+# --- Example 3: Class-level budget ---
+class CostAwareAgent(Agent):
+    model = model
+    system_prompt = "You are a concise assistant."
+    budget = Budget(run=1.00, on_exceeded=warn_on_exceeded)
 
 
-class Assistant(Agent):
-    _agent_name = "assistant"
-    _agent_description = "Assistant with budget control"
-    model = almock
-    system_prompt = "You are a helpful assistant."
-    budget = Budget(run=0.10, on_exceeded=warn_on_exceeded)
-
-
-if __name__ == "__main__":
-    assistant = Assistant()
-    print("Serving at http://localhost:8000/playground")
-    # assistant.serve(port=8000, enable_playground=True, debug=True)
-    assistant.serve(protocol=ServeProtocol.CLI)
+agent3 = CostAwareAgent()
+response3 = agent3.response("Hello!")
+print(f"Class agent cost: ${response3.cost:.6f}")
+print(f"Budget remaining: {agent3.budget_state}")

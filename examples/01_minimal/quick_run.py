@@ -1,41 +1,39 @@
-"""Quick Run Example.
+"""Quick Run — Fastest way to use Syrin.
 
-Demonstrates:
-- syrin.run() one-liner for quick LLM calls
-- syrin.configure() for global settings
-- Using run() with system prompt and budget
-- Serving the equivalent agent
+Three ways to get started, from simplest to most flexible.
 
-Run: python -m examples.01_minimal.quick_run
-Visit: http://localhost:8000/playground
-
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/01_minimal/quick_run.py
 """
 
-from __future__ import annotations
+from syrin import Agent, Budget, Model, warn_on_exceeded
 
-from pathlib import Path
+model = Model.Almock()  # No API key needed
 
-from dotenv import load_dotenv
+# --- Way 1: Builder (recommended) ---
+agent = (
+    Agent.builder(model)
+    .with_system_prompt("Explain like I'm five years old.")
+    .with_budget(Budget(run=0.50))
+    .build()
+)
+response = agent.response("What is gravity?")
+print(f"Builder: {response.content[:80]}...")
+print()
 
-import syrin
-from examples.models.models import almock
-from syrin import Agent
+# --- Way 2: Preset (one-liner) ---
+agent2 = Agent.basic(model, system_prompt="You are a helpful assistant.")
+response2 = agent2.response("What is 2 + 2?")
+print(f"Preset:  {response2.content}")
+print()
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
-
-class QuickRunAgent(Agent):
-    """Agent equivalent to syrin.run() with system prompt and budget."""
-
-    _agent_name = "quick-run"
-    _agent_description = "Quick run demo agent"
-    model = almock
-    system_prompt = "Explain like I'm five years old."
-    budget = syrin.Budget(run=0.10, on_exceeded=syrin.warn_on_exceeded)
+# --- Way 3: Class-based (best for reuse) ---
+class MyAgent(Agent):
+    model = model
+    system_prompt = "You are helpful and concise."
+    budget = Budget(run=1.00, on_exceeded=warn_on_exceeded)
 
 
-if __name__ == "__main__":
-    agent = QuickRunAgent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+agent3 = MyAgent()
+response3 = agent3.response("Hello!")
+print(f"Class:   {response3.content}")

@@ -32,8 +32,8 @@ Agent with Memory
 Copy this code and run it!
 """
 
-from Syrin import Agent, Memory
-from Syrin.model import Model
+from syrin import Agent, Memory
+from syrin.model import Model
 
 
 class MemoryfulAgent(Agent):
@@ -130,9 +130,9 @@ Agent with All Memory Types
 This shows how to use all 4 types of memory
 """
 
-from Syrin import Agent, Memory, MemoryType
-from Syrin.model import Model
-from Syrin.tool import tool
+from syrin import Agent, Memory, MemoryType
+from syrin.model import Model
+from syrin.tool import tool
 
 
 # Tools to store different memory types
@@ -234,8 +234,8 @@ Interactive Memory Agent
 Chat with an agent that learns about you over time
 """
 
-from Syrin import Agent, Memory
-from Syrin.model import Model
+from syrin import Agent, Memory
+from syrin.model import Model
 
 
 class InteractiveMemoryAgent(Agent):
@@ -293,9 +293,9 @@ Customer Support Agent with Memory
 A support bot that remembers customer issues
 """
 
-from Syrin import Agent, Memory
-from Syrin.model import Model
-from Syrin.tool import tool
+from syrin import Agent, Memory
+from syrin.model import Model
+from syrin.tool import tool
 
 
 @tool
@@ -374,8 +374,8 @@ if __name__ == "__main__":
 Agents can also "forget" old information:
 
 ```python
-from Syrin import Agent, Memory, DecayStrategy
-from Syrin.model import Model
+from syrin import Agent, Memory, DecayStrategy
+from syrin.model import Model
 
 
 class ForgetfulAgent(Agent):
@@ -419,7 +419,7 @@ system_prompt = "You are a helpful assistant."
 ### 2. Use Tools to Store Important Info
 
 ```python
-from Syrin.tool import tool
+from syrin.tool import tool
 
 @tool
 def save_user_preference(preference: str, category: str) -> dict:

@@ -16,8 +16,8 @@ Simple Q&A Agent Example
 Copy this code and run it!
 """
 
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class MyQAAgent(Agent):
@@ -165,8 +165,8 @@ print(f"Stop reason: {response.stop_reason}")
 Make it interactive so users can ask questions:
 
 ```python
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class InteractiveQAAgent(Agent):
@@ -209,8 +209,8 @@ if __name__ == "__main__":
 Create different agents for different purposes:
 
 ```python
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class GrammarChecker(Agent):
@@ -270,8 +270,8 @@ if __name__ == "__main__":
 Sometimes things go wrong. Here's how to handle it:
 
 ```python
-from Syrin import Agent
-from Syrin.model import Model
+from syrin import Agent
+from syrin.model import Model
 
 
 class SafeQAAgent(Agent):

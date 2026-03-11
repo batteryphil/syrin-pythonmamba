@@ -1,40 +1,32 @@
-"""Multiple Tasks Example — Writer with research + write tasks.
+"""Multiple Tasks Example -- Agent with several @task methods.
 
 Demonstrates:
-- Agent with multiple @syrin.task methods
-- Chaining tasks: research then write
-- Named entry points for different capabilities
+- Defining multiple tasks on a single agent
+- Chaining tasks: research first, then write
+- Each task is an independent named entry point
 
-Run: python -m examples.02_tasks.multiple_tasks
-Visit: http://localhost:8000/playground
-
-Requires: uv pip install syrin[serve]
+Run: python examples/02_tasks/multiple_tasks.py
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+from syrin import Agent, Model, task
 
-from dotenv import load_dotenv
 
-from examples.models.models import almock
-from syrin import Agent, task
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
+# --- Define the agent with two tasks ---
 
 class Writer(Agent):
-    """Agent with research and write tasks. Uses @syrin.task for named APIs."""
+    """Agent with research and write tasks."""
 
     _agent_name = "writer"
     _agent_description = "Writer with research(topic) and write(topic, style) tasks"
-    model = almock
+    model = Model.Almock()
     system_prompt = "You are a professional writer. Research thoroughly and write clearly."
 
     @task
     def research(self, topic: str) -> str:
         """Research a topic and return key points."""
-        r = self.response(f"Research {topic}. List 3–5 key points.")
+        r = self.response(f"Research {topic}. List 3-5 key points.")
         return r.content or ""
 
     @task
@@ -44,8 +36,19 @@ class Writer(Agent):
         return r.content or ""
 
 
+# --- Run it ---
+
 if __name__ == "__main__":
     writer = Writer()
-    print("Serving at http://localhost:8000/playground")
-    writer.serve(port=8000, enable_playground=True, debug=True)
-    # writer.serve(protocol=ServeProtocol.CLI)
+
+    # Call each task independently
+    print("--- Research Task ---")
+    research_result = writer.research("artificial intelligence")
+    print(research_result)
+
+    print("\n--- Write Task ---")
+    write_result = writer.write("artificial intelligence", style="casual")
+    print(write_result)
+
+    # Optional: serve with playground UI
+    # writer.serve(port=8000, enable_playground=True, debug=True)

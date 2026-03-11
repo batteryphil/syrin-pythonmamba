@@ -1,50 +1,72 @@
-"""Shared Budget Example.
+"""Shared Budget — Multiple agents sharing a single budget pool.
 
 Demonstrates:
 - Budget(shared=True) for multi-agent shared budgets
 - Spawn with shared budget (child borrows from parent)
-- Budget tracking across agents
+- Budget tracking across parent and child agents
 
-Run: python -m examples.03_budget.shared_budget
-Visit: http://localhost:8000/playground
+No API key needed (uses Almock).
 
-Requires: uv pip install syrin[serve]
+Run:
+    python examples/03_budget/shared_budget.py
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+from syrin import Agent, Budget, Model, warn_on_exceeded
 
-from dotenv import load_dotenv
+# Create a mock model — no API key needed
+model = Model.Almock()
 
-from examples.models.models import almock
-from syrin import Agent, Budget, warn_on_exceeded
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
-
+# ---------------------------------------------------------------------------
 # 1. Shared budget across agents
+# ---------------------------------------------------------------------------
+print("=" * 60)
+print("1. Parent agent with shared budget ($10.00)")
+print("=" * 60)
+
 shared = Budget(run=10.0, shared=True, on_exceeded=warn_on_exceeded)
-parent = Agent(model=almock, budget=shared)
+parent = Agent(model=model, budget=shared)
 result = parent.response("Hello from parent")
-print(f"Parent cost: ${result.cost:.6f}")
-print(f"Parent budget: {parent.budget_state}")
+print(f"   Parent cost:   ${result.cost:.6f}")
+print(f"   Budget state:  {parent.budget_state}")
 
-
+# ---------------------------------------------------------------------------
 # 2. Spawn child that borrows from shared budget
+# ---------------------------------------------------------------------------
+print("\n" + "=" * 60)
+print("2. Spawn child — borrows from parent's shared budget")
+print("=" * 60)
+
+
 class Child(Agent):
-    model = almock
+    """Child agent that inherits the parent's shared budget."""
+
+    model = model
 
 
 result = parent.spawn(Child, task="Do work")
-print(f"Child result: {result.content[:60]}...")
-print(f"Parent budget after child: {parent.budget_state}")
+print(f"   Child result:  {result.content[:60]}...")
+print(f"   Budget after:  {parent.budget_state}")
 
+# ---------------------------------------------------------------------------
 # 3. Multiple children sharing budget
-parent2 = Agent(model=almock, budget=Budget(run=10.0, shared=True))
+# ---------------------------------------------------------------------------
+print("\n" + "=" * 60)
+print("3. Three children sharing one budget pool")
+print("=" * 60)
+
+parent2 = Agent(model=model, budget=Budget(run=10.0, shared=True))
 for i in range(3):
     parent2.spawn(Child, task=f"Task {i + 1}")
-print(f"Budget after 3 children: {parent2.budget_state}")
+    print(f"   After child {i + 1}: {parent2.budget_state}")
+
+# ---------------------------------------------------------------------------
+# 4. Class-level shared budget (reusable agent definition)
+# ---------------------------------------------------------------------------
+print("\n" + "=" * 60)
+print("4. Class-level: shared budget parent")
+print("=" * 60)
 
 
 class SharedBudgetParent(Agent):
@@ -52,11 +74,15 @@ class SharedBudgetParent(Agent):
 
     _agent_name = "shared-budget"
     _agent_description = "Agent with shared budget (spawn children that borrow)"
-    model = almock
+    model = model
     budget = Budget(run=10.0, shared=True, on_exceeded=warn_on_exceeded)
 
 
-if __name__ == "__main__":
-    agent = SharedBudgetParent()
-    print("Serving at http://localhost:8000/playground")
-    agent.serve(port=8000, enable_playground=True, debug=True)
+agent = SharedBudgetParent()
+result = agent.response("Plan a project in three steps.")
+print(f"   Cost:          ${result.cost:.6f}")
+print(f"   Budget state:  {agent.budget_state}")
+
+# --- Serve with web playground (uncomment to try) ---
+# agent.serve(port=8000, enable_playground=True, debug=True)
+# Visit http://localhost:8000/playground
