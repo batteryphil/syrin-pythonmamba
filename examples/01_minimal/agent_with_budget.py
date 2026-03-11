@@ -39,6 +39,7 @@ except BudgetExceededError as e:
     print(f"Budget exceeded (expected): {e}")
 print()
 
+
 # --- Example 3: Class-level budget ---
 class CostAwareAgent(Agent):
     model = model

@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from syrin import Agent, Model, task
 
-
 # --- Define the triage agent ---
+
 
 class TriageAgent(Agent):
     """Agent that triages items with structured output."""

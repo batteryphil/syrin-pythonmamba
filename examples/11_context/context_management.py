@@ -157,9 +157,7 @@ agent3 = Agent(
     config=AgentConfig(context=PassThroughContextManager()),
 )
 agent3.response("Hi, custom manager!")
-print(
-    f"  Pass-through manager: {agent3.context_stats.total_tokens} tokens, no compaction"
-)
+print(f"  Pass-through manager: {agent3.context_stats.total_tokens} tokens, no compaction")
 
 # ---------------------------------------------------------------------------
 # Summary

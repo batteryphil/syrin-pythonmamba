@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from syrin import Agent, Model, task
 
-
 # --- Define the agent with a single task ---
+
 
 class Researcher(Agent):
     """Agent that researches topics. Uses @task for a named API."""

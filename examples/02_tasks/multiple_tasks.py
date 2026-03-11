@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from syrin import Agent, Model, task
 
-
 # --- Define the agent with two tasks ---
+
 
 class Writer(Agent):
     """Agent with research and write tasks."""

@@ -16,8 +16,8 @@ import json
 from syrin import Agent, Model, tool
 from syrin.enums import DocFormat
 
-
 # --- Define some tools ---
+
 
 @tool
 def calculate(a: float, b: float, operation: str = "add") -> str:
@@ -94,7 +94,7 @@ total_json = sum(len(json.dumps(t.parameters_schema)) for t in tools)
 total_toon = sum(len(t.schema_to_toon()) for t in tools)
 total_savings = ((total_json - total_toon) / total_json) * 100
 
-print(f"  3 tools combined:")
+print("  3 tools combined:")
 print(f"  JSON: {total_json} chars")
 print(f"  TOON: {total_toon} chars")
 print(f"  Savings: {total_savings:.1f}%")

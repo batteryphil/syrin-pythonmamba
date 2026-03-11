@@ -244,5 +244,3 @@ class TestContextModeFocused:
         assert "q2" in contents
         assert "ans1" not in contents
         assert "q1" not in contents
-
-

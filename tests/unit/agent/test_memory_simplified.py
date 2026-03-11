@@ -101,8 +101,6 @@ class TestConversationMemoryParamRemoved:
             Agent(model=_almock(), conversation_memory=Memory())
 
 
-
-
 class TestMemoryProperty:
     """agent.memory property returns active memory."""
 

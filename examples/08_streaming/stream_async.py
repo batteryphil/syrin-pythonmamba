@@ -12,8 +12,8 @@ import asyncio
 
 from syrin import Agent, Model
 
-
 # --- Define an async streaming agent ---
+
 
 class AsyncStreamAgent(Agent):
     _agent_name = "async-stream-agent"
@@ -23,6 +23,7 @@ class AsyncStreamAgent(Agent):
 
 
 # --- Stream asynchronously and collect output ---
+
 
 async def main() -> None:
     agent = AsyncStreamAgent()

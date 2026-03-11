@@ -60,7 +60,7 @@ config = CheckpointConfig(
     compress=False,
 )
 agent = Agent(model=model, config=AgentConfig(checkpoint=config))
-print(f"  Storage: sqlite, trigger: STEP, max: 5")
+print("  Storage: sqlite, trigger: STEP, max: 5")
 
 # ---------------------------------------------------------------------------
 # 4. Named checkpoint: save and restore by tag

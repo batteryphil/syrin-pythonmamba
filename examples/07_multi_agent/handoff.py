@@ -24,14 +24,14 @@ class Presenter(Agent):
 # Step 1: Analyzer processes the request
 analyzer = Analyzer()
 result = analyzer.response("Analyze the benefits of renewable energy")
-print(f"=== Analyzer ===")
+print("=== Analyzer ===")
 print(f"{result.content[:120]}...")
 print(f"Cost: ${result.cost:.6f}")
 print()
 
 # Step 2: Hand off to Presenter
 handoff_result = analyzer.handoff(Presenter, "Present the analysis")
-print(f"=== Presenter (via handoff) ===")
+print("=== Presenter (via handoff) ===")
 print(f"{handoff_result.content[:120]}...")
 print(f"Cost: ${handoff_result.cost:.6f}")
 

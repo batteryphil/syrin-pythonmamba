@@ -12,7 +12,17 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from syrin import Agent, Budget, CheckpointConfig, CheckpointTrigger, Decay, Memory, Model, RateLimit, tool
+from syrin import (
+    Agent,
+    Budget,
+    CheckpointConfig,
+    CheckpointTrigger,
+    Decay,
+    Memory,
+    Model,
+    RateLimit,
+    tool,
+)
 from syrin.context import Context
 from syrin.enums import DecayStrategy, Media, MemoryBackend, MemoryType, WriteMode
 from syrin.generation import ImageGenerator, VideoGenerator

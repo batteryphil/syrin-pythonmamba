@@ -58,7 +58,14 @@ except ImportError:
     pass
 
 
-_QDRANT_SKIP_KEYS = {"content", "document_id", "chunk_index", "token_count", "source", "source_type"}
+_QDRANT_SKIP_KEYS = {
+    "content",
+    "document_id",
+    "chunk_index",
+    "token_count",
+    "source",
+    "source_type",
+}
 
 
 def _payload_from_chunk(chunk: Chunk) -> dict[str, str | int | float | bool | None]:

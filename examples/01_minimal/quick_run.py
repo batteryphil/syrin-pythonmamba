@@ -27,6 +27,7 @@ response2 = agent2.response("What is 2 + 2?")
 print(f"Preset:  {response2.content}")
 print()
 
+
 # --- Way 3: Class-based (best for reuse) ---
 class MyAgent(Agent):
     model = model

@@ -44,7 +44,7 @@ class DeepgramVoiceProvider(BaseVoiceProvider):
         model_id: str,
         **kwargs: Any,
     ) -> tuple[bytes, str, str]:
-        from deepgram import DeepgramClient, SpeakOptions  # type: ignore[import-untyped]
+        from deepgram import DeepgramClient, SpeakOptions
 
         client = DeepgramClient(api_key=api_key)
         opts = SpeakOptions(model=model_id)

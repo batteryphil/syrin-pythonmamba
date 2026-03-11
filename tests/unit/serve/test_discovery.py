@@ -137,8 +137,8 @@ def test_discovery_request_hook_emitted() -> None:
 def test_agent_card_override_from_class() -> None:
     """agent_card = AgentCard(...) on Agent class overrides auto-generated fields."""
 
-    from syrin.serve import AgentCard, AgentCardAuth, AgentCardProvider  # noqa: F811
     from syrin.model import Model
+    from syrin.serve import AgentCard, AgentCardAuth, AgentCardProvider  # noqa: F811
 
     class CustomAgent(Agent):
         _agent_name = "custom-agent"

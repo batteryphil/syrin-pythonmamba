@@ -25,12 +25,12 @@ from syrin.types.validation import (
     ValidationResult,
 )
 
-
 # --- 1. Basic @structured class ---
 
 print("=" * 50)
 print("1. Basic @structured class")
 print("=" * 50)
+
 
 @structured
 class UserInfo:
@@ -53,6 +53,7 @@ print("\n" + "=" * 50)
 print("2. Pydantic model as output")
 print("=" * 50)
 
+
 class ProductInfo(BaseModel):
     name: str
     price: float
@@ -72,6 +73,7 @@ if result.structured.parsed:
 print("\n" + "=" * 50)
 print("3. Validation hooks")
 print("=" * 50)
+
 
 @structured
 class SentimentResult:
@@ -107,6 +109,7 @@ print(f"  is_valid: {result.structured.is_valid}")
 print("\n" + "=" * 50)
 print("4. Custom validator")
 print("=" * 50)
+
 
 class ReviewResult(BaseModel):
     rating: int
@@ -158,6 +161,7 @@ print("\n" + "=" * 50)
 print("5. Pydantic field validator")
 print("=" * 50)
 
+
 class RestrictedUser(BaseModel):
     name: str
     email: str
@@ -185,6 +189,7 @@ print(f"  is_valid: {result.structured.is_valid}")
 
 
 # --- Optional: serve as a class-based agent ---
+
 
 class StructuredOutputAgent(Agent):
     _agent_name = "structured-output"

@@ -10,8 +10,8 @@ Run: python examples/08_streaming/stream_sync.py
 
 from syrin import Agent, Model
 
-
 # --- Define a streaming agent ---
+
 
 class StreamAgent(Agent):
     _agent_name = "stream-agent"

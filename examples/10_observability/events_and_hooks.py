@@ -22,10 +22,10 @@ agent = Agent(
     budget=Budget(run=1.0, on_exceeded=warn_on_exceeded),
     memory=Memory(),
 )
-agent.events.on(Hook.AGENT_RUN_START, lambda ctx: events_log.append("run_start"))
-agent.events.on(Hook.AGENT_RUN_END, lambda ctx: events_log.append("run_end"))
-agent.events.on(Hook.LLM_REQUEST_START, lambda ctx: events_log.append("llm_start"))
-agent.events.on(Hook.LLM_REQUEST_END, lambda ctx: events_log.append("llm_end"))
+agent.events.on(Hook.AGENT_RUN_START, lambda _: events_log.append("run_start"))
+agent.events.on(Hook.AGENT_RUN_END, lambda _: events_log.append("run_end"))
+agent.events.on(Hook.LLM_REQUEST_START, lambda _: events_log.append("llm_start"))
+agent.events.on(Hook.LLM_REQUEST_END, lambda _: events_log.append("llm_end"))
 
 agent.response("Hello!")
 print(f"Events fired: {events_log}")

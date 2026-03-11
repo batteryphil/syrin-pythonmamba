@@ -29,6 +29,7 @@ def writer_prompt(style: str) -> str:
 
 # --- Specialized team agents ---
 
+
 class Researcher(Agent):
     _agent_name = "researcher"
     _agent_description = "Researches topics (technology)"
@@ -44,6 +45,7 @@ class Writer(Agent):
 
 
 # --- General-purpose agents for selection demo ---
+
 
 class GeneralResearcher(Agent):
     _agent_name = "general-researcher"

@@ -32,6 +32,7 @@ def role_prompt(role: str, specialization: str = "") -> str:
 
 # --- 1. Parameterized prompts assigned at class level ---
 
+
 class ScienceExpert(Agent):
     model = mock
     system_prompt = expert_prompt(domain="quantum physics", tone="academic")
@@ -43,6 +44,7 @@ class BusinessExpert(Agent):
 
 
 # --- 2. Role-based prompts ---
+
 
 class Researcher(Agent):
     model = mock

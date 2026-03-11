@@ -15,7 +15,16 @@ Run:
 
 from __future__ import annotations
 
-from syrin import Agent, AgentConfig, Budget, Context, Model, TokenLimits, TokenRateLimit, warn_on_exceeded
+from syrin import (
+    Agent,
+    AgentConfig,
+    Budget,
+    Context,
+    Model,
+    TokenLimits,
+    TokenRateLimit,
+    warn_on_exceeded,
+)
 
 # Create a mock model — no API key needed
 model = Model.Almock()

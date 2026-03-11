@@ -16,9 +16,6 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import Mock
 
-from syrin import Agent, Model
-from syrin.guardrails import ContentFilter
-
 
 async def example_authority_check() -> None:
     print("\n" + "=" * 55)

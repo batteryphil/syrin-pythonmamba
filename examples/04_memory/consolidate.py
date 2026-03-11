@@ -11,7 +11,7 @@ Run:
 
 from __future__ import annotations
 
-from syrin import Memory, Model
+from syrin import Memory
 from syrin.enums import MemoryType
 
 

@@ -147,7 +147,9 @@ class GitHubLoader:
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             while len(repos) < max_repos:
-                url = f"https://api.github.com/users/{self._username}/repos?per_page=100&page={page}"
+                url = (
+                    f"https://api.github.com/users/{self._username}/repos?per_page=100&page={page}"
+                )
                 response = await client.get(url, headers=headers)
                 response.raise_for_status()
                 batch = response.json()

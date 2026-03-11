@@ -61,7 +61,9 @@ configured = Model.OpenAI(
     max_tokens=2048,
     context_window=128000,
 )
-print(f"  temperature={configured.settings.temperature}, max_tokens={configured.settings.max_output_tokens}")
+print(
+    f"  temperature={configured.settings.temperature}, max_tokens={configured.settings.max_output_tokens}"
+)
 
 # ---------------------------------------------------------------------------
 # 4. Model.Custom for third-party OpenAI-compatible APIs

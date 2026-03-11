@@ -20,12 +20,12 @@ response = agent.response("What are the three primary colors?")
 
 # --- Core fields ---
 print("=== Response Object ===")
-print(f"Content:    {response.content}")         # The answer text
-print(f"Cost:       ${response.cost:.6f}")        # USD spent
-print(f"Tokens:     {response.tokens}")           # Total tokens used
-print(f"Model:      {response.model}")            # Model that responded
-print(f"Duration:   {response.duration:.2f}s")    # Wall-clock time
-print(f"Success:    {bool(response)}")            # True if response has content
+print(f"Content:    {response.content}")  # The answer text
+print(f"Cost:       ${response.cost:.6f}")  # USD spent
+print(f"Tokens:     {response.tokens}")  # Total tokens used
+print(f"Model:      {response.model}")  # Model that responded
+print(f"Duration:   {response.duration:.2f}s")  # Wall-clock time
+print(f"Success:    {bool(response)}")  # True if response has content
 print()
 
 # --- Budget info (only if budget is set) ---

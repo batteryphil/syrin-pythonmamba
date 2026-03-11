@@ -45,7 +45,7 @@ class CartesiaVoiceProvider(BaseVoiceProvider):
         model_id: str,
         **kwargs: Any,
     ) -> tuple[bytes, str, str]:
-        from cartesia import Cartesia  # type: ignore[import-not-found]
+        from cartesia import Cartesia
 
         vid = voice_id if voice_id != "default" else self.voice_id
         client = Cartesia(api_key=api_key)

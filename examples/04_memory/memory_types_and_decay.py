@@ -41,7 +41,9 @@ def main() -> None:
     core = CoreMemory(id="core-1", content="My name is John Smith", importance=0.95)
     episodic = EpisodicMemory(id="ep-1", content="Yesterday I visited the Eiffel Tower")
     semantic = SemanticMemory(id="sem-1", content="Python is a programming language")
-    procedural = ProceduralMemory(id="proc-1", content="How to make coffee: boil water, add grounds")
+    procedural = ProceduralMemory(
+        id="proc-1", content="How to make coffee: boil water, add grounds"
+    )
     factory = create_memory(MemoryType.CORE, "factory-1", "Created via factory")
 
     for label, mem in [
@@ -62,7 +64,9 @@ def main() -> None:
     store.add(content="User prefers dark mode", memory_type=MemoryType.CORE)
     store.add(content="Yesterday's meeting was at 3pm", memory_type=MemoryType.EPISODIC)
     store.add(content="Paris is the capital of France", memory_type=MemoryType.SEMANTIC)
-    store.add(content="How to reset password: click forgot password", memory_type=MemoryType.PROCEDURAL)
+    store.add(
+        content="How to reset password: click forgot password", memory_type=MemoryType.PROCEDURAL
+    )
 
     core_memories = store.recall(memory_type=MemoryType.CORE)
     print(f"  Core memories ({len(core_memories)}):")
@@ -118,7 +122,12 @@ def main() -> None:
     agent = Agent(
         model=Model.Almock(),
         memory=Memory(
-            types=[MemoryType.CORE, MemoryType.EPISODIC, MemoryType.SEMANTIC, MemoryType.PROCEDURAL],
+            types=[
+                MemoryType.CORE,
+                MemoryType.EPISODIC,
+                MemoryType.SEMANTIC,
+                MemoryType.PROCEDURAL,
+            ],
             top_k=5,
         ),
     )

@@ -100,7 +100,7 @@ agent = Agent(
         )
     ),
 )
-print(f"   Agent configured with RPM=100, threshold at 80%")
+print("   Agent configured with RPM=100, threshold at 80%")
 
 # ---------------------------------------------------------------------------
 # 6. Multiple thresholds (RPM + TPM)
@@ -135,7 +135,7 @@ agent = Agent(
         ),
     ),
 )
-print(f"   Agent configured with 3 thresholds on RPM/TPM")
+print("   Agent configured with 3 thresholds on RPM/TPM")
 
 # ---------------------------------------------------------------------------
 # 7. Class-level rate limits (reusable agent definition)

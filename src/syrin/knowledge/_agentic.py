@@ -103,7 +103,9 @@ def _parse_sub_queries(text: str) -> list[str]:
     # Remove common prefixes: "1.", "a)", "-", "*", "•", "(1)", "Q1:", etc.
     out: list[str] = []
     for line in lines:
-        m = re.match(r"^(?:\(?[a-zA-Z\d]+[\.\)\:\-]\s*|[\u2022\u25e6\u25aa\u25cf\u2023*\-]+\s*)", line)
+        m = re.match(
+            r"^(?:\(?[a-zA-Z\d]+[\.\)\:\-]\s*|[\u2022\u25e6\u25aa\u25cf\u2023*\-]+\s*)", line
+        )
         if m:
             line = line[m.end() :].strip()
         if line:

@@ -15,8 +15,8 @@ import asyncio
 
 from syrin import Agent, Model
 
-
 # --- 1. Basic async call ---
+
 
 async def example_basic_arun() -> None:
     """Single async agent call with arun()."""
@@ -31,6 +31,7 @@ async def example_basic_arun() -> None:
 
 
 # --- 2. Parallel agents with asyncio.gather ---
+
 
 async def example_parallel_agents() -> None:
     """Run three agents in parallel and collect results."""
@@ -68,6 +69,7 @@ async def example_parallel_agents() -> None:
 
 # --- 3. Sequential async (dependent calls) ---
 
+
 async def example_sequential_async() -> None:
     """Chain async calls where each depends on the previous result."""
     print("\n" + "=" * 50)
@@ -88,6 +90,7 @@ async def example_sequential_async() -> None:
 
 # --- 4. Async with timeout ---
 
+
 async def example_async_with_timeout() -> None:
     """Protect an async call with a timeout."""
     print("\n" + "=" * 50)
@@ -104,6 +107,7 @@ async def example_async_with_timeout() -> None:
 
 
 # --- Run all examples ---
+
 
 async def main() -> None:
     await example_basic_arun()

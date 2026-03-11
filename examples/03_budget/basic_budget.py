@@ -63,6 +63,7 @@ agent4.response("Hello!")
 print(f"Events captured: {len(exceeded_events)}")
 print()
 
+
 # ============================================================
 # 5. Class-level budget — reusable agent definition
 # ============================================================

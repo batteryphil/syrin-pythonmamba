@@ -148,6 +148,18 @@ module = "syrin.providers.litellm"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "deepgram"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "elevenlabs"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "cartesia"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "phoenix.*"
 ignore_missing_imports = true
 

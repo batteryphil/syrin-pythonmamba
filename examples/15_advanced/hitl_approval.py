@@ -15,6 +15,7 @@ mock = Model.Almock(latency_seconds=0.01, lorem_length=40)
 
 # --- Tools: delete_record requires approval, search does not ---
 
+
 @tool(requires_approval=True, description="Delete a record by ID")
 def delete_record(id: str) -> str:
     return f"Deleted record {id}"
@@ -26,6 +27,7 @@ def search(query: str) -> str:
 
 
 # --- Approval callback ---
+
 
 def approve_cb(msg: str, timeout: int, ctx: dict) -> bool:
     """In production this would prompt a human, post to Slack, etc."""
