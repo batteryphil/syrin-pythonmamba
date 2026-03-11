@@ -1,6 +1,6 @@
 [project]
 name = "syrin"
-version = "0.7.0"
+version = "0.8.0"
 description = "Python library for building AI agents with budget management, declarative definitions, and production-ready observability."
 readme = "README.md"
 requires-python = ">=3.11"

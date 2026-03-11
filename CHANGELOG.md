@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.0] - 2026-03-11
+
+### Added
+
+- **Intelligent model routing**: Automatic LLM selection based on cost, performance, and context requirements.
+- **Multi-modality support**: Native support for images, video, and audio generation/processing.
+- **Knowledge integration**: RAG (Retrieval-Augmented Generation) with vector stores, document loaders, and semantic search.
+
+### Changed
+
+- **Simplified installation**: `pip install syrin` now includes OpenAI and serving dependencies by default.
+- **Removed CLI**: `syrin trace`, `syrin run`, and `syrin doctor` commands removed; use `python my_agent.py --trace` for observability.
+
+### Breaking
+
+- **CLI removal**: Command-line interface deprecated; use direct Python execution with `--trace` flag.
+
+---
+
 ## [0.7.0] - 2026-03-07
 
 ### Breaking
