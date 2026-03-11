@@ -25,6 +25,19 @@
   <a href="https://x.com/syrin_dev">Twitter</a>
 </p>
 
+## 🚀 Installation
+
+```bash
+# Basic install
+pip install syrin
+
+# With serving (playground, HTTP API)
+pip install syrin[serve]
+
+# With all features
+pip install syrin[serve,anthropic,voice]
+```
+
 ---
 
 ## 🎯 The Problem: "Why Did My AI Agent Cost $10,000 Last Month?"
@@ -458,22 +471,7 @@ Multi-agent system that researches topics and writes reports with full cost cont
 | **[Memory](docs/memory.md)** | Memory systems and backends |
 | **[Multi-Agent](docs/multi-agent.md)** | Handoff, spawn, DynamicPipeline |
 
----
 
-## 🚀 Installation
-
-```bash
-# Basic install
-pip install syrin
-
-# With serving (playground, HTTP API)
-pip install syrin[serve]
-
-# With all features
-pip install syrin[serve,anthropic,voice]
-```
-
----
 
 ## ⭐ Why Star This Repo?
 
