@@ -7,39 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.8.1] - 2026-03-13
+
 ### Added
 
-- **DoclingLoader** — Universal document loader (PDF, DOCX, PPTX, XLSX, HTML, images) with AI-powered table extraction. Tables become separate Documents with `table_csv`, `table_html`, `table_markdown` in metadata. `pip install syrin[docling]`
-- **DOCXLoader** — Load DOCX files. Uses Docling when available, else python-docx. `Knowledge.DOCX()`, `pip install syrin[docx]`
-- **CSVLoader** — Load CSV files with optional `rows_per_document`. `Knowledge.CSV()`, no extra deps
-- **ExcelLoader** — Load XLSX files, one Document per sheet. `Knowledge.Excel()`, `pip install syrin[excel]`
-- **DirectoryLoader** — Now supports `.docx`, `.csv`, `.xlsx`, `.xls` via new loaders
-- **Grounding layer** — `GroundingConfig` on Knowledge for anti-hallucination: fact extraction, verification, and citations. `search_knowledge` / `search_knowledge_deep` return verified facts when `grounding=GroundingConfig(enabled=True)`
-- **GroundedFact** — Dataclass for verified facts with `content`, `source`, `page`, `confidence`, `verification` (VERIFIED/UNVERIFIED/CONTRADICTED/NOT_FOUND)
-- **VerificationStatus** — StrEnum for fact verification states
-- **DecisionAction.FLAG** — Guardrail action to annotate without blocking (for unverified claims)
-- **FactVerificationGuardrail** — Verifies output claims against `context.metadata["grounded_facts"]`
-- **CitationGuardrail** — Ensures factual statements have source citations (`[Source: doc, Page N]`)
-- **Shared verification** — `verify_claim` and `grade_results` moved to `_verification.py` for reuse by agentic RAG and grounding
-- **Template engine** — Slot-based generation with Mustache syntax. `Template`, `SlotConfig`, `OutputFormat`, `OutputConfig`. Use `output_config=OutputConfig(format=..., template=tpl)` on Agent (requires `output=Output(MyModel)`). `response.content` = rendered template, `response.template_data` = slot values
-- **OutputConfig** — Renamed from `OutputFormatConfig`. Agent uses `output_config` (renamed from `output_format`).
-- **File generation** — When `output_config` format is TEXT/MARKDOWN/HTML/PDF/DOCX, agent produces `response.file` (Path) and `response.file_bytes` (bytes). `save_as_pdf()`, `save_as_docx()`, `save_as()` helpers. PDF requires `pip install syrin[pdf-output]`, DOCX requires `syrin[docx]`.
-- **Citation system** — `OutputConfig.citation=CitationConfig(style=...)` parses `[Source: doc.pdf, Page N]` markers from content, reformats as inline/footnote/appendix, and populates `response.citations` (`Citation` dataclass with text, source, page). Use for financial, legal, medical outputs.
-- **@structured improvements** — Nested types (`list[Shareholder]`) with JSON schema `$defs`/`$ref`, `Annotated[T, "description"]` for field descriptions (helps LLM), proper required/optional from `Optional` and defaults.
-- **response.parsed** — Convenience property: `response.parsed` is same as `response.structured.parsed` when output is configured.
+- **Batch fact verification** — Ground facts in batches of 10 for efficiency
+- **GroundingConfig.model** — Dedicated model for grounding/verification
+- **YAML frontmatter** — `Template.from_file()` parses YAML frontmatter
 
 ### Changed
 
-- **Tool result length** — `max_tool_result_length` default is now `0` (no truncation). Full tool results are sent to the LLM. Use `max_tool_result_length > 0` to cap length. Display in traces/playground remains truncated to 2000 chars.
-- **Structured output retry** — When validation fails, the agent calls the LLM again with the validation error and schema so the model can fix the output. Use `validation.get_retry_prompt(output_type, error_message)` for custom flows.
-- **Knowledge search** — Results are deduplicated by content hash so overlapping chunks do not repeat.
-- **PDFLoader** — Logs a warning when a page produces no text and suggests `Knowledge.Docling(...)` for table/image extraction.
-- **Guardrails** — `ParallelEvaluationEngine` default timeout 30s. `GuardrailChain` supports `timeout_s=30` (default) per guardrail so evaluation cannot hang.
+- **PDF extraction** — Consolidated to single `docling` dependency
+- **Grounding** — Improved claim-to-fact matching with index-based pairing
 
 ### Fixed
 
-- Chunk metadata from documents (page, title, etc.) is preserved through all chunkers.
-- Budget tracker is wired for knowledge tools; embedding costs from `search_knowledge` are recorded on the agent run budget.
+- **IPO DRHP example** — Working example with Budget, FactVerificationGuardrail
+- **Test mocks** — Fixed output validation failure tests
 
 ---
 
