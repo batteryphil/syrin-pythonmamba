@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="https://syrin.ai">Website</a> ·
-  <a href="docs/getting-started/quick-start.md">Docs</a> ·
+  <a href="https://docs.syrin.dev/agent-kit/getting-started/quick-start">Docs</a> ·
   <a href="https://discord.gg/p4jnKxYKpB">Discord</a> ·
   <a href="https://x.com/syrin_dev">Twitter</a>
 </p>
@@ -500,18 +500,18 @@ Multi-agent system that researches topics, verifies facts, and writes reports.
 
 | Resource | Description |
 |----------|-------------|
-| [Getting Started](docs/getting-started/quick-start.md) | 5-minute guide to your first agent |
-| [Budget Control](docs/core/budget.md) | Complete budget guide + enterprise FAQ |
-| [Memory](docs/core/memory.md) | Memory types, backends, decay |
-| [Observability / Hooks](docs/debugging/hooks.md) | 72+ hook events, tracing |
-| [Syrin Debug](docs/debugging/pry.md) | Live terminal debugging with Pry |
-| [Watch / Triggers](docs/agent/watch-guide.md) | cron, webhook, queue triggers |
-| [Knowledge Pool](docs/integrations/knowledge-pool.md) | GitHub, docs, RAG ingestion |
-| [Structured Output](docs/agent/response-object.md) | Guaranteed Pydantic/JSON output |
-| [Prompt Injection](docs/advanced/prompt-injection.md) | Defense-in-depth security |
-| [Multi-Agent](docs/multi-agent/overview.md) | Handoff, spawn, DynamicPipeline |
-| [Guardrails](docs/agent/guardrails.md) | PII, length, content filtering |
-| [Serving](docs/production/serving.md) | HTTP API, playground, MCP |
+| [Getting Started](https://docs.syrin.dev/agent-kit/getting-started/quick-start) | 5-minute guide to your first agent |
+| [Budget Control](https://docs.syrin.dev/agent-kit/core/budget) | Complete budget guide + enterprise FAQ |
+| [Memory](https://docs.syrin.dev/agent-kit/core/memory) | Memory types, backends, decay |
+| [Observability / Hooks](https://docs.syrin.dev/agent-kit/debugging/hooks) | 72+ hook events, tracing |
+| [Syrin Debug](https://docs.syrin.dev/agent-kit/debugging/pry) | Live terminal debugging with Pry |
+| [Watch / Triggers](https://docs.syrin.dev/agent-kit/agent/watch-guide) | cron, webhook, queue triggers |
+| [Knowledge Pool](https://docs.syrin.dev/agent-kit/integrations/knowledge-pool) | GitHub, docs, RAG ingestion |
+| [Structured Output](https://docs.syrin.dev/agent-kit/agent/response-object) | Guaranteed Pydantic/JSON output |
+| [Prompt Injection](https://docs.syrin.dev/agent-kit/advanced/prompt-injection) | Defense-in-depth security |
+| [Multi-Agent](https://docs.syrin.dev/agent-kit/multi-agent/overview) | Handoff, spawn, DynamicPipeline |
+| [Guardrails](https://docs.syrin.dev/agent-kit/agent/guardrails) | PII, length, content filtering |
+| [Serving](https://docs.syrin.dev/agent-kit/production/serving) | HTTP API, playground, MCP |
 | [Examples](examples/README.md) | Runnable code for every use case |
 
 ---
