@@ -21,7 +21,7 @@ def save_checkpoint(agent: Agent, name: str | None = None, reason: str | None = 
     if agent._checkpointer is None:
         return None
 
-    agent_name = cast(str, name or agent._agent_name)
+    agent_name = name or agent._agent_name
     messages_serialized: list[dict[str, object]] = []
     for msg in agent.messages:
         messages_serialized.append(msg.model_dump())
@@ -105,7 +105,7 @@ def list_checkpoints(agent: Agent, name: str | None = None) -> list[str]:
     if agent._checkpointer is None:
         return []
 
-    agent_name = cast(str, name or agent._agent_name)
+    agent_name = name or agent._agent_name
     return agent._checkpointer.list_checkpoints(agent_name)
 
 

@@ -22,6 +22,9 @@ Exported surface:
     - prompt-context helpers used by higher-level agent code
 """
 
+import sys
+import types
+
 from syrin.prompt._core import (
     Prompt,
     PromptContext,
@@ -29,9 +32,11 @@ from syrin.prompt._core import (
     PromptVariable,
     PromptVersion,
     make_prompt_context,
-    prompt,
     system_prompt,
     validated,
+)
+from syrin.prompt._core import (
+    prompt as _prompt_fn,
 )
 
 __all__ = [
@@ -45,3 +50,22 @@ __all__ = [
     "system_prompt",
     "validated",
 ]
+
+# Re-export for `from syrin.prompt import prompt`
+prompt = _prompt_fn
+
+
+class _CallablePromptModule(types.ModuleType):
+    """Module subclass that is itself callable as the ``prompt`` decorator.
+
+    When Python processes ``from syrin.prompt import ...``, it writes
+    ``syrin.__dict__['prompt'] = <module syrin.prompt>``, shadowing the
+    ``prompt`` function exported by ``syrin``.  Making the module callable
+    means ``@prompt`` continues to work correctly even after that side-effect.
+    """
+
+    def __call__(self, *args: object, **kwargs: object) -> object:
+        return _prompt_fn(*args, **kwargs)  # type: ignore[call-overload]
+
+
+sys.modules[__name__].__class__ = _CallablePromptModule

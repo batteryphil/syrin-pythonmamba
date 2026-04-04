@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from typing import TYPE_CHECKING, Any, cast, get_type_hints
+from typing import TYPE_CHECKING, Any, get_type_hints
 
 if TYPE_CHECKING:
     from syrin.agent import Agent
 
+from syrin.enums import ToolErrorMode
 from syrin.exceptions import ToolArgumentError, ToolExecutionError
 from syrin.run_context import RunContext
 from syrin.tool import ToolSpec
@@ -169,7 +170,7 @@ def execute_tool(agent: Agent, name: str, arguments: dict[str, object]) -> str |
                     )
                 ctx = RunContext(
                     deps=agent._dependencies,
-                    agent_name=cast(str, agent._agent_name),
+                    agent_name=agent._agent_name,
                     conversation_id=getattr(agent, "_conversation_id", None),
                     budget_state=agent.budget_state,
                     retry_count=0,
@@ -190,7 +191,14 @@ def execute_tool(agent: Agent, name: str, arguments: dict[str, object]) -> str |
         except (ToolExecutionError, ToolArgumentError):
             raise
         except Exception as e:
-            raise ToolExecutionError(f"Tool {name!r} failed: {e}") from e
+            _config = getattr(agent, "_config", None)
+            _mode = getattr(_config, "tool_error_mode", ToolErrorMode.PROPAGATE)
+            if _mode == ToolErrorMode.RETURN_AS_STRING:
+                return f"Tool error ({name}): {e}"
+            elif _mode == ToolErrorMode.STOP:
+                raise ToolExecutionError(f"Tool {name!r} failed: {e}") from e
+            else:
+                raise
     if name == "generate_image":
         return (
             "Image generation is not available. Provide api_key via a Google model or "

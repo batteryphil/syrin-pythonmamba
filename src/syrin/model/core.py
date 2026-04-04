@@ -755,15 +755,15 @@ class Model:
             agent = Agent(model=model)
             r = agent.run("Hello")
         """
-        from syrin.enums import AlmockPricing
+        from syrin.enums import MockPricing
         from syrin.providers.almock import ALMOCK_PRICING
 
-        tier: AlmockPricing = AlmockPricing.MEDIUM
-        if isinstance(pricing_tier, AlmockPricing):
+        tier: MockPricing = MockPricing.MEDIUM
+        if isinstance(pricing_tier, MockPricing):
             tier = pricing_tier
         elif isinstance(pricing_tier, str):
-            tier = AlmockPricing(pricing_tier.lower())
-        inp, out = ALMOCK_PRICING.get(tier, ALMOCK_PRICING[AlmockPricing.MEDIUM])
+            tier = MockPricing(pricing_tier.lower())
+        inp, out = ALMOCK_PRICING.get(tier, ALMOCK_PRICING[MockPricing.MEDIUM])
 
         return Model(
             model_id="almock/default",
@@ -785,6 +785,58 @@ class Model:
             supports_tools=supports_tools,
             profile_name=profile_name,
             **kwargs,  # type: ignore[arg-type]
+        )
+
+    @staticmethod
+    def mock(
+        *,
+        pricing_tier: str | None = None,
+        context_window: int | None = 8192,
+        response_mode: str = "lorem",
+        custom_response: str | None = None,
+        lorem_length: int = 100,
+        latency_min: float = 1.0,
+        latency_max: float = 3.0,
+        latency_seconds: float | None = None,
+        supports_tools: bool = True,
+    ) -> Model:
+        """Create a mock model for testing — no API calls, no API key needed.
+
+        Identical to ``Model.Almock()``. Use this name in new code.
+        Returns configurable Lorem Ipsum or custom text with optional simulated latency.
+
+        Args:
+            pricing_tier: "low", "medium", "high", or "ultra_high" for cost testing.
+            context_window: Simulated context window size (default 8192).
+            response_mode: "lorem" for Lorem Ipsum; "custom" for custom_response.
+            custom_response: Fixed response text when response_mode == "custom".
+            lorem_length: Output length in characters (default 100).
+            latency_min: Min delay seconds (default 1.0). Ignored if latency_seconds set.
+            latency_max: Max delay seconds (default 3.0). Ignored if latency_seconds set.
+            latency_seconds: Fixed delay in seconds. Overrides min/max.
+            supports_tools: Whether the mock model accepts tool calls (default True).
+
+        Example:
+            model = Model.mock()
+            agent = Agent(model=model, system_prompt="You are helpful.")
+            result = agent.run("Hello")
+
+            # Zero-latency for fast tests:
+            model = Model.mock(latency_min=0, latency_max=0)
+
+            # Custom response for deterministic tests:
+            model = Model.mock(response_mode="custom", custom_response="Paris")
+        """
+        return Model.Almock(
+            pricing_tier=pricing_tier,
+            context_window=context_window,
+            response_mode=response_mode,
+            custom_response=custom_response,
+            lorem_length=lorem_length,
+            latency_min=latency_min,
+            latency_max=latency_max,
+            latency_seconds=latency_seconds,
+            supports_tools=supports_tools,
         )
 
     def __init__(

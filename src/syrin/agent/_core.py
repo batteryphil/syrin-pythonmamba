@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import contextlib
 import contextvars
 import logging
 import time
@@ -11,7 +12,11 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from typing import TYPE_CHECKING, ClassVar, cast
 
 if TYPE_CHECKING:
+    from syrin.budget._estimate import CostEstimate
+    from syrin.budget._history import CostStats
+    from syrin.remote_config._core import RemoteConfigSnapshot
     from syrin.serve.config import ServeConfig  # noqa: F401
+    from syrin.swarm._spawn import SpawnResult, SpawnSpec
 
 from syrin._sentinel import NOT_PROVIDED
 from syrin.agent._budget_ops import (
@@ -55,7 +60,6 @@ from syrin.agent._construction import init_agent as _agent_init
 from syrin.agent._construction import init_subclass as _agent_init_subclass
 from syrin.agent._events import print_event as _events_print
 from syrin.agent._guardrails import run_guardrails as _guardrails_run
-from syrin.agent._handoff import handoff as _handoff_impl
 from syrin.agent._helpers import (
     _AgentRuntime,
     _ContextFacade,
@@ -138,6 +142,7 @@ from syrin.cost import calculate_cost, estimate_cost_for_call
 from syrin.domain_events import EventBus
 from syrin.enums import (
     CircuitState,
+    FallbackStrategy,
     GuardrailStage,
     Hook,
     LoopStrategy,
@@ -217,18 +222,47 @@ class _AgentMeta(type):
         # __init_subclass__ merges from both "tools" and "_syrin_class_tools".
         if "tools" in namespace and not hasattr(namespace["tools"], "__get__"):
             namespace["_syrin_class_tools"] = namespace.pop("tools")
-        # Type-checker-friendly ClassVars: copy into internal so __init__ gets them
-        if "_agent_name" in namespace:
-            val = namespace["_agent_name"]
-            if not hasattr(val, "__get__") and isinstance(val, str):
-                namespace["_syrin_default_name"] = val
-            elif not hasattr(val, "__get__") and val is None:
-                namespace["_syrin_default_name"] = None
-        if "_agent_description" in namespace:
-            val = namespace["_agent_description"]
-            if not hasattr(val, "__get__") and isinstance(val, str):
-                namespace["_syrin_default_description"] = val
         return super().__new__(mcs, name, bases, namespace, **kwargs)
+
+
+class ContextQuality:
+    """Quality metrics for the agent's current context window.
+
+    Attributes:
+        fill_ratio: Fraction of context window in use (0.0–1.0).
+        tokens_used: Current estimated token count in the context.
+        max_tokens: Maximum context window capacity.
+        truncated: True when the context has been truncated at least once.
+
+    Example::
+
+        cq = agent.context_quality
+        if cq.fill_ratio > 0.9:
+            print("Context nearly full")
+    """
+
+    __slots__ = ("fill_ratio", "max_tokens", "tokens_used", "truncated")
+
+    def __init__(
+        self,
+        *,
+        fill_ratio: float,
+        tokens_used: int,
+        max_tokens: int,
+        truncated: bool = False,
+    ) -> None:
+        """Initialise ContextQuality.
+
+        Args:
+            fill_ratio: Fraction of context used (0.0–1.0).
+            tokens_used: Current token count estimate.
+            max_tokens: Context window capacity.
+            truncated: Whether the context has been truncated.
+        """
+        self.fill_ratio = fill_ratio
+        self.tokens_used = tokens_used
+        self.max_tokens = max_tokens
+        self.truncated = truncated
 
 
 class Agent(Watchable, Servable, metaclass=_AgentMeta):
@@ -264,9 +298,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         system_prompt: str — Instructions sent with every request. Default: "".
         name: str | None — Agent identifier for handoffs, discovery. Default: None.
         description: str — Human-readable description (metaclass moves to internal). Default: "".
-        _agent_name: ClassVar[str | None] — Same as name; use this to avoid type-checker override warnings.
-        Name precedence: constructor name > class _agent_name/name > cls.__name__.lower()
-        _agent_description: ClassVar[str] — Same as description; use this to avoid type-checker override warnings.
+        Name precedence: constructor name > class name > cls.__name__.lower()
         tools: list[ToolSpec] — Tools the agent can call. Merged with parent. Default: [].
         budget: Budget | None — Cost limits (run, per-period). Default: None (unlimited).
         memory: Memory | None — Persistent memory config. Default: None.
@@ -305,10 +337,26 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
     _syrin_default_output: object = None  # Output | None
     _syrin_default_name: str | None = None
     _syrin_default_description: str = ""
-    _agent_name: ClassVar[str | None] = None
-    _agent_description: ClassVar[str] = ""
+    team: ClassVar[list[type[Agent]] | None] = None
+    """Sub-agents this agent supervises.
+
+    When set on an :class:`Agent` subclass, the swarm automatically spawns
+    each listed agent class as a team member when the parent runs inside a
+    :class:`~syrin.swarm.Swarm`.  The parent receives ``CONTROL`` and
+    ``CONTEXT`` permissions over every team member, and each member's
+    ``_supervisor_id`` is set to the parent's agent ID.
+
+    Example::
+
+        class CEO(Agent):
+            team = [CTO, CMO]
+
+        class CTO(Agent):
+            team = [BackendEngineer, FrontendEngineer]
+    """
 
     # Instance state initialized by `_agent_init`.
+    _agent_name: str
     _runtime: _AgentRuntime
     _description: str
     _debug: bool
@@ -411,6 +459,322 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         """RemoteConfigurable: apply overrides for agent-owned sections."""
         _remote_config_apply_overrides(agent, pairs, section_schema)  # type: ignore[arg-type]
 
+    def config_schema(self, *, output: str | None = None) -> dict[str, object]:
+        """Export the agent's full configuration as a JSON Schema dict.
+
+        Wraps :meth:`get_remote_config_schema` and packages the result into
+        a standard ``{"type": "object", "properties": {...}}`` JSON Schema.
+        Optionally writes the schema to a file.
+
+        Args:
+            output: Optional file path.  When provided, the schema is written
+                as pretty-printed JSON to this path.
+
+        Returns:
+            A ``dict`` conforming to JSON Schema draft-07 with at minimum
+            ``"type": "object"`` and a ``"properties"`` key.
+
+        Example:
+            >>> schema = agent.config_schema()
+            >>> agent.config_schema(output="schema.json")
+        """
+        import json as _json
+
+        from syrin.remote._schema_export import ConfigSchemaExporter
+
+        raw = ConfigSchemaExporter.export(self)
+
+        _type_map: dict[str, str] = {
+            "bool": "boolean",
+            "int": "integer",
+            "float": "number",
+            "str": "string",
+            "list": "array",
+            "dict": "object",
+            "object": "object",
+        }
+
+        fields_raw = raw.get("fields", [])
+        fields_list: list[object] = fields_raw if isinstance(fields_raw, list) else []
+        properties: dict[str, object] = {}
+        for field_entry in fields_list:
+            if not isinstance(field_entry, dict):
+                continue
+            name = field_entry.get("name")
+            if not isinstance(name, str):
+                continue
+            field_type = field_entry.get("type", "string")
+            prop: dict[str, object] = {
+                "type": _type_map.get(str(field_type), "string"),
+                "description": field_entry.get("description") or "",
+                "default": field_entry.get("default"),
+            }
+            properties[name] = prop
+
+        agent_name = getattr(self, "_agent_name", None) or type(self).__name__
+        schema: dict[str, object] = {
+            "type": "object",
+            "title": f"{agent_name} config schema",
+            "properties": properties,
+        }
+
+        if output is not None:
+            with open(output, "w", encoding="utf-8") as fh:
+                _json.dump(schema, fh, indent=2, default=str)
+
+        return schema
+
+    def current_config(self) -> RemoteConfigSnapshot:
+        """Return a snapshot of the agent's current configuration values.
+
+        Captures the agent's ``agent_id``, current remote config version
+        (0 if no :class:`~syrin.remote_config.RemoteConfig` is attached),
+        and a mapping of all currently known field values.
+
+        Returns:
+            A frozen :class:`~syrin.remote_config.RemoteConfigSnapshot`.
+
+        Example:
+            >>> snap = agent.current_config()
+            >>> snap.agent_id
+            'my-agent-prod'
+        """
+        from datetime import datetime, timezone
+
+        from syrin.remote_config._core import RemoteConfigSnapshot
+
+        agent_name = getattr(self, "_agent_name", None) or type(self).__name__
+        remote_config = getattr(self, "_remote_config", None)
+        version = 0
+        values: dict[str, object] = {}
+        if remote_config is not None:
+            version = getattr(remote_config, "_version", 0)
+            values = dict(getattr(remote_config, "_current_values", {}))
+
+        return RemoteConfigSnapshot(
+            agent_id=str(agent_name),
+            version=version,
+            values=values,
+            captured_at=datetime.now(tz=timezone.utc),
+        )
+
+    @property
+    def agent_id(self) -> str:
+        """Unique identifier for this agent instance.
+
+        Combines the agent name with a short UUID suffix so two instances
+        of the same class have different IDs.
+
+        Returns:
+            A non-empty string identifying this agent instance uniquely.
+        """
+        instance_id: str | None = getattr(self, "_agent_instance_id", None)
+        if instance_id:
+            return instance_id
+        name: str | None = getattr(self, "_agent_name", None)
+        return name if name else type(self).__name__
+
+    @property
+    def estimated_cost(self) -> CostEstimate | None:
+        """Pre-flight cost estimate for this agent.
+
+        Returns a :class:`~syrin.budget._estimate.CostEstimate` when
+        ``budget.estimation=True``, otherwise ``None``.  Uses
+        ``budget.estimator`` when set, falling back to the default estimator.
+
+        Returns:
+            Cost estimate with p50/p95 in USD, or ``None`` if estimation is
+            disabled or no budget is configured.
+        """
+        budget = self._budget
+        if budget is None or not getattr(budget, "estimation", False):
+            return None
+        estimator = budget._effective_estimator()
+        est = estimator.estimate_many([type(self)], budget)
+        # Apply estimation_policy when budget is insufficient
+        if not est.sufficient:
+            from syrin.enums import EstimationPolicy  # noqa: PLC0415
+
+            policy = getattr(budget, "estimation_policy", EstimationPolicy.WARN_ONLY)
+            if policy == EstimationPolicy.RAISE:
+                from syrin.budget._preflight import InsufficientBudgetError  # noqa: PLC0415
+
+                raise InsufficientBudgetError(
+                    total_p50=est.p50,
+                    total_p95=est.p95,
+                    budget_configured=budget.max_cost or 0.0,
+                    policy=policy,
+                )
+        return est
+
+    def _run_preflight_check(self) -> None:
+        """Run a preflight budget check before the first LLM call.
+
+        Uses ``budget.preflight_fail_on`` to decide whether to raise or warn.
+        Only runs when ``budget.preflight=True``.
+        """
+        import logging as _logging  # noqa: PLC0415
+
+        from syrin.enums import PreflightPolicy  # noqa: PLC0415
+
+        budget = self._budget
+        if budget is None:
+            return
+        max_cost = getattr(budget, "max_cost", None)
+        if not max_cost or max_cost <= 0:
+            return
+        estimator = getattr(budget, "_effective_estimator", lambda: None)()
+        if estimator is None:
+            return
+        try:
+            est = estimator.estimate_many([type(self)], budget)
+        except Exception:  # noqa: BLE001
+            return
+        if est.sufficient:
+            return
+        policy: PreflightPolicy = getattr(budget, "preflight_fail_on", PreflightPolicy.WARN_ONLY)
+        if policy == PreflightPolicy.BELOW_P95:
+            from syrin.budget._preflight import InsufficientBudgetError  # noqa: PLC0415
+            from syrin.enums import EstimationPolicy  # noqa: PLC0415
+
+            raise InsufficientBudgetError(
+                total_p50=est.p50,
+                total_p95=est.p95,
+                budget_configured=max_cost,
+                policy=EstimationPolicy.RAISE,
+            )
+        # WARN_ONLY: log and continue
+        _logging.getLogger(__name__).warning(
+            "Preflight: budget $%.4f may be insufficient (p95 estimate $%.4f)",
+            max_cost,
+            est.p95,
+        )
+
+    def _check_budget_anomaly(self, actual_cost: float) -> None:
+        """Fire BUDGET_ANOMALY hook if actual_cost exceeds anomaly threshold.
+
+        Only runs when ``budget.anomaly_detection`` is configured with an
+        :class:`~syrin.budget.AnomalyConfig` and the agent has cost history.
+        """
+        budget = self._budget
+        if budget is None:
+            return
+        anomaly_config = getattr(budget, "anomaly_detection", None)
+        if anomaly_config is None:
+            return
+        # Get historical p95 from the budget store
+        try:
+            from syrin.budget._history import _get_default_store  # noqa: PLC0415
+
+            store = _get_default_store()
+            stats = store.stats(type(self).__name__)
+            p95 = getattr(stats, "p95_cost", 0.0)
+            if p95 <= 0:
+                return
+        except Exception:  # noqa: BLE001
+            return
+        from syrin.budget._guardrails import BudgetGuardrails  # noqa: PLC0415
+
+        BudgetGuardrails.check_anomaly(
+            actual=actual_cost,
+            p95=p95,
+            config=anomaly_config,
+            fire_fn=self._emit_event,
+        )
+
+    @classmethod
+    def cost_stats(cls) -> CostStats:
+        """Return historical cost statistics for this agent class.
+
+        Queries the default :class:`~syrin.budget._history.RollingBudgetStore`
+        for all recorded runs of this agent. Requires ``estimation=True`` on the
+        ``Budget`` (or explicit ``_record_run_cost`` calls) to have data.
+
+        Returns:
+            :class:`~syrin.budget._history.CostStats` with ``mean``, ``p50``,
+            ``p95``, ``p99``, ``stddev``, ``trend_weekly_pct``, ``run_count``.
+
+        Example::
+
+            stats = ResearchAgent.cost_stats()
+            print(f"p95 cost: ${stats.p95_cost:.3f}")
+        """
+        from syrin.budget._history import _get_default_store  # noqa: PLC0415
+
+        return _get_default_store().stats(cls.__name__)
+
+    @property
+    def context_quality(self) -> ContextQuality:
+        """Current context window quality metrics.
+
+        Returns:
+            A :class:`ContextQuality` snapshot with ``fill_ratio``,
+            ``tokens_used``, ``max_tokens``, and ``truncated``.
+        """
+        model = getattr(self, "_model", None)
+        max_tokens: int = (
+            getattr(model, "context_window", 128_000) if model is not None else 128_000
+        )
+        tokens_used: int = getattr(self, "_estimated_token_count", 0)
+        truncated: bool = getattr(self, "_context_was_truncated", False)
+        fill_ratio = min(1.0, tokens_used / max_tokens) if max_tokens > 0 else 0.0
+        return ContextQuality(
+            fill_ratio=fill_ratio,
+            tokens_used=tokens_used,
+            max_tokens=max_tokens,
+            truncated=truncated,
+        )
+
+    def set_goal(self, goal: str) -> None:
+        """Set or update the agent's goal and emit :attr:`~syrin.enums.Hook.GOAL_UPDATED`.
+
+        Args:
+            goal: The new goal string.
+        """
+        from syrin.enums import Hook  # noqa: PLC0415
+
+        self._goal: str | None = goal
+        with contextlib.suppress(Exception):  # noqa: BLE001
+            self._emit_event(Hook.GOAL_UPDATED, {"agent_id": self.agent_id, "goal": goal})
+
+    def update_goal(self, goal: str) -> None:
+        """Alias for :meth:`set_goal` — overwrites the current goal.
+
+        Args:
+            goal: The new goal string.
+        """
+        self.set_goal(goal)
+
+    @property
+    def goal(self) -> str | None:
+        """Current goal set via :meth:`set_goal`, or ``None`` if not set."""
+        return getattr(self, "_goal", None)
+
+    def _notify_truncation(self, *, tokens_used: int, max_tokens: int) -> None:
+        """Fire :attr:`~syrin.enums.Hook.MEMORY_TRUNCATED` after context truncation.
+
+        Called internally by the context-management loop when the conversation
+        history is pruned to fit within the model's context window.
+
+        Args:
+            tokens_used: Token count after truncation.
+            max_tokens: Context window capacity.
+        """
+        from syrin.enums import Hook  # noqa: PLC0415
+
+        self._context_was_truncated: bool = True
+        fill_ratio = min(1.0, tokens_used / max_tokens) if max_tokens > 0 else 0.0
+        with contextlib.suppress(Exception):  # noqa: BLE001
+            self._emit_event(
+                Hook.MEMORY_TRUNCATED,
+                {
+                    "agent_id": self.agent_id,
+                    "tokens_used": tokens_used,
+                    "max_tokens": max_tokens,
+                    "fill_ratio": fill_ratio,
+                },
+            )
+
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
         _agent_init_subclass(cls)
@@ -418,7 +782,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
     def __init__(
         self,
         model: Model | ModelConfig | None = NOT_PROVIDED,  # type: ignore[assignment]
-        system_prompt: str | None = NOT_PROVIDED,  # type: ignore[assignment]
+        system_prompt: str | Callable[[], str] | None = NOT_PROVIDED,  # type: ignore[assignment]
         tools: list[ToolSpec] | None = NOT_PROVIDED,  # type: ignore[assignment]
         budget: Budget | None = NOT_PROVIDED,  # type: ignore[assignment]
         *,
@@ -427,7 +791,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         budget_store: BudgetStore | None = None,
         memory: Memory | MemoryPreset | None = NOT_PROVIDED,  # type: ignore[assignment]
         loop_strategy: LoopStrategy = LoopStrategy.REACT,
-        custom_loop: Loop | type[Loop] | None = None,
+        loop: Loop | type[Loop] | None = None,
         guardrails: list[Guardrail] | GuardrailChain | None = NOT_PROVIDED,  # type: ignore[assignment]
         human_approval_timeout: int = 300,
         max_tool_result_length: int = 0,
@@ -442,6 +806,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         inject_template_vars: bool = True,
         max_child_agents: int | None = None,
         config: AgentConfig | None = None,
+        context: Context | None = None,
         model_router: ModelRouter | RoutingConfig | None = None,
         input_media: set[Media] | None = None,
         output_media: set[Media] | None = None,
@@ -451,6 +816,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         voice_generation: object = None,
         knowledge: object | None = None,
         output_config: object | None = None,  # OutputFormat | OutputConfig | None
+        pry: bool = False,
     ) -> None:
         """Create an agent with model, prompt, tools, and optional config.
 
@@ -485,10 +851,9 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         **Advanced:**
             output: Structured output config (Pydantic model). Validates responses.
             max_tool_iterations: Max tool-call loops per response (default 10).
-            loop_strategy: REACT (tool loop) or SINGLE_SHOT. Ignored when custom_loop is set.
-            custom_loop: Custom Loop instance or class. Overrides loop_strategy when provided.
-                Use only when you implement your own Loop (e.g. HumanInTheLoop); for built-in
-                behavior use loop_strategy=LoopStrategy.REACT or LoopStrategy.SINGLE_SHOT.
+            loop_strategy: REACT (tool loop) or SINGLE_SHOT. Ignored when loop is set.
+            loop: Loop instance or class. Use SingleShotLoop(), ReactLoop(), PlanExecuteLoop(),
+                CodeActionLoop(), or HumanInTheLoop(). Overrides loop_strategy when provided.
             guardrails: List of Guardrail or GuardrailChain. Validate input/output.
                 Why: Block harmful content, PII, or policy violations.
                 When: Production agents handling user input or regulated domains.
@@ -504,6 +869,9 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             config: AgentConfig for advanced options (context, rate_limit, checkpoint, etc.).
                 Use config=AgentConfig(context=Context(max_tokens=100_000)) for context window
                 and compaction; prevents unbounded message growth in long conversations.
+            context: Context settings (max_tokens, token_limits, compaction strategy).
+                Shortcut for config=AgentConfig(context=...). If both are set, this
+                takes precedence over config.context.
             template_variables: Template vars for system prompts (e.g. {"user_name": "Alice"}).
                 Merged with inject_template_vars ({date}, {agent_id}, {conversation_id}).
             inject_template_vars: If True (default), inject {date}, {agent_id}, {conversation_id}
@@ -533,6 +901,15 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             ...     memory=Memory(top_k=5),
             ... )
         """
+        # Merge top-level context shortcut into config
+        if context is not None:
+            if config is None:
+                from syrin.agent.config import AgentConfig
+
+                config = AgentConfig(context=context)
+            else:
+                # context= takes precedence over config.context
+                object.__setattr__(config, "context", context)
         # Deferred runtime bootstrap remains part of Agent construction:
         # _auto_trace_check, _auto_debug_check, and _auto_log_level_check run in
         # syrin.agent._construction.init_agent before instance setup continues.
@@ -547,7 +924,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             budget_store=budget_store,
             memory=memory,
             loop_strategy=loop_strategy,
-            custom_loop=custom_loop,
+            loop=loop,
             guardrails=guardrails,
             human_approval_timeout=human_approval_timeout,
             max_tool_result_length=max_tool_result_length,
@@ -572,6 +949,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             knowledge=knowledge,
             output_config=output_config,
         )
+        self._pry: bool = pry
 
     @property
     def iteration(self) -> int:
@@ -581,7 +959,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
     @property
     def name(self) -> str:
         """Agent name for discovery, routing, and Agent Card. Defaults to lowercase class name."""
-        return cast(str, self._agent_name)
+        return self._agent_name
 
     @property
     def description(self) -> str:
@@ -1329,86 +1707,213 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         """Run guardrails on text with observability. Excludes remotely disabled guardrails."""
         return _guardrails_run(self, text, stage)
 
-    def handoff(
-        self,
-        target_agent: type[Agent],
-        task: str,
-        *,
-        transfer_context: bool = True,
-        transfer_budget: bool = False,
-    ) -> Response[str]:
-        """Delegate a task to another agent and return its response.
-
-        Why: Route to specialized agents (e.g. research vs support). Transfers
-        memory and optionally budget so the target has full context.
-
-        transfer_context: Copy persistent memories to target so it knows what
-        this agent knew. transfer_budget: Share remaining budget with target.
-
-        Emits HANDOFF_START (before work), HANDOFF_END (after), HANDOFF_BLOCKED
-        when blocked by a before-handler raising HandoffBlockedError.
-        HandoffRetryRequested from target propagates to caller for retry logic.
-
-        Args:
-            target_agent: Agent class (e.g. ResearchAgent). Instantiated internally.
-            task: Task description for the target.
-            transfer_context: Copy memories to target. Default True.
-            transfer_budget: Give target remaining budget. Default False.
-
-        Returns:
-            Response from target_agent.run(task).
-
-        Raises:
-            ValidationError: task is None or empty.
-            HandoffBlockedError: Before-handler blocks handoff.
-            HandoffRetryRequested: Target signals invalid data, retry with format_hint.
-
-        Example:
-            >>> r = agent.handoff(SupportAgent, "User needs refund help")
-            >>> print(r.content)
-        """
-        return _handoff_impl(
-            self,
-            target_agent,
-            task,
-            transfer_context=transfer_context,
-            transfer_budget=transfer_budget,
-        )
-
     def spawn(
         self,
-        agent_class: type[Agent],
+        agent_class: type[Agent] | object,
         task: str | None = None,
         *,
-        budget: Budget | None = None,
+        budget: Budget | float | None = None,
         max_child_agents: int | None = None,
     ) -> Agent | Response[str]:
-        """Create a child agent. Optionally run a task and return its response.
+        """Create a child agent or run a Workflow. Optionally run a task and return response.
 
         Why: Break work into sub-agents (specialists). Budget flows from parent:
         - Parent has shared budget: child borrows from it.
         - Child gets budget: "pocket money" up to parent's remaining.
         - Child spend is deducted from parent.
 
+        When used inside an async ``arun`` within a Swarm, pass ``budget`` as a
+        ``float`` (USD amount) and ``await`` the result to draw from the shared
+        pool and get back a :class:`~syrin.swarm._spawn.SpawnResult`.
+
+        You can also pass a :class:`~syrin.workflow.Workflow` instance instead of an
+        Agent class. The workflow is run with ``task`` as input and budget flows
+        the same way.
+
         Emits SPAWN_START (before creation), SPAWN_END (after child completes if task given).
 
         Args:
-            agent_class: Agent class to spawn (e.g. ResearchAgent).
+            agent_class: Agent class to spawn, or a Workflow instance to run.
             task: If set, run task and return Response. Else return agent instance.
-            budget: Child's budget (pocket money). Must not exceed parent remaining.
+            budget: Child's budget. Pass ``Budget`` for the old pocket-money API;
+                pass a ``float`` (USD) to draw from the swarm pool (must ``await``).
             max_child_agents: Cap on concurrent children. Default from instance or 10.
 
         Returns:
-            Response if task given; else the spawned Agent instance.
+            Response if task given (old API); spawned Agent instance if no task;
+            coroutine yielding :class:`~syrin.swarm._spawn.SpawnResult` when budget is float.
 
         Example:
+            >>> # Old sync API
             >>> r = agent.spawn(ResearchAgent, task="Find papers on X")
-            >>> child = agent.spawn(ResearchAgent)  # No task
-            >>> child.run("Another task")
+            >>> # Swarm pool API (inside async arun)
+            >>> result = await agent.spawn(ResearchAgent, task="...", budget=1.00)
+            >>> # Workflow spawn
+            >>> result = await agent.spawn(my_workflow, task="...", budget=2.00)
         """
-        return _spawn_impl(
-            self, agent_class, task, budget=budget, max_child_agents=max_child_agents
+        # Detect Workflow instance: has _steps and arun() but is not a class
+        _is_workflow_instance = (
+            not isinstance(agent_class, type)
+            and hasattr(agent_class, "arun")
+            and hasattr(agent_class, "_steps")
         )
+        if _is_workflow_instance:
+            return self._spawn_workflow(agent_class, task or "", budget)  # type: ignore[return-value]
+        if isinstance(budget, float):
+            # Return a coroutine so callers can ``await`` it for pool-aware spawning.
+            return self._pool_spawn(cast("type[Agent]", agent_class), task or "", budget)  # type: ignore[return-value]
+        budget_obj: Budget | None = budget
+        return _spawn_impl(
+            self,
+            cast("type[Agent]", agent_class),
+            task,
+            budget=budget_obj,
+            max_child_agents=max_child_agents,
+        )
+
+    async def _spawn_workflow(
+        self,
+        workflow: object,
+        task: str,
+        budget: Budget | float | None = None,
+    ) -> SpawnResult:
+        """Spawn a Workflow instance and return a SpawnResult.
+
+        Args:
+            workflow: A Workflow instance with an ``arun(task)`` method.
+            task: Input task string passed to the workflow.
+            budget: Optional budget (Budget or float USD).
+
+        Returns:
+            :class:`~syrin.swarm._spawn.SpawnResult` with workflow output and cost.
+        """
+        from syrin.enums import StopReason  # noqa: PLC0415
+        from syrin.swarm._spawn import SpawnResult  # noqa: PLC0415
+
+        # Apply budget to the workflow if it has a _budget attribute
+        if budget is not None and hasattr(workflow, "_budget"):
+            if isinstance(budget, float):
+                from syrin.budget import Budget as _Budget  # noqa: PLC0415
+
+                object.__setattr__(workflow, "_budget", _Budget(max_cost=budget)) if hasattr(
+                    workflow, "__setattr__"
+                ) else setattr(workflow, "_budget", _Budget(max_cost=budget))
+            else:
+                workflow._budget = budget
+
+        # workflow is typed as `object`; access .arun via Protocol-style cast
+        from typing import Protocol as _Protocol  # noqa: PLC0415
+
+        class _HasArun(_Protocol):
+            async def arun(self, task: str) -> object: ...
+
+        response = await cast(_HasArun, workflow).arun(task)
+        cost = getattr(response, "cost", 0.0) or 0.0
+        content = getattr(response, "content", "") or ""
+        return SpawnResult(
+            content=content,
+            cost=cost,
+            budget_remaining=0.0,
+            stop_reason=StopReason.END_TURN,
+            child_agent_id=f"{type(self).__name__}::workflow",
+        )
+
+    async def _pool_spawn(
+        self,
+        agent_class: type[Agent],
+        task: str,
+        budget_amount: float,
+    ) -> SpawnResult:
+        """Async spawn that draws from the swarm's shared BudgetPool.
+
+        Used internally when ``spawn()`` is called with a float budget inside a Swarm.
+        Falls back to a simple ``arun`` when no swarm context is attached.
+
+        Args:
+            agent_class: Agent class to instantiate and run.
+            task: Task string to pass to the child agent.
+            budget_amount: Amount to allocate from the pool (USD).
+
+        Returns:
+            :class:`~syrin.swarm._spawn.SpawnResult` with child output and cost.
+        """
+        from syrin.enums import StopReason
+        from syrin.swarm._spawn import SpawnResult, _spawn_from_pool
+
+        ctx = getattr(self, "_swarm_context", None)
+        pool = ctx.pool if ctx is not None else None
+
+        if pool is None:
+            # No swarm pool attached — run the child directly.
+            child = agent_class()
+            response = await child.arun(task)
+            return SpawnResult(
+                content=getattr(response, "content", "") or "",
+                cost=getattr(response, "cost", 0.0) or 0.0,
+                budget_remaining=0.0,
+                stop_reason=StopReason.END_TURN,
+                child_agent_id=f"{type(self).__name__}::{agent_class.__name__}",
+            )
+
+        return await _spawn_from_pool(
+            type(self).__name__,
+            agent_class,
+            task,
+            budget_amount,
+            pool,
+        )
+
+    async def spawn_many(
+        self,
+        specs: list[SpawnSpec],
+        *,
+        on_failure: FallbackStrategy = FallbackStrategy.SKIP_AND_CONTINUE,
+    ) -> list[SpawnResult]:
+        """Spawn multiple child agents concurrently, each with their own budget slice.
+
+        Runs all specs in parallel (``asyncio.gather``). On failure, behaviour is
+        controlled by ``on_failure``:
+
+        - :attr:`~syrin.enums.FallbackStrategy.SKIP_AND_CONTINUE`: failed children
+          contribute an empty :class:`~syrin.swarm._spawn.SpawnResult` (content ``""``).
+        - :attr:`~syrin.enums.FallbackStrategy.ABORT_SWARM`: first failure re-raises.
+
+        Args:
+            specs: List of :class:`~syrin.swarm._spawn.SpawnSpec` describing each child.
+            on_failure: How to handle individual child failures.
+
+        Returns:
+            One :class:`~syrin.swarm._spawn.SpawnResult` per spec, in order.
+
+        Example:
+            >>> results = await self.spawn_many([
+            ...     SpawnSpec(agent=ResearchAgent, task="Find X", budget=0.50),
+            ...     SpawnSpec(agent=SummaryAgent,  task="Summarise", budget=0.25),
+            ... ])
+        """
+        from syrin.enums import StopReason
+        from syrin.swarm._spawn import SpawnResult
+
+        coroutines = [self._pool_spawn(spec.agent, spec.task, spec.budget) for spec in specs]
+        gathered = await asyncio.gather(*coroutines, return_exceptions=True)
+
+        results: list[SpawnResult] = []
+        for item in gathered:
+            if isinstance(item, BaseException):
+                if on_failure == FallbackStrategy.ABORT_SWARM:
+                    raise item
+                results.append(
+                    SpawnResult(
+                        content="",
+                        cost=0.0,
+                        budget_remaining=0.0,
+                        stop_reason=StopReason.END_TURN,
+                        child_agent_id="",
+                    )
+                )
+            else:
+                results.append(item)
+        return results
 
     def _update_parent_budget(self, cost: float) -> None:
         """Update parent's budget when child spends (borrow mechanism)."""
@@ -1739,7 +2244,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             raise CircuitBreakerOpenError(
                 f"Circuit breaker open for agent {self._agent_name!r}. "
                 f"Recovery in {cb.recovery_timeout}s.",
-                agent_name=cast(str, self._agent_name),
+                agent_name=self._agent_name,
                 circuit_state=state,
                 recovery_at=recovery_at,
                 fallback_model=fallback_str,
@@ -1765,7 +2270,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
                         EventContext(
                             error=str(e),
                             failures=cb.get_state().failures,
-                            agent_name=cast(str, self._agent_name),
+                            agent_name=self._agent_name,
                         ),
                     )
             raise
@@ -1913,6 +2418,19 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             >>> r = agent.run("What is 2+2?")
             >>> r = agent.run("Long task...", context=Context(max_tokens=4000))
         """
+        import asyncio as _asyncio
+
+        _loop: _asyncio.AbstractEventLoop | None = None
+        try:
+            _loop = _asyncio.get_running_loop()
+        except RuntimeError:
+            _loop = None
+        if _loop is not None:
+            raise RuntimeError(
+                "agent.run() was called from inside an async context. "
+                "Use 'await agent.arun(...)' instead.\n"
+                "  result = await agent.arun('hello')"
+            )
         _validate_user_input(user_input, "run", self._max_input_length)
         # 6.1: Normalize user input if enabled
         if (
@@ -1934,8 +2452,27 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
                 self._budget_tracker.reset_run()
                 if self._budget is not None:
                     self._budget._set_spent(0)
+            # Preflight budget check — runs before the first LLM call
+            if self._budget is not None and getattr(self._budget, "preflight", False):
+                self._run_preflight_check()
             try:
-                return self._run_loop_response(user_input)
+                result = self._run_loop_response(user_input)
+                # Auto-record cost when estimation=True (budget intelligence)
+                if (
+                    self._budget is not None
+                    and getattr(self._budget, "estimation", False)
+                    and result.cost > 0
+                ):
+                    with contextlib.suppress(Exception):  # noqa: BLE001
+                        self._budget._record_run_cost(type(self).__name__, result.cost)
+                # Anomaly detection — fire BUDGET_ANOMALY if cost > threshold * p95
+                if (
+                    self._budget is not None
+                    and getattr(self._budget, "anomaly_detection", None) is not None
+                    and result.cost > 0
+                ):
+                    self._check_budget_anomaly(result.cost)
+                return result
             except (BudgetThresholdError, BudgetExceededError):
                 self._maybe_checkpoint("budget")
                 raise
@@ -2228,14 +2765,3 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         exc_tb: object,
     ) -> None:
         """D12: Async context manager exit. Does not suppress exceptions."""
-
-
-# Presets and builder
-from syrin.agent import presets as _presets
-from syrin.agent.builder import AgentBuilder as _AgentBuilder
-
-Agent.presets = _presets  # type: ignore[attr-defined]
-Agent.builder = staticmethod(lambda model: _AgentBuilder(model))  # type: ignore[attr-defined]
-Agent.basic = staticmethod(_presets.basic)  # type: ignore[attr-defined]
-Agent.with_memory = staticmethod(_presets.with_memory)  # type: ignore[attr-defined]
-Agent.with_budget = staticmethod(_presets.with_budget)  # type: ignore[attr-defined]

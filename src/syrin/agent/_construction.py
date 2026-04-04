@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from collections.abc import Callable
 from typing import TYPE_CHECKING, cast
 
 from syrin._sentinel import NOT_PROVIDED
@@ -74,12 +76,8 @@ def init_subclass(cls: type[Agent]) -> None:
     default_guardrails = _merge_class_attrs(mro, "guardrails", merge=True)
     default_memory = _merge_class_attrs(mro, "memory", merge=False)
     default_output = _merge_class_attrs(mro, "output", merge=False)
-    default_name = _merge_class_attrs(mro, "_agent_name", merge=False)
-    if default_name is NOT_PROVIDED:
-        default_name = _merge_class_attrs(mro, "name", merge=False)
-    default_description = _merge_class_attrs(mro, "_agent_description", merge=False)
-    if default_description is NOT_PROVIDED:
-        default_description = _merge_class_attrs(mro, "description", merge=False)
+    default_name = _merge_class_attrs(mro, "_syrin_default_name", merge=False)
+    default_description = _merge_class_attrs(mro, "_syrin_default_description", merge=False)
     cls._syrin_default_model = default_model if default_model is not NOT_PROVIDED else None  # type: ignore[assignment]
     cls._syrin_default_memory = default_memory  # type: ignore[assignment]
     method_names = _get_system_prompt_method_names(cls)
@@ -133,7 +131,7 @@ def init_agent(
     self: Agent,
     *,
     model: Model | ModelConfig | None,
-    system_prompt: str | None,
+    system_prompt: str | Callable[[], str] | None,
     tools: list[ToolSpec] | None,
     budget: Budget | None,
     output: Output | None,
@@ -141,7 +139,7 @@ def init_agent(
     budget_store: BudgetStore | None,
     memory: Memory | MemoryPreset | None,
     loop_strategy: LoopStrategy,
-    custom_loop: Loop | type[Loop] | None,
+    loop: Loop | type[Loop] | None,
     guardrails: list[Guardrail] | GuardrailChain | None,
     human_approval_timeout: int,
     max_tool_result_length: int,
@@ -558,6 +556,7 @@ def init_agent(
     )
     self._provider = _resolve_provider(self._model, self._model_config)
     object.__setattr__(self, "_agent_name", name)
+    object.__setattr__(self, "_agent_instance_id", f"{name}-{uuid.uuid4().hex[:8]}")
     self._description = description
     self._dependencies = dependencies
     if self._budget_component.budget is not None:
@@ -581,15 +580,11 @@ def init_agent(
                 "Set pricing_override or input_price/output_price on the model.",
                 self._model_config.model_id,
             )
-    if custom_loop is not None:
-        if (
-            isinstance(custom_loop, type)
-            and hasattr(custom_loop, "run")
-            and callable(custom_loop.run)
-        ):
-            loop_instance = custom_loop()
-        elif hasattr(custom_loop, "run") and callable(custom_loop.run):
-            loop_instance = custom_loop  # type: ignore[assignment]
+    if loop is not None:
+        if isinstance(loop, type) and hasattr(loop, "run") and callable(loop.run):
+            loop_instance = loop()
+        elif hasattr(loop, "run") and callable(loop.run):
+            loop_instance = loop  # type: ignore[assignment]
         else:
             loop_instance = ReactLoop(max_iterations=max_tool_iterations)
     else:
@@ -645,7 +640,7 @@ def init_agent(
                 f"audit must be AuditLog or None, got {type(audit).__name__}. "
                 "Use AuditLog(path='./audit.jsonl') for JSONL logging."
             )
-        audit_handler = AuditHookHandler(source=cast(str, self._agent_name), config=audit)
+        audit_handler = AuditHookHandler(source=self._agent_name, config=audit)
         self.events.on_all(audit_handler)
     self._run_report = AgentReport()
     self._approval_gate = approval_gate
