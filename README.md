@@ -34,6 +34,8 @@ Syrin is built differently. Budget control, memory, observability, multi-agent o
 
 ---
 
+## Quick Installation
+
 ```bash
 pip install syrin
 ```
@@ -176,7 +178,43 @@ agent.forget("previous role title")
 | `KNOWLEDGE` | General knowledge and concepts — ideal for vector/semantic search |
 | `INSTRUCTIONS` | Skills and how-to knowledge — workflows, user preferences on process |
 
-**Backends:** SQLite (zero config), PostgreSQL, Redis, Qdrant, ChromaDB — swap with one line.
+**Backends — swap with one line:**
+
+```python
+from syrin import Agent, Model
+from syrin.memory import Memory, QdrantConfig, RedisConfig, PostgresConfig
+from syrin.enums import MemoryBackend
+
+# SQLite — zero config, persists to disk (default for most projects)
+agent = Agent(model=model, memory=Memory(backend=MemoryBackend.SQLITE, path="~/.syrin/memory.db"))
+
+# Qdrant — vector search, ideal for semantic recall at scale
+agent = Agent(model=model, memory=Memory(
+    backend=MemoryBackend.QDRANT,
+    qdrant=QdrantConfig(url="https://your-cluster.qdrant.io", api_key="..."),
+))
+
+# Redis — fast cache with optional TTL, good for short-lived session memory
+agent = Agent(model=model, memory=Memory(
+    backend=MemoryBackend.REDIS,
+    redis=RedisConfig(host="localhost", port=6379, ttl=3600),
+))
+
+# PostgreSQL — production-grade, pgvector for embeddings
+agent = Agent(model=model, memory=Memory(
+    backend=MemoryBackend.POSTGRES,
+    postgres=PostgresConfig(host="localhost", database="agents", user="...", password="..."),
+))
+```
+
+| Backend | Best for |
+|---|---|
+| `MEMORY` | Testing and ephemeral runs — no setup, no persistence |
+| `SQLITE` | Local development and single-process production — zero config |
+| `QDRANT` | Semantic search at scale — cloud-ready vector database |
+| `CHROMA` | Lightweight local vector search — fast to set up |
+| `REDIS` | Session-scoped memory with TTL — low latency |
+| `POSTGRES` | Full production — ACID, pgvector, multi-agent shared store |
 
 ---
 
