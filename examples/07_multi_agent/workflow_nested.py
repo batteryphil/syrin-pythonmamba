@@ -32,8 +32,7 @@ from dotenv import load_dotenv
 
 from syrin import Agent, Budget, Model
 from syrin.response import Response
-from syrin.swarm import Swarm
-from syrin.swarm import SpawnResult
+from syrin.swarm import SpawnResult, Swarm
 from syrin.workflow import Workflow
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
