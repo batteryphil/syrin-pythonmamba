@@ -1,173 +1,152 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Syrin-Labs/cli/main/assets/syrin-logo-dark-bg.png" alt="Syrin" width="200">
+  <img src="https://raw.githubusercontent.com/Syrin-Labs/cli/main/assets/syrin-logo-dark-bg.png" alt="Syrin" width="180">
 </p>
 
-<h1 align="center">Syrin</h1>
+<h2 align="center">The Python Library for Production AI Agents</h2>
 
 <p align="center">
-  <b>Agents that ship. Not surprise you with bills.</b>
-</p>
-<p align="center">
-  <i>Python library for AI agents with budget control, memory, and observability built-in.</i>
+  Budget control · Persistent memory · Multi-agent orchestration · Built-in observability
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/syrin/"><img src="https://img.shields.io/pypi/v/syrin.svg" alt="PyPI"></a>
-  <a href="https://github.com/syrin-labs/syrin-python/blob/main/LICENSE"><img src="https://img.shields.io/github/license/syrin-labs/syrin-python.svg" alt="License"></a>
   <a href="https://pypi.org/project/syrin/"><img src="https://img.shields.io/pypi/pyversions/syrin.svg" alt="Python"></a>
+  <a href="https://github.com/syrin-labs/syrin-python/blob/main/LICENSE"><img src="https://img.shields.io/github/license/syrin-labs/syrin-python.svg" alt="License"></a>
   <a href="https://github.com/syrin-labs/syrin-python/stargazers"><img src="https://img.shields.io/github/stars/syrin-labs/syrin-python.svg?style=social" alt="Stars"></a>
+  <a href="https://discord.gg/BJUdNBh4TC"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 <p align="center">
   <a href="https://syrin.ai">Website</a> ·
-  <a href="https://docs.syrin.dev/agent-kit/getting-started/quick-start">Docs</a> ·
-  <a href="https://discord.gg/p4jnKxYKpB">Discord</a> ·
-  <a href="https://x.com/syrin_dev">Twitter</a>
+  <a href="https://docs.syrin.dev/agent-kit/">Docs</a> ·
+  <a href="https://discord.gg/BJUdNBh4TC">Discord</a> ·
+  <a href="https://reddit.com/r/syrin_ai">Reddit</a> ·
+  <a href="https://www.youtube.com/@syrin_dev">YouTube</a>
 </p>
 
 ---
 
-## See It In Action
+## The Problem with AI Agents in Production
 
-### Syrin Debug — Live Terminal Debugging
+Most AI agent frameworks hand you primitives and wish you luck. You prototype in a weekend, then spend weeks bolting on cost tracking, memory, observability, and guardrails before anything goes near production.
 
-Watch your agents think in real-time:
-
-[![Syrin Pry Debugger](https://img.youtube.com/vi/Wofz35A5a60/0.jpg)](https://youtu.be/Wofz35A5a60)
-
-A Rich-based live terminal UI — never scroll through log walls again.
+Syrin is built differently. Budget control, memory, observability, multi-agent orchestration, and safety guardrails are **first-class features** — not afterthoughts.
 
 ---
 
-## The Problem: "Why Did My AI Agent Cost $10,000 Last Month?"
-
-You built an AI agent. It worked perfectly in testing. Then came the bill — a surprise invoice for thousands of dollars with **zero warning**.
-
-This is the #1 reason AI agents never make it to production. Not because they don't work — because they're financially reckless.
-
-> *"I had no idea when my agent hit the budget."*
-> *"My logs don't show where tokens went."*
-> *"I spent 3 weeks building memory from scratch."*
-> *"My agent crashed after 2 hours — no way to resume."*
-
-**Syrin solves this.** One library. Zero surprises. Production-ready from day one.
-
----
-
-## Installation
-
-```bash
-pip install syrin
-
-# With Anthropic support
-pip install syrin[anthropic]
-
-# With voice capabilities
-pip install syrin[voice]
-```
-
----
-
-## 60-Second Quickstart
+## 30-Second Quickstart
 
 ```python
 from syrin import Agent, Budget, Model
 from syrin.enums import ExceedPolicy
 
-class Assistant(Agent):
-    model = Model.Almock()  # No API key needed for testing
-    budget = Budget(max_cost=0.50, exceed_policy=ExceedPolicy.STOP)
+class Analyst(Agent):
+    model  = Model.OpenAI("gpt-4o-mini", api_key="...")
+    budget = Budget(max_cost=0.10, exceed_policy=ExceedPolicy.STOP)
+    system_prompt = "You are a precise financial analyst."
 
-result = Assistant().run("Explain quantum computing simply")
+result = Analyst().run("Summarise Q3 revenue trends from the attached report")
+
 print(result.content)
-print(f"Cost: ${result.cost:.6f}  |  Remaining: ${result.budget_remaining}")
+print(f"Cost: ${result.cost:.6f}  |  Tokens: {result.tokens}  |  Remaining: ${result.budget_remaining:.4f}")
 ```
 
-Switch to a real model by replacing one line:
-
-```python
-model = Model.OpenAI("gpt-4o-mini", api_key="your-key")
-# or
-model = Model.Anthropic("claude-sonnet-4-5", api_key="your-key")
-```
+That's it. The agent hard-stops at $0.10. No surprise invoices, no extra code.
 
 ---
 
-## What Syrin Solves
+## What You Can Build
 
-### 1. Budget & Cost Control
+| Use Case | Key Capabilities |
+|---|---|
+| **Research pipelines** | Parallel agents gather sources; consensus topology validates findings |
+| **Customer support bots** | Session memory, PII guardrails, handoff to human when confidence is low |
+| **Document intelligence** | RAG over PDFs/repos, structured output, budget per document |
+| **Financial analysis** | Hard cost caps, audit logs, type-safe structured results |
+| **Voice AI assistants** | ElevenLabs/Deepgram integration, memory across calls |
+| **Compliance review** | PII scanning, output validation, full provenance records |
+| **Code review agents** | Knowledge base over your codebase, tool use, structured findings |
+| **Autonomous schedulers** | Cron/webhook/queue triggers, checkpoints for crash recovery |
 
-No more surprise bills. Set a cap, pick a policy — done.
+---
+
+## What Makes Syrin Different
+
+### Budget Control — The Industry Gap
+
+Every other library treats cost as a monitoring concern. Syrin treats it as a **runtime constraint**. Agents check their budget before every LLM call and enforce limits with the policy you choose.
 
 ```python
-from syrin import Agent, Budget, Model, raise_on_exceeded, warn_on_exceeded
+from syrin import Agent, Budget, Model, RateLimit
 from syrin.enums import ExceedPolicy
-from syrin.threshold import BudgetThreshold
+from syrin.budget import BudgetThreshold
 
-agent = Agent(
-    model=Model.OpenAI("gpt-4o-mini", api_key="..."),
-    budget=Budget(
-        max_cost=1.00,         # Hard cap per run
-        reserve=0.10,          # Hold back $0.10 for the reply
-        exceed_policy=ExceedPolicy.STOP,  # STOP | WARN | IGNORE | SWITCH
-
-        # Alert at 80% before you hit the wall
+class ProductionAgent(Agent):
+    model  = Model.OpenAI("gpt-4o", api_key="...")
+    budget = Budget(
+        max_cost=1.00,                        # Hard cap per run
+        reserve=0.10,                         # Hold back for final reply
+        exceed_policy=ExceedPolicy.STOP,      # STOP | WARN | IGNORE | SWITCH
+        rate_limits=RateLimit(
+            hour=10.00,                       # $10/hour across all runs
+            day=100.00,                       # $100/day
+            month=2000.00,                    # $2,000/month
+        ),
         thresholds=[
-            BudgetThreshold(at=80, action=lambda ctx: alert_ops(ctx.percentage)),
+            BudgetThreshold(at=80, action=lambda ctx: alert_ops_team(ctx)),
         ],
-    ),
-)
-
-result = agent.run("Process this report")
-print(f"Estimated (pre-call): ${result.cost_estimated:.6f}")
-print(f"Actual    (post-call): ${result.cost:.6f}")
-print(f"Cache savings:         ${result.cache_savings:.6f}")
+    )
 ```
 
-**How it works:**
-- **Pre-call check:** estimates cost before sending to the LLM — fails fast if it would exceed
-- **Post-call recording:** records actual tokens from the provider
-- **Thresholds:** fire callbacks at any percentage of budget consumed
-- **ExceedPolicy:** `STOP` raises, `WARN` logs, `IGNORE` continues silently
-
-**Rate limits across time windows:**
-
-```python
-from syrin import RateLimit
-
-budget = Budget(
-    max_cost=0.10,           # $0.10 per run
-    rate_limits=RateLimit(
-        hour=5.00,           # $5/hour
-        day=50.00,           # $50/day
-        month=500.00,        # $500/month
-    ),
-)
-```
-
-**Shared budget across parallel agents:**
-
-```python
-shared = Budget(max_cost=10.00, shared=True)
-orchestrator = Agent(model=model, budget=shared)
-# All spawned children deduct from the same $10 pool — thread-safe
-```
-
-**Dashboard:**
-
-```python
-summary = agent.budget_summary()
-# → run_cost, run_tokens, hourly/daily totals, remaining, percent_used
-
-costs = agent.export_costs(format="json")
-# → [{cost_usd, total_tokens, model, timestamp}, ...]
-```
+Pre-call estimation, post-call actuals, threshold callbacks, rate-window enforcement — all declarative, zero boilerplate.
 
 ---
 
-### 2. Memory That Persists
+### Multi-Agent Orchestration — 5 Topologies
 
-Agents that remember users, facts, and skills across sessions.
+```python
+from syrin import Agent, Budget, Model
+from syrin.swarm import Swarm, SwarmConfig, BudgetPool
+from syrin.enums import SwarmTopology
+
+pool = BudgetPool(total=5.00)  # $5 shared; no agent can exceed its slice
+
+class Researcher(Agent):
+    model = Model.OpenAI("gpt-4o", api_key="...")
+
+class FactChecker(Agent):
+    model = Model.Anthropic("claude-sonnet-4-5", api_key="...")
+
+class Writer(Agent):
+    model = Model.OpenAI("gpt-4o-mini", api_key="...")
+
+swarm = Swarm(
+    agents=[Researcher, FactChecker, Writer],
+    config=SwarmConfig(
+        topology=SwarmTopology.ORCHESTRATOR,  # LLM routes work dynamically
+        budget_pool=pool,
+    ),
+)
+
+result = swarm.run("Research and write a report on battery technology trends")
+print(result.content)
+print(result.cost_breakdown)   # Per-agent cost breakdown
+print(result.budget_report)    # Pool utilisation
+```
+
+**Five topologies — one `Swarm` class:**
+
+| Topology | What it does |
+|---|---|
+| `ORCHESTRATOR` | First agent routes tasks to the rest dynamically |
+| `PARALLEL` | All agents run concurrently; results merged |
+| `CONSENSUS` | Multiple agents vote; winner selected by strategy |
+| `REFLECTION` | Producer–critic loop until quality threshold is met |
+| `WORKFLOW` | Sequential, parallel, branch, and dynamic fan-out steps |
+
+---
+
+### Persistent Memory — 4 Types, Extensible Backends
 
 ```python
 from syrin import Agent, Model
@@ -175,369 +154,309 @@ from syrin.enums import MemoryType
 
 agent = Agent(model=Model.OpenAI("gpt-4o-mini", api_key="..."))
 
-# Store facts (persisted across sessions)
-agent.remember("User prefers TypeScript", memory_type=MemoryType.CORE)
-agent.remember("Last session: discussed API design", memory_type=MemoryType.EPISODIC)
+# Store — persisted across sessions
+agent.remember("User is a TypeScript engineer at a fintech startup", memory_type=MemoryType.CORE)
+agent.remember("Previous session: reviewed authentication architecture", memory_type=MemoryType.EPISODIC)
 
-# Recall relevant memories (semantic search)
-memories = agent.recall("user preferences", limit=5)
+# Recall — semantic search over stored memories
+memories = agent.recall("user background", limit=5)
 
-# Forget when needed
-agent.forget("outdated fact")
+# Forget — when facts are outdated
+agent.forget("previous role title")
 ```
 
-**4 memory types:**
-
-| Type | Use For |
-|------|---------|
-| `CORE` | Long-term facts — user profile, preferences |
+| Memory Type | Stores |
+|---|---|
+| `CORE` | Long-term facts — user profile, preferences, domain knowledge |
 | `EPISODIC` | Conversation history and past events |
-| `SEMANTIC` | Knowledge with embeddings (RAG) |
-| `PROCEDURAL` | Skills, instructions, how-to knowledge |
+| `SEMANTIC` | Embedding-indexed knowledge for RAG |
+| `PROCEDURAL` | Skills, workflows, how-to instructions |
 
-**Backends:** SQLite (default, zero config), Qdrant (vector search), Redis (cache), PostgreSQL (production).
+**Backends:** SQLite (zero config), PostgreSQL, Redis, Qdrant, ChromaDB — swap with one line.
 
 ---
 
-### 3. Observability Built-In
+### Observability — 72+ Lifecycle Hooks
 
-See everything that happens inside your agent.
+Every LLM call, tool invocation, budget event, memory operation, and handoff emits a typed hook. Attach handlers at the agent level — no patching, no monkey-patching.
 
 ```python
-from syrin import Agent, Model
 from syrin.enums import Hook
 
-agent = Agent(model=Model.OpenAI("gpt-4o-mini", api_key="..."), debug=True)
-
-# Subscribe to lifecycle events
-def log_cost(ctx):
-    print(f"Run complete. Cost: ${ctx.cost:.6f}  Tokens: {ctx.tokens}")
-
-def on_budget_warning(ctx):
-    print(f"Budget at {ctx.percentage}% — ${ctx.current_value:.4f} spent")
-
-agent.events.on(Hook.AGENT_RUN_END, log_cost)
-agent.events.on(Hook.BUDGET_THRESHOLD, on_budget_warning)
-agent.events.on(Hook.TOOL_CALL_END, lambda ctx: print(f"Tool: {ctx.name}"))
-
-result = agent.run("Research quantum computing")
+agent.events.on(Hook.AGENT_RUN_END,      lambda ctx: metrics.record(ctx.cost, ctx.tokens))
+agent.events.on(Hook.BUDGET_THRESHOLD,   lambda ctx: pagerduty.alert(f"Budget at {ctx.percentage}%"))
+agent.events.on(Hook.TOOL_CALL_END,      lambda ctx: logger.info(f"Tool {ctx.name} → {ctx.duration_ms}ms"))
+agent.events.on(Hook.MEMORY_RECALL,      lambda ctx: trace.span("recall", memories=ctx.count))
 ```
 
-**CLI tracing — no code changes needed:**
+Or enable full tracing from the CLI — no code changes:
 
 ```bash
 python my_agent.py --trace
 ```
 
-**72+ hook events** covering every lifecycle moment: LLM requests, tool calls, budget events, memory operations, handoffs, checkpoints, circuit breaker trips.
-
 ---
 
-### 4. Multi-Agent Orchestration
+### Live Terminal Debugger — Pry
+
+A Rich-based TUI that lets you step through agent execution, inspect state, and set breakpoints — directly in your terminal.
+
+[![Syrin Pry Debugger](https://img.youtube.com/vi/Wofz35A5a60/0.jpg)](https://youtu.be/Wofz35A5a60)
 
 ```python
-from syrin import Agent, Budget, Model
+from syrin.debug import Pry
 
-class Researcher(Agent):
-    model = Model.OpenAI("gpt-4o", api_key="...")
-    system_prompt = "You research topics thoroughly."
-
-class Writer(Agent):
-    model = Model.OpenAI("gpt-4o-mini", api_key="...")
-    system_prompt = "You write clear, concise reports."
-
-# Handoff: researcher passes context to writer
-researcher = Researcher()
-result = researcher.handoff(Writer, "Write a report from the research")
-
-# Spawn: orchestrator creates sub-agents
-orchestrator = Agent(model=model, budget=Budget(max_cost=5.00, shared=True))
-orchestrator.spawn(Researcher, task="Research AI trends")
-orchestrator.spawn(Writer, task="Summarize findings")
-
-# Parallel: multiple agents at once
-results = orchestrator.spawn_parallel([
-    (Researcher, {"task": "Topic A"}),
-    (Researcher, {"task": "Topic B"}),
-])
-
-# DynamicPipeline: LLM decides which agents to use
-from syrin import DynamicPipeline
-pipeline = DynamicPipeline(agents=[Researcher, Writer], model=model)
-result = pipeline.run("Research AI trends and write a summary")
-print(f"{result.content}  |  Cost: ${result.cost:.4f}")
+pry = Pry()
+pry.attach(agent)
+agent.run("Analyse this dataset")
+# [e] events  [t] tools  [m] memory  [g] guardrails  [p] pause  [n] step  [q] quit
 ```
 
 ---
 
-### 5. Guardrails & Safety
+### Guardrails & Safety
 
 ```python
 from syrin import Agent, Model
-from syrin.guardrails.built_in.pii import PIIScanner
-from syrin.guardrails.built_in.length import LengthGuardrail
+from syrin.guardrails import PIIGuardrail, LengthGuardrail, ToolOutputValidator
+from pydantic import BaseModel
 
 class SafeAgent(Agent):
-    model = Model.OpenAI("gpt-4o-mini", api_key="...")
+    model      = Model.OpenAI("gpt-4o-mini", api_key="...")
     guardrails = [
-        LengthGuardrail(max_length=4000),
-        PIIScanner(redact=True),   # Automatically redact PII
+        PIIGuardrail(redact=True),          # Redact emails, phones, SSNs, card numbers
+        LengthGuardrail(max_length=4000),   # Enforce output length
     ]
 
-result = SafeAgent().run("Process: call me at 555-123-4567")
-print(result.report.guardrail.passed)    # False (PII found)
-print(result.content)                    # "call me at ***-***-****" (redacted)
+result = SafeAgent().run("Process: please call me at 555-123-4567")
+# result.content → "please call me at ***-***-****"
+# result.report.guardrail.passed → False
 ```
 
 ---
 
-### 6. State Persistence & Checkpoints
+### Production-Ready from Day One
 
+**One-line HTTP serving:**
 ```python
-from syrin import Agent, Model
+agent.serve(port=8000, enable_playground=True)
+# → POST /chat   POST /stream   GET /playground
+```
+
+**Crash-proof checkpoints:**
+```python
 from syrin.checkpoint import CheckpointConfig
 
 agent = Agent(
-    model=Model.OpenAI("gpt-4o-mini", api_key="..."),
+    model=model,
     checkpoint_config=CheckpointConfig(dir="/tmp/checkpoints", auto_save=True),
 )
+result = agent.run("Begin long analysis...")
+# Crash? Resume exactly where it left off:
+agent.load_checkpoint("analysis-run-1")
+```
 
-result = agent.run("Start a long analysis...")
-checkpoint_id = agent.save_checkpoint("mid-analysis")
+**Event-driven triggers:**
+```python
+from syrin.watch import CronProtocol, WebhookProtocol
 
-# Resume later, even after a crash
-agent.load_checkpoint(checkpoint_id)
-result = agent.run("Continue the analysis")
+agent.watch(CronProtocol(cron="0 9 * * *"), task="Send morning briefing")
+agent.watch(WebhookProtocol(path="/events"), task="Process incoming event")
 ```
 
 ---
 
-### 7. One-Line Serving
+## Real-World Examples
+
+### Research Pipeline — Parallel Agents with Consensus
 
 ```python
-agent = Agent(model=Model.OpenAI("gpt-4o-mini", api_key="..."))
-agent.serve(port=8000, enable_playground=True)
-# → POST /chat  POST /stream  GET /playground
-```
+from syrin import Agent, Budget, Model
+from syrin.swarm import Swarm, SwarmConfig, ConsensusConfig
+from syrin.enums import SwarmTopology, ConsensusStrategy
 
----
+class ResearchAgent(Agent):
+    model = Model.OpenAI("gpt-4o", api_key="...")
+    system_prompt = "Research the given topic with citations."
 
-### 8. Custom Budget Store (Bring Your Own Backend)
-
-```python
-from syrin.budget_store import BudgetStore, BudgetTracker
-
-class PostgresBudgetStore(BudgetStore):
-    def load(self, key: str) -> BudgetTracker | None:
-        row = db.query("SELECT data FROM budgets WHERE key = %s", key)
-        return BudgetTracker.deserialize(row["data"]) if row else None
-
-    def save(self, key: str, tracker: BudgetTracker) -> None:
-        db.upsert("budgets", key=key, data=tracker.serialize())
-
-agent = Agent(
-    model=model,
-    budget=Budget(max_cost=10.00),
-    budget_store=PostgresBudgetStore(),
-    budget_store_key=f"user:{user_id}",   # Per-user isolation
+swarm = Swarm(
+    agents=[ResearchAgent, ResearchAgent, ResearchAgent],  # 3 independent researchers
+    config=SwarmConfig(
+        topology=SwarmTopology.CONSENSUS,
+        consensus=ConsensusConfig(
+            min_agreement=0.67,
+            voting_strategy=ConsensusStrategy.MAJORITY,
+        ),
+        budget_pool=BudgetPool(total=3.00),
+    ),
 )
+
+result = swarm.run("What are the main risks of lithium-ion batteries at scale?")
+print(result.content)           # Consensus answer
+print(result.cost_breakdown)    # Cost per agent
 ```
 
 ---
 
-### 9. Live Debugging with Pry
-
-Debug agents in a live terminal — see thinking, tokens, tools, and memory in real-time.
+### Customer Support — Memory + Handoffs + Guardrails
 
 ```python
-agent = Agent(model=Model.OpenAI("gpt-4o"), debug=True)
-agent.run("Research AI trends")
-```
+from syrin import Agent, Budget, Model
+from syrin.guardrails import PIIGuardrail
+from syrin.enums import MemoryType
 
-Press `e` for errors, `t` for tools, `m` for memory, `f` for full trace. Exit with `q`.
+class SupportAgent(Agent):
+    model      = Model.OpenAI("gpt-4o-mini", api_key="...")
+    budget     = Budget(max_cost=0.05)    # $0.05 per conversation turn
+    guardrails = [PIIGuardrail(redact=True)]
+    system_prompt = "You are a helpful customer support agent."
 
----
+class EscalationAgent(Agent):
+    model = Model.OpenAI("gpt-4o", api_key="...")
+    system_prompt = "You handle escalated support cases requiring senior judgment."
 
-### 10. Event-Driven Triggers (Watch)
+agent = SupportAgent()
+agent.remember(f"Customer {user_id}: premium plan, joined 2023", memory_type=MemoryType.CORE)
 
-Agents that react to the world — webhooks, cron jobs, message queues.
+result = agent.run(user_message)
 
-```python
-from syrin import Agent
-from syrin.watch import CronProtocol, WebhookProtocol, QueueProtocol
-
-# Cron-triggered agent
-agent.watch(CronProtocol(cron="0 9 * * *"), task="Send daily digest")
-
-# Webhook-triggered agent  
-agent.watch(WebhookProtocol(path="/webhook"), task="Process incoming request")
-
-# Queue consumer
-agent.watch(QueueProtocol(queue="tasks"), task="Process queued item")
+if result.confidence < 0.6:
+    result = agent.handoff(EscalationAgent, context=result.content)
 ```
 
 ---
 
-### 11. Production Knowledge (RAG)
-
-Ingest entire GitHub repos, docs, websites — with intelligent chunking and retrieval.
+### Document Intelligence — RAG + Structured Output
 
 ```python
-from syrin import Knowledge
-from syrin.enums import ChunkStrategy
+from syrin import Agent, Model
+from syrin.knowledge import Knowledge
+from syrin.enums import KnowledgeBackend
+from pydantic import BaseModel
+
+class ContractRisk(BaseModel):
+    risk_level: str           # low | medium | high | critical
+    key_clauses: list[str]
+    recommended_action: str
 
 kb = Knowledge(
-    sources=[
-        "https://docs.syrin.ai",
-        "github://owner/repo",  # Full repo ingestion
-    ],
-    chunk_strategy=ChunkStrategy.RECURSIVE,
+    sources=["path/to/contracts/"],
+    backend=KnowledgeBackend.QDRANT,
     embedding_provider="openai",
 )
 
-# Agent with knowledge
-agent = Agent(model=model, knowledge=kb)
-result = agent.run("How do I configure budget alerts?")
-# → Answers from your docs
-```
+class ContractReviewer(Agent):
+    model       = Model.OpenAI("gpt-4o", api_key="...")
+    budget      = Budget(max_cost=0.25)
+    knowledge   = kb
+    output_type = ContractRisk
 
-**Supported sources:** GitHub, GitLab, websites, RSS feeds, Google Docs, Confluence, Notion.
-
----
-
-### 12. Structured Output Enforcement
-
-Guaranteed JSON, Pydantic, or dataclass output — every time.
-
-```python
-from pydantic import BaseModel
-from syrin import Agent
-
-class Priority(BaseModel):
-    priority: str  # high, medium, low
-    category: str
-
-agent = Agent(
-    model=Model.OpenAI("gpt-4o"),
-    output_type=Priority,
-)
-
-result = agent.run("Classify: server down in us-east-1")
-# result.output is a Priority object, guaranteed
-# result.output.priority → "high"
-# result.output.category → "infrastructure"
+result = ContractReviewer().run("Review the indemnification clause in contract-2024-07.pdf")
+risk: ContractRisk = result.output   # Guaranteed typed output
+print(f"Risk: {risk.risk_level} — {risk.recommended_action}")
 ```
 
 ---
 
-### 13. Prompt Injection Defense
+## Installation
 
-Defense-in-depth against the #1 security threat in LLM apps.
+```bash
+# Core library
+pip install syrin
 
-```python
-from syrin import Agent
-from syrin.security import InputNormalization, SpotlightDefense, CanaryTokens
+# With OpenAI support
+pip install syrin[openai]
 
-agent = Agent(
-    model=Model.OpenAI("gpt-4o"),
-    security=[
-        InputNormalization(),      # Normalize inputs
-        SpotlightDefense(),        # Detect injection attempts
-        CanaryTokens(),            # Hidden tokens that trigger alerts
-    ],
-)
+# With Anthropic support
+pip install syrin[anthropic]
+
+# Multi-modal — voice, documents, vector stores
+pip install syrin[voice,pdf,vector]
+
+# Full install
+pip install syrin[openai,anthropic,serve,vector,postgres,pdf,voice]
 ```
 
 ---
 
 ## Why Syrin
 
-| Feature | Syrin | DIY / Others |
-|---------|-------|--------------|
-| **Budget control** | Built-in, declarative | DIY or missing |
-| **Pre-call estimates** | Automatic | Parse manually |
-| **Post-call actuals** | Automatic | Parse provider response |
-| **Rate windows** | hour/day/week/month built-in | Implement + persist |
-| **Threshold alerts** | `BudgetThreshold(at=80, ...)` | Build from scratch |
-| **Thread-safe parallel** | SQLite WAL built-in | Implement locks |
-| **Agent memory** | 4 types, auto-managed | Manual setup |
-| **Observability** | 72+ hooks, full traces | Add-on tools |
-| **Live Debug (Pry)** | Rich TUI dashboard | Parse logs |
-| **Event Triggers** | cron, webhook, queue | Build schedulers |
-| **Production Knowledge** | GitHub, docs, RAG built-in | Manual indexing |
-| **Structured Output** | Guaranteed Pydantic/JSON | Parse + validate |
-| **Prompt Injection Defense** | Input normalization, spotlighting | DIY |
-| **Multi-agent** | Handoff, spawn, pipeline | Complex orchestration |
-| **Type-safe** | StrEnum, mypy strict | String hell |
-| **Production API** | One-line serve | Build Flask wrapper |
-| **Checkpoints** | State persistence | DIY |
-| **Circuit breaking** | Built-in | External library |
-| **Custom backends** | BudgetStore ABC | Full reimplementation |
-
----
-
-## Real Projects Built with Syrin
-
-### Voice AI Recruiter ([examples/resume_agent](examples/resume_agent))
-
-A voice agent that handles recruiter calls using Syrin + Pipecat.
-
-```bash
-cd examples/resume_agent && python voice_server.py
-```
-
-### IPO Drafting Agent ([examples/ipo_drafting_agent](examples/ipo_drafting_agent))
-
-Multi-agent system that drafts financial documents with full cost control.
-
-### Research Assistant
-
-Multi-agent system that researches topics, verifies facts, and writes reports.
+| Capability | Syrin | DIY / Other Libraries |
+|---|---|---|
+| **Budget enforcement** | Declarative, pre-call + post-call | Not available or manual |
+| **Rate windows** | hour / day / month built-in | Build and persist yourself |
+| **Threshold callbacks** | `BudgetThreshold(at=80, ...)` | Write from scratch |
+| **Shared budget pools** | Thread-safe `BudgetPool` | Implement locking |
+| **Memory (4 types)** | Built-in, auto-managed, backend-agnostic | Manual setup |
+| **Multi-agent (5 topologies)** | Single `Swarm` class | Complex orchestration code |
+| **Lifecycle hooks** | 72+ typed events | Logging + parsing |
+| **Live debugger** | Rich TUI (Pry) | Parse log files |
+| **Guardrails** | PII, length, content, output validation | Per-project code |
+| **Checkpoints** | Auto-save, crash recovery | DIY |
+| **RAG / Knowledge** | GitHub, docs, PDFs, websites | Manual indexing pipeline |
+| **Structured output** | Guaranteed Pydantic / JSON | Parse + validate manually |
+| **Serving** | One-line HTTP + playground | Build Flask/FastAPI wrapper |
+| **Type safety** | StrEnum everywhere, mypy strict | String literals |
 
 ---
 
 ## Documentation
 
-| Resource | Description |
-|----------|-------------|
-| [Getting Started](https://docs.syrin.dev/agent-kit/getting-started/quick-start) | 5-minute guide to your first agent |
-| [Budget Control](https://docs.syrin.dev/agent-kit/core/budget) | Complete budget guide + enterprise FAQ |
-| [Memory](https://docs.syrin.dev/agent-kit/core/memory) | Memory types, backends, decay |
-| [Observability / Hooks](https://docs.syrin.dev/agent-kit/debugging/hooks) | 72+ hook events, tracing |
-| [Syrin Debug](https://docs.syrin.dev/agent-kit/debugging/pry) | Live terminal debugging with Pry |
-| [Watch / Triggers](https://docs.syrin.dev/agent-kit/agent/watch-guide) | cron, webhook, queue triggers |
-| [Knowledge Pool](https://docs.syrin.dev/agent-kit/integrations/knowledge-pool) | GitHub, docs, RAG ingestion |
-| [Structured Output](https://docs.syrin.dev/agent-kit/agent/response-object) | Guaranteed Pydantic/JSON output |
-| [Prompt Injection](https://docs.syrin.dev/agent-kit/advanced/prompt-injection) | Defense-in-depth security |
-| [Multi-Agent](https://docs.syrin.dev/agent-kit/multi-agent/overview) | Handoff, spawn, DynamicPipeline |
-| [Guardrails](https://docs.syrin.dev/agent-kit/agent/guardrails) | PII, length, content filtering |
-| [Serving](https://docs.syrin.dev/agent-kit/production/serving) | HTTP API, playground, MCP |
+| Guide | Description |
+|---|---|
+| [Quick Start](https://docs.syrin.dev/agent-kit/) | Your first agent in 5 minutes |
+| [Budget Control](https://docs.syrin.dev/agent-kit/) | Caps, rate limits, thresholds, shared pools |
+| [Memory](https://docs.syrin.dev/agent-kit/) | 4 types, backends, decay curves |
+| [Multi-Agent Swarms](https://docs.syrin.dev/agent-kit/) | 5 topologies, A2A messaging, budget delegation |
+| [Observability & Hooks](https://docs.syrin.dev/agent-kit/) | 72+ events, tracing, Pry debugger |
+| [Guardrails](https://docs.syrin.dev/agent-kit/) | PII, length, content filtering, output validation |
+| [Knowledge / RAG](https://docs.syrin.dev/agent-kit/) | Ingestion, chunking, retrieval |
+| [Serving](https://docs.syrin.dev/agent-kit/) | HTTP API, streaming, playground |
+| [Checkpoints](https://docs.syrin.dev/agent-kit/) | State persistence, crash recovery |
 | [Examples](examples/README.md) | Runnable code for every use case |
 
 ---
 
-## Community
+## Join the Community
 
-- [Website](https://syrin.ai)
-- [Discord](https://discord.gg/p4jnKxYKpB)
-- [Twitter](https://x.com/syrin_dev)
-- [Issues](https://github.com/syrin-labs/syrin-python/issues)
-- [Discussions](https://github.com/syrin-labs/syrin-python/discussions)
+We are building a community of engineers shipping AI agents to production. Ask questions, share what you have built, and help shape the roadmap.
+
+<p align="center">
+  <a href="https://discord.gg/BJUdNBh4TC">
+    <img src="https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://www.youtube.com/@syrin_dev">
+    <img src="https://img.shields.io/badge/YouTube-Watch%20tutorials-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://reddit.com/r/syrin_ai">
+    <img src="https://img.shields.io/badge/Reddit-r%2Fsyrin__ai-FF4500?style=for-the-badge&logo=reddit&logoColor=white" alt="Reddit">
+  </a>
+</p>
+
+| Channel | What's there |
+|---|---|
+| [Discord](https://discord.gg/BJUdNBh4TC) | Real-time help, showcase your agents, roadmap discussion |
+| [Reddit — r/syrin_ai](https://reddit.com/r/syrin_ai) | Longer posts, tutorials, use-case deep dives |
+| [YouTube — @syrin_dev](https://www.youtube.com/@syrin_dev) | Walkthroughs, feature demos, production patterns |
+| [GitHub Discussions](https://github.com/syrin-labs/syrin-python/discussions) | RFCs, architecture questions, feature requests |
+| [Website](https://syrin.ai) | Product overview, roadmap, changelog |
 
 ---
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on setting up the dev environment, running tests, and submitting pull requests.
 
 ---
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
 <p align="center">
-  <b>Agents that ship. Not surprise you with bills.</b>
+  Built for engineers who ship AI to production.
 </p>
