@@ -16,8 +16,7 @@ Run: python -m examples.04_memory.redis_memory
 
 from __future__ import annotations
 
-from examples.models.models import almock
-from syrin import Agent, Memory, MemoryType
+from syrin import Agent, Memory, MemoryType, Model
 from syrin.enums import MemoryBackend
 from syrin.memory import RedisConfig
 
@@ -35,14 +34,14 @@ def main() -> None:
     )
 
     agent = Agent(
-        model=almock,
+        model=Model.mock(),
         system_prompt="You are a helpful assistant with Redis-backed memory.",
         memory=memory,
     )
 
-    agent.remember("User prefers Python over JavaScript", memory_type=MemoryType.CORE)
-    agent.remember("Last discussed async/await patterns", memory_type=MemoryType.EPISODIC)
-    agent.remember("Likes functional programming style", memory_type=MemoryType.SEMANTIC)
+    agent.remember("User prefers Python over JavaScript", memory_type=MemoryType.FACTS)
+    agent.remember("Last discussed async/await patterns", memory_type=MemoryType.HISTORY)
+    agent.remember("Likes functional programming style", memory_type=MemoryType.KNOWLEDGE)
 
     # Recall by query (substring match; Redis does not support vector search)
     entries = agent.recall(query="programming", limit=5)

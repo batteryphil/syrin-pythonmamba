@@ -1,6 +1,6 @@
 """Tests for audit models: AuditEntry, AuditLog, AuditFilters."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from syrin.audit import AuditEntry, AuditFilters, AuditLog
 from syrin.enums import AuditEventType
@@ -92,7 +92,7 @@ class TestAuditFilters:
 
     def test_filters_with_all_fields(self) -> None:
         """All filter fields accepted."""
-        since = datetime.now(timezone.utc)
+        since = datetime.now(UTC)
         f = AuditFilters(
             agent="TestAgent",
             event=AuditEventType.LLM_CALL,

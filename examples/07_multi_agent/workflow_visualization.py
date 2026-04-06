@@ -19,6 +19,12 @@ Run:
 from __future__ import annotations
 
 import asyncio
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from syrin import Agent, Model
 from syrin.enums import SwarmTopology
@@ -26,11 +32,13 @@ from syrin.response import Response
 from syrin.swarm import Swarm, SwarmConfig
 from syrin.workflow import Workflow
 
+_MODEL = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+
 # ── Agent definitions ─────────────────────────────────────────────────────────
 
 
 class PlannerAgent(Agent):
-    model = Model.mock(latency_seconds=0.05, lorem_length=10)
+    model = _MODEL
     system_prompt = "You create research plans."
 
     async def arun(self, input_text: str) -> Response[str]:
@@ -38,7 +46,7 @@ class PlannerAgent(Agent):
 
 
 class ResearchAgent(Agent):
-    model = Model.mock(latency_seconds=0.05, lorem_length=10)
+    model = _MODEL
     system_prompt = "You gather market research."
 
     async def arun(self, input_text: str) -> Response[str]:
@@ -46,7 +54,7 @@ class ResearchAgent(Agent):
 
 
 class AnalysisAgent(Agent):
-    model = Model.mock(latency_seconds=0.05, lorem_length=10)
+    model = _MODEL
     system_prompt = "You analyse market research."
 
     async def arun(self, input_text: str) -> Response[str]:
@@ -54,7 +62,7 @@ class AnalysisAgent(Agent):
 
 
 class WriterAgent(Agent):
-    model = Model.mock(latency_seconds=0.05, lorem_length=10)
+    model = _MODEL
     system_prompt = "You write executive reports."
 
     async def arun(self, input_text: str) -> Response[str]:
@@ -62,7 +70,7 @@ class WriterAgent(Agent):
 
 
 class EditorAgent(Agent):
-    model = Model.mock(latency_seconds=0.05, lorem_length=10)
+    model = _MODEL
     system_prompt = "You review and edit reports."
 
     async def arun(self, input_text: str) -> Response[str]:
@@ -214,7 +222,7 @@ async def example_compare_visualizations() -> None:
 
 
 class DetailAgent(Agent):
-    model = Model.mock(latency_seconds=0.05, lorem_length=10)
+    model = _MODEL
     system_prompt = "You write detailed reports."
 
     async def arun(self, input_text: str) -> Response[str]:
@@ -222,7 +230,7 @@ class DetailAgent(Agent):
 
 
 class BriefAgent(Agent):
-    model = Model.mock(latency_seconds=0.05, lorem_length=10)
+    model = _MODEL
     system_prompt = "You write brief summaries."
 
     async def arun(self, input_text: str) -> Response[str]:

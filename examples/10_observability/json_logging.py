@@ -28,8 +28,7 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from examples.models.models import almock  # noqa: E402
-from syrin import Agent  # noqa: E402
+from syrin import Agent, Model  # noqa: E402
 from syrin.logging import LogFormat, SyrinHandler  # noqa: E402
 
 
@@ -57,7 +56,7 @@ def setup_text_logging(level: int = logging.INFO) -> None:
 
 class SimpleAgent(Agent):
     name = "simple_agent"
-    model = almock
+    model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
     system_prompt = "You are a helpful assistant."
 
 

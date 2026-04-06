@@ -166,7 +166,7 @@ async def supervisor_loop(worker_ids: list[str]) -> None:
 
 ## Integration with Swarm
 
-Connect the monitor to a swarm's lifecycle hooks by passing `swarm._fire_event`:
+Run the monitor alongside a swarm. Use `swarm.play()` to get an async handle, then drive the monitor loop independently:
 
 ```python
 from syrin.swarm import Swarm
@@ -177,13 +177,11 @@ swarm = Swarm(agents=[...], goal="...")
 async def run_with_monitor():
     handle = swarm.play()
 
-    monitor = MonitorLoop(
-        targets=["WorkerAgent"],
+    async with MonitorLoop(
+        targets=[worker_agent],   # agent instances
         poll_interval=1.0,
         max_interventions=3,
-        fire_event_fn=swarm._fire_event,  # Monitor events appear in swarm hooks
-    )
-    async with monitor:
+    ) as monitor:
         async for event in monitor:
             # Assess and intervene here
             if handle.status.value in ("completed", "failed", "cancelled"):

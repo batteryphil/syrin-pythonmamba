@@ -312,7 +312,7 @@ HOOK_SCHEMAS: dict[Hook, HookContextSchema] = {
         example={
             "memory_id": "uuid-123",
             "content": "User likes Python",
-            "memory_type": "semantic",
+            "memory_type": "knowledge",
             "importance": 0.8,
         },
     ),
@@ -344,7 +344,7 @@ HOOK_SCHEMAS: dict[Hook, HookContextSchema] = {
         example={
             "memory_id": None,
             "query": "old data",
-            "memory_type": "episodic",
+            "memory_type": "history",
             "deleted_count": 5,
         },
     ),

@@ -54,7 +54,7 @@ class TestMemoryReport:
         agent._memory_backend = mock_backend
 
         # Store a memory
-        agent.remember("Test memory", memory_type=MemoryType.EPISODIC)
+        agent.remember("Test memory", memory_type=MemoryType.HISTORY)
 
         # Report should be updated
         assert agent.report.memory.stores == initial_stores + 1

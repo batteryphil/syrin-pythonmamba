@@ -95,11 +95,13 @@ async def test_reflection_topology_end_to_end() -> None:
     swarm = Swarm(
         agents=[WriterCls(), CriticCls()],
         goal="write and review",
-        config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-        reflection_config=ReflectionConfig(
-            producer=WriterCls,
-            critic=CriticCls,
-            max_rounds=2,
+        config=SwarmConfig(
+            topology=SwarmTopology.REFLECTION,
+            reflection=ReflectionConfig(
+                producer=WriterCls,
+                critic=CriticCls,
+                max_rounds=2,
+            ),
         ),
         budget=Budget(max_cost=1.00),
     )
@@ -119,8 +121,10 @@ async def test_consensus_topology_end_to_end() -> None:
     swarm = Swarm(
         agents=[A, B, C],
         goal="reach consensus",
-        config=SwarmConfig(topology=SwarmTopology.CONSENSUS),
-        consensus_config=ConsensusConfig(min_agreement=0.67),
+        config=SwarmConfig(
+            topology=SwarmTopology.CONSENSUS,
+            consensus=ConsensusConfig(min_agreement=0.67),
+        ),
         budget=Budget(max_cost=1.00),
     )
     result = await swarm.run()
@@ -187,7 +191,7 @@ async def test_memory_bus_custom_backend() -> None:
     entry = MemoryEntry(
         id=str(uuid.uuid4()),
         content="custom backend test data",
-        type=MemoryType.SEMANTIC,
+        type=MemoryType.KNOWLEDGE,
         agent_id="test-agent",
     )
     await bus.publish(entry, agent_id="test-agent")

@@ -35,20 +35,20 @@ class TestExtractPydanticSchema:
         assert run.constraints.get("ge") == 0
         assert run.default is None
 
-    def test_budget_reserve_default(self) -> None:
-        """Budget.reserve has default 0."""
+    def test_budget_safety_margin_default(self) -> None:
+        """Budget.safety_margin has default 0."""
         fields = extract_pydantic_schema(Budget, "budget")
-        reserve = next((f for f in fields if f.name == "reserve"), None)
+        reserve = next((f for f in fields if f.name == "safety_margin"), None)
         assert reserve is not None
         assert reserve.default == 0
         assert reserve.constraints.get("ge") == 0
 
-    def test_budget_on_exceeded_remote_excluded(self) -> None:
-        """Callable fields (on_exceeded) are remote_excluded."""
+    def test_budget_exceed_policy_is_remote_configurable(self) -> None:
+        """exceed_policy is a StrEnum field and must appear in the remote schema."""
         fields = extract_pydantic_schema(Budget, "budget")
-        on_exceeded = next((f for f in fields if f.name == "on_exceeded"), None)
-        assert on_exceeded is not None
-        assert on_exceeded.remote_excluded is True
+        exceed_policy = next((f for f in fields if f.name == "exceed_policy"), None)
+        assert exceed_policy is not None
+        assert exceed_policy.remote_excluded is not True
 
     def test_budget_per_nested_children(self) -> None:
         """Budget.rate_limits (RateLimit) has children with budget.rate_limits.hour, etc."""
@@ -284,7 +284,7 @@ class TestExtractAgentSchema:
         assert "debug" in names
         assert "system_prompt" in names
         assert "human_approval_timeout" in names
-        assert "loop_strategy" in names
+        assert "loop_strategy" not in names  # loop_strategy removed; use loop= directly
 
     def test_agent_schema_budget_section_when_budget_set(self) -> None:
         """When agent has budget, budget section present with run field."""
@@ -309,7 +309,7 @@ class TestExtractAgentSchema:
 
         agent = Agent(
             model=Model.Almock(),
-            memory=Memory(restrict_to=[MemoryType.CORE], top_k=5),
+            memory=Memory(types=[MemoryType.FACTS], top_k=5),
         )
         schema = extract_agent_schema(agent)
         assert "memory" in schema.sections

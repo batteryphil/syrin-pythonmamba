@@ -5034,21 +5034,17 @@ source = { editable = "." }
 dependencies = [
     { name = "chevron" },
     { name = "croniter" },
-    { name = "fastapi" },
     { name = "httpx" },
     { name = "jsonschema" },
-    { name = "openai" },
     { name = "opentelemetry-exporter-otlp-proto-common" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-proto" },
     { name = "pydantic" },
     { name = "pygments" },
     { name = "python-dotenv" },
-    { name = "python-multipart" },
     { name = "requests" },
     { name = "rich" },
     { name = "tiktoken" },
-    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
@@ -5084,6 +5080,9 @@ knowledge = [
 litellm = [
     { name = "litellm" },
 ]
+openai = [
+    { name = "openai" },
+]
 pdf = [
     { name = "docling" },
     { name = "pandas" },
@@ -5095,6 +5094,11 @@ pdf-output = [
 postgres = [
     { name = "asyncpg" },
     { name = "pgvector" },
+]
+serve = [
+    { name = "fastapi" },
+    { name = "python-multipart" },
+    { name = "uvicorn" },
 ]
 sqlite = [
     { name = "sqlite-vec" },
@@ -5132,7 +5136,7 @@ requires-dist = [
     { name = "docling", marker = "extra == 'docling'", specifier = ">=2.70" },
     { name = "docling", marker = "extra == 'pdf'", specifier = ">=2.70" },
     { name = "elevenlabs", marker = "extra == 'voice'", specifier = ">=1.0" },
-    { name = "fastapi", specifier = ">=0.134.0" },
+    { name = "fastapi", marker = "extra == 'serve'", specifier = ">=0.134.0" },
     { name = "flatbuffers", marker = "extra == 'knowledge'" },
     { name = "google-genai", marker = "extra == 'generation'" },
     { name = "httpx" },
@@ -5140,7 +5144,7 @@ requires-dist = [
     { name = "litellm", marker = "extra == 'litellm'" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numpy", marker = "extra == 'dev'" },
-    { name = "openai", specifier = ">=2.26.0" },
+    { name = "openai", marker = "extra == 'openai'", specifier = ">=2.26.0" },
     { name = "openpyxl", marker = "extra == 'excel'", specifier = ">=3.1.0" },
     { name = "opentelemetry-exporter-otlp-proto-common", specifier = ">=1.20.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.20.0" },
@@ -5155,7 +5159,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "python-docx", marker = "extra == 'docx'", specifier = ">=1.0.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
-    { name = "python-multipart", specifier = ">=0.0.22" },
+    { name = "python-multipart", marker = "extra == 'serve'", specifier = ">=0.0.22" },
     { name = "qdrant-client", marker = "extra == 'vector'" },
     { name = "redis", marker = "extra == 'vector'" },
     { name = "requests", specifier = ">=2.33.0" },
@@ -5165,10 +5169,10 @@ requires-dist = [
     { name = "tabulate", marker = "extra == 'docling'" },
     { name = "tabulate", marker = "extra == 'pdf'" },
     { name = "tiktoken" },
-    { name = "uvicorn", specifier = ">=0.41.0" },
+    { name = "uvicorn", marker = "extra == 'serve'", specifier = ">=0.41.0" },
     { name = "weasyprint", marker = "extra == 'pdf-output'", specifier = ">=60.0" },
 ]
-provides-extras = ["anthropic", "litellm", "vector", "postgres", "sqlite", "knowledge", "generation", "voice", "pdf", "pdf-output", "docling", "docx", "excel", "dev"]
+provides-extras = ["openai", "anthropic", "litellm", "serve", "vector", "postgres", "sqlite", "knowledge", "generation", "voice", "pdf", "pdf-output", "docling", "docx", "excel", "dev"]
 
 [package.metadata.requires-dev]
 dev = [

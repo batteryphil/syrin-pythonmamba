@@ -212,17 +212,15 @@ def test_inject_map_summary_empty_summary_no_inject() -> None:
 
 def test_agent_context_get_map_update_map() -> None:
     """agent.context.get_map() and agent.context.update_map() work via facade."""
-    from syrin import Agent, AgentConfig, Model
+    from syrin import Agent, Model
 
     with tempfile.TemporaryDirectory() as d:
         path = Path(d) / "map.json"
         agent = Agent(
             model=Model.Almock(latency_seconds=0.01),
-            config=AgentConfig(
-                context=Context(
-                    map_backend="file",
-                    map_path=str(path),
-                )
+            context=Context(
+                map_backend="file",
+                map_path=str(path),
             ),
         )
         agent.context.update_map({"summary": "Test session."})

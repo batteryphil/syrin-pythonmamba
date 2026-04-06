@@ -171,7 +171,7 @@ class ModelRouter:
         if self._budget is None or self._budget.max_cost is None:
             return None
         remaining = self._budget.remaining
-        limit = (self._budget.max_cost or 0) - self._budget.reserve
+        limit = (self._budget.max_cost or 0) - self._budget.safety_margin
         if limit <= 0:
             return None
         return remaining / limit if remaining is not None else None

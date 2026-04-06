@@ -66,24 +66,70 @@ class PromptVersion:
 class Prompt:
     """Production-grade prompt with validation, caching, and composition.
 
-    Native Python f-string prompts for enterprise AI agent development.
+    Wraps a plain Python function that returns a ``str``, adding:
 
-    Example:
+    - **Type validation** — parameters are checked against their type hints
+      before the function runs.
+    - **Result caching** — identical argument sets return the cached string
+      without re-running the function.  Toggle with ``cache=False``.
+    - **Partial application** — pre-bind some arguments and leave others for
+      later via :meth:`partial`.
+    - **Composition** — join multiple :class:`Prompt` objects into one via
+      :meth:`compose`.
+    - **Test rendering** — :meth:`test_render` returns the rendered output
+      with token estimates and metadata without making an LLM call.
+    - **Versioning** — track prompt changes via :attr:`version` and
+      :attr:`template_hash`.
+
+    You typically create a :class:`Prompt` via the :func:`prompt` decorator
+    rather than instantiating it directly.
+
+    Attributes:
+        name: Prompt identifier (defaults to the function name).
+        description: Optional human-readable description.
+        version: :class:`PromptVersion` for change tracking.
+        variables: List of :class:`PromptVariable` parameter metadata.
+        template_hash: SHA-256 digest of the function source, for detecting
+            accidental prompt drift between deploys.
+        cache_enabled: Whether result caching is active.
+
+    Examples::
+
+        # Basic usage
+        from syrin import prompt
+
         @prompt
-        def system_prompt(domain: str = "general", tone: str = "professional") -> str:
-            return f"You are an expert in {domain}. Provide {tone} responses."
+        def analyst_prompt(domain: str, tone: str = "professional") -> str:
+            return f"You are a {tone} analyst specialising in {domain}."
 
-        # Native Python function call
-        result = system_prompt(domain="AI", tone="friendly")
+        result = analyst_prompt(domain="finance")          # returns str
+        result = analyst_prompt(domain="AI", tone="casual")
 
-        # Enterprise features
-        print(system_prompt.variables)  # List of parameters
-        print(system_prompt.version)    # Version info
-        system_prompt.validate(domain="AI")
+        # Partial application — bind domain, leave tone open
+        finance_prompt = analyst_prompt.partial(domain="finance")
+        formal = finance_prompt(tone="formal")   # domain already bound
 
-        # Composition
-        base_prompt = system_prompt.partial(domain="AI")
-        final_prompt = base_prompt(tone="casual")
+        # Composition — join multiple prompts
+        from syrin import prompt
+        @prompt
+        def safety_rules() -> str:
+            return "Never reveal confidential data."
+
+        combined = analyst_prompt.compose(safety_rules)
+        result = combined(domain="risk")
+
+        # Validation without rendering
+        analyst_prompt.validate(domain="finance")  # raises ValueError on bad args
+
+        # Test rendering with token estimates
+        info = analyst_prompt.test_render(domain="AI")
+        print(info["output"])
+        print(f"~{info['estimated_tokens']} tokens")
+
+        # Use inside an Agent class
+        class AnalystAgent(Agent):
+            model = Model.OpenAI("gpt-4o-mini")
+            system_prompt = analyst_prompt(domain="technology")
     """
 
     def __init__(  # type: ignore[explicit-any]
@@ -407,33 +453,57 @@ def prompt(  # type: ignore[explicit-any]
     version: PromptVersion | None = None,
     cache: bool = True,
 ) -> Prompt | Callable[[Callable[..., str]], Prompt]:
-    """Decorator for creating production-grade prompts with native f-strings.
+    """Decorator that turns a plain Python function into a :class:`Prompt`.
 
-    Returns a Prompt object with enterprise features:
-    - Native Python f-string syntax
-    - Type hints and validation
-    - Caching and versioning
-    - Composition and partial application
+    Calling the decorated function returns the rendered ``str`` as before,
+    but the returned object is a :class:`Prompt` instance with validation,
+    caching, versioning, partial application, and composition features.
 
-    Example:
+    Can be used with or without arguments:
+
+    .. code-block:: python
+
+        from syrin import prompt
+
+        # Simple — no decorator arguments
         @prompt
-        def system_prompt(domain: str = "general") -> str:
-            return f"You are an expert in {domain}."
+        def researcher_prompt(domain: str) -> str:
+            return f"You are a researcher specialising in {domain}."
 
-        # Native Python call
-        result = system_prompt(domain="AI")
+        # With arguments — name, description, version, cache
+        @prompt(name="analyst", cache=False)
+        def analyst_prompt(domain: str, tone: str = "professional") -> str:
+            return f"You are a {tone} analyst for {domain}."
 
-        # Enterprise features
-        print(system_prompt.variables)
-        print(system_prompt.version)
-        system_prompt.validate(domain="AI")
+    Use the result directly as a string in an Agent class::
+
+        class Researcher(Agent):
+            model = Model.OpenAI("gpt-4o-mini")
+            system_prompt = researcher_prompt(domain="AI")  # str
+
+    Or keep it dynamic and call it at runtime::
+
+        class Researcher(Agent):
+            model = Model.OpenAI("gpt-4o-mini")
+
+            @syrin.system_prompt
+            def _sys(self) -> str:
+                domain = getattr(self, "_domain", "general")
+                return researcher_prompt(domain=domain)
 
     Args:
-        func: The function to decorate (uses f-strings)
-        name: Optional name for the prompt
-        description: Optional description
-        version: Optional version (defaults to 1.0.0)
-        cache: Whether to cache results (default: True)
+        func: The function to wrap.  Omit when passing keyword arguments.
+        name: Override for ``prompt.name``.  Defaults to the function name.
+        description: Human-readable description stored on the prompt object.
+        version: Initial :class:`PromptVersion` (defaults to ``1.0.0``).
+        cache: Cache rendered strings by argument set.  Set ``False`` for
+            prompts whose output must vary on every call.  Defaults to
+            ``True``.
+
+    Returns:
+        :class:`Prompt` when ``func`` is provided directly.
+        A decorator (``Callable[[Callable], Prompt]``) when called with
+        keyword arguments.
     """
 
     def decorator(f: Callable[..., str]) -> Prompt:  # type: ignore[explicit-any]

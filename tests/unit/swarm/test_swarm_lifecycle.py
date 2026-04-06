@@ -84,15 +84,15 @@ class TestSwarmCancelAgent:
     """swarm.cancel_agent() stops one agent without stopping the swarm."""
 
     async def test_cancel_one_agent_others_continue(self) -> None:
-        """Cancelling one agent by name lets others finish."""
+        """Cancelling one agent by object lets others finish."""
         a = _make_slow_agent("LongAgent", "long result", delay=0.2)
         b = _make_instant_agent("FastAgent", "fast result")
         swarm = Swarm(agents=[a, b], goal="cancel agent test")
         handle = swarm.play()
 
         await asyncio.sleep(0)
-        # Cancel the slow agent — fast agent should still finish
-        await swarm.cancel_agent("LongAgent")
+        # Cancel the slow agent by passing the agent object — no free strings
+        await swarm.cancel_agent(a)
         result = await handle.wait()
 
         assert result is not None

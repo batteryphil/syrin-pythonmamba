@@ -14,8 +14,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from examples.models.models import almock
-from syrin import Agent, AgentConfig, CheckpointConfig, CheckpointTrigger, Context
+from syrin import Agent, CheckpointConfig, CheckpointTrigger, Context, Model
 from syrin.memory import Memory
 
 
@@ -25,20 +24,18 @@ def main() -> None:
 
         mem = Memory()
         agent = Agent(
-            model=almock,
+            model=Model.mock(),
             system_prompt="You are a helpful assistant. Keep replies concise.",
             memory=mem,
-            config=AgentConfig(
-                context=Context(
-                    max_tokens=8000,
-                    auto_compact_at=0.6,
-                ),
-                checkpoint=CheckpointConfig(
-                    storage="sqlite",
-                    path=str(db_path),
-                    trigger=CheckpointTrigger.STEP,
-                    max_checkpoints=5,
-                ),
+            context=Context(
+                max_tokens=8000,
+                auto_compact_at=0.6,
+            ),
+            checkpoint=CheckpointConfig(
+                storage="sqlite",
+                path=str(db_path),
+                trigger=CheckpointTrigger.STEP,
+                max_checkpoints=5,
             ),
         )
 
@@ -56,16 +53,14 @@ def main() -> None:
         # Simulate restart: new agent, load from same storage
         mem2 = Memory()
         agent2 = Agent(
-            model=almock,
+            model=Model.mock(),
             system_prompt="You are a helpful assistant. Keep replies concise.",
             memory=mem2,
-            config=AgentConfig(
-                context=Context(max_tokens=8000, auto_compact_at=0.6),
-                checkpoint=CheckpointConfig(
-                    storage="sqlite",
-                    path=str(db_path),
-                    trigger=CheckpointTrigger.STEP,
-                ),
+            context=Context(max_tokens=8000, auto_compact_at=0.6),
+            checkpoint=CheckpointConfig(
+                storage="sqlite",
+                path=str(db_path),
+                trigger=CheckpointTrigger.STEP,
             ),
         )
         ok = agent2.load_checkpoint(cid)

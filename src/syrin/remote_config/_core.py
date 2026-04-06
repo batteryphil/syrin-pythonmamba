@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from syrin.remote_config._command import RemoteCommandConfig
@@ -240,7 +240,7 @@ class RemoteConfig:
 
         version_record = ConfigVersion(
             version=self._version,
-            applied_at=datetime.now(tz=timezone.utc),
+            applied_at=datetime.now(tz=UTC),
             applied_by=changed_by,
             fields_changed=list(changes.keys()),
             previous_values=previous,
@@ -306,7 +306,7 @@ class RemoteConfig:
 
         rollback_record = ConfigVersion(
             version=self._version,
-            applied_at=datetime.now(tz=timezone.utc),
+            applied_at=datetime.now(tz=UTC),
             applied_by="rollback",
             fields_changed=list(rolled_back_from.fields_changed),
             previous_values=previous,

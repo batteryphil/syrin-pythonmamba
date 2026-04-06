@@ -43,15 +43,14 @@ if __name__ == "__main__":
 
     from dotenv import load_dotenv
 
-    from examples.models.models import almock
-    from syrin import Agent
+    from syrin import Agent, Model
 
     load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
     class ProductAgent(Agent):
         name = "product-agent"
         description = "Product catalog agent (MCP tools)"
-        model = almock
+        model = Model.mock()
         system_prompt = "You help users find products."
         tools = [ProductMCP()]
 

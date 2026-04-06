@@ -51,16 +51,13 @@ def test_get_config_returns_schema_and_values() -> None:
     assert run_field.get("baseline_value") == 1.0
     assert run_field.get("current_value") == 1.0
     assert run_field.get("overridden") is False
-    # Agent section must expose loop_strategy with enum_values for UI dropdown
+    # Agent section must NOT expose loop_strategy (removed; use loop= directly)
     agent_section = data["sections"].get("agent", {})
     loop_field = next(
         (f for f in agent_section.get("fields", []) if f.get("path") == "agent.loop_strategy"),
         None,
     )
-    assert loop_field is not None, "agent.loop_strategy field must be present"
-    assert loop_field.get("enum_values") is not None, "agent.loop_strategy must have enum_values"
-    assert "react" in (loop_field.get("enum_values") or [])
-    assert "single_shot" in (loop_field.get("enum_values") or [])
+    assert loop_field is None, "agent.loop_strategy field must be removed"
 
 
 def test_get_config_with_route_prefix() -> None:
@@ -103,8 +100,8 @@ def test_patch_config_applies_overrides() -> None:
     assert agent._budget.max_cost == 2.0
 
 
-def test_patch_agent_loop_strategy_accepts_display_format() -> None:
-    """PATCH agent.loop_strategy with display-style value ('plan execute') is normalized and accepted."""
+def test_patch_agent_max_tool_iterations_via_config_route() -> None:
+    """PATCH agent.max_tool_iterations via /config route is accepted."""
     agent = _TestAgentWithBudget(budget=Budget(max_cost=1.0))
     config = ServeConfig()
     router = build_router(agent, config)
@@ -119,14 +116,13 @@ def test_patch_agent_loop_strategy_accepts_display_format() -> None:
     payload = {
         "agent_id": agent_id,
         "version": 1,
-        "overrides": [{"path": "agent.loop_strategy", "value": "react"}],
+        "overrides": [{"path": "agent.max_tool_iterations", "value": 5}],
     }
     r = client.patch("/config", json=payload)
     assert r.status_code == 200
     data = r.json()
-    assert "agent.loop_strategy" not in [p for p, _ in data.get("rejected", [])]
-
-    assert type(agent._loop).__name__ == "ReactLoop"
+    assert "agent.max_tool_iterations" in data.get("accepted", [])
+    assert agent._max_tool_iterations == 5
 
 
 def test_patch_config_invalid_path_rejected() -> None:

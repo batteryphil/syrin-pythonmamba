@@ -18,16 +18,17 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 from syrin import Agent, Budget, Model
 from syrin.response import Response
 from syrin.swarm import SpawnSpec, Swarm
 
-if not os.environ.get("OPENAI_API_KEY"):
-    sys.exit("OPENAI_API_KEY is required. Set it and re-run.")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-_MODEL = Model.OpenAI("gpt-4o-mini")
+_MODEL = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
 
 # ── Sub-agent definitions ─────────────────────────────────────────────────────
 

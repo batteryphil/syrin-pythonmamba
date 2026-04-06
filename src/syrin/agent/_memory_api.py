@@ -20,7 +20,7 @@ from syrin.observability import SemanticAttributes, SpanKind
 def remember(
     agent: Agent,
     content: str,
-    memory_type: MemoryType = MemoryType.EPISODIC,
+    memory_type: MemoryType = MemoryType.HISTORY,
     importance: float = 1.0,
     **metadata: object,
 ) -> str:

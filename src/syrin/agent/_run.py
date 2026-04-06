@@ -311,13 +311,13 @@ def _auto_store_turn(
         if text and text.strip():
             agent.remember(
                 f"User said: {text.strip()}",
-                memory_type=MemoryType.EPISODIC,
+                memory_type=MemoryType.HISTORY,
                 importance=0.7,
             )
         if assistant_content and assistant_content.strip():
             agent.remember(
                 f"Assistant replied: {assistant_content.strip()}",
-                memory_type=MemoryType.EPISODIC,
+                memory_type=MemoryType.HISTORY,
                 importance=0.6,
             )
     except Exception as exc:

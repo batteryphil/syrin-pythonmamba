@@ -40,13 +40,11 @@ def basic(model: Model, *, system_prompt: str = "You are helpful.") -> Agent:
         >>> agent.run("What is 2+2?")
     """
     from syrin.agent import Agent
-    from syrin.enums import LoopStrategy
 
     return Agent(
         model=model,
         system_prompt=system_prompt,
         memory=None,
-        loop_strategy=LoopStrategy.SINGLE_SHOT,
     )
 
 
@@ -74,7 +72,7 @@ def with_memory(
         >>> agent.run("What's my name?")  # "Alice"
     """
     from syrin.agent import Agent
-    from syrin.enums import LoopStrategy, MemoryType
+    from syrin.enums import MemoryType
     from syrin.memory import Memory
 
     return Agent(
@@ -82,8 +80,7 @@ def with_memory(
         system_prompt=system_prompt,
         memory=memory
         if memory is not None
-        else Memory(restrict_to=[MemoryType.CORE, MemoryType.EPISODIC], top_k=10),
-        loop_strategy=LoopStrategy.REACT,
+        else Memory(types=[MemoryType.FACTS, MemoryType.HISTORY], top_k=10),
     )
 
 
@@ -112,13 +109,11 @@ def with_budget(
     """
     from syrin.agent import Agent
     from syrin.budget import Budget
-    from syrin.enums import LoopStrategy
 
     return Agent(
         model=model,
         system_prompt=system_prompt,
         budget=budget if budget is not None else Budget(max_cost=0.25),
-        loop_strategy=LoopStrategy.REACT,
     )
 
 
@@ -136,15 +131,14 @@ def research() -> Agent:
     """
     from syrin.agent import Agent
     from syrin.budget import Budget
-    from syrin.enums import LoopStrategy, MemoryType
+    from syrin.enums import MemoryType
     from syrin.memory import Memory
 
     return Agent(
         model=_default_model(),
         system_prompt="You are a research assistant. Use tools to search and cite sources. Be thorough and accurate.",
         budget=Budget(max_cost=0.50),
-        memory=Memory(restrict_to=[MemoryType.CORE, MemoryType.EPISODIC], top_k=15),
-        loop_strategy=LoopStrategy.REACT,
+        memory=Memory(types=[MemoryType.FACTS, MemoryType.HISTORY], top_k=15),
         max_tool_iterations=15,
     )
 
@@ -163,15 +157,14 @@ def assistant() -> Agent:
     """
     from syrin.agent import Agent
     from syrin.budget import Budget
-    from syrin.enums import LoopStrategy, MemoryType
+    from syrin.enums import MemoryType
     from syrin.memory import Memory
 
     return Agent(
         model=_default_model(),
         system_prompt="You are a helpful assistant. Be concise and friendly.",
         budget=Budget(max_cost=0.25),
-        memory=Memory(restrict_to=[MemoryType.CORE, MemoryType.EPISODIC], top_k=10),
-        loop_strategy=LoopStrategy.REACT,
+        memory=Memory(types=[MemoryType.FACTS, MemoryType.HISTORY], top_k=10),
     )
 
 
@@ -189,15 +182,14 @@ def code_helper() -> Agent:
     """
     from syrin.agent import Agent
     from syrin.budget import Budget
-    from syrin.enums import LoopStrategy, MemoryType
+    from syrin.enums import MemoryType
     from syrin.memory import Memory
 
     return Agent(
         model=_default_model(),
         system_prompt="You are a code assistant. Provide clear, idiomatic code. Prefer standard library and minimal dependencies.",
         budget=Budget(max_cost=0.50),
-        memory=Memory(restrict_to=[MemoryType.CORE, MemoryType.EPISODIC], top_k=10),
-        loop_strategy=LoopStrategy.REACT,
+        memory=Memory(types=[MemoryType.FACTS, MemoryType.HISTORY], top_k=10),
     )
 
 

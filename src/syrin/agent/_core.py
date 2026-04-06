@@ -18,6 +18,8 @@ if TYPE_CHECKING:
     from syrin.serve.config import ServeConfig  # noqa: F401
     from syrin.swarm._spawn import SpawnResult, SpawnSpec
 
+from datetime import UTC
+
 from syrin._sentinel import NOT_PROVIDED
 from syrin.agent._budget_ops import (
     check_and_apply_budget as _budget_check_and_apply,
@@ -125,7 +127,6 @@ from syrin.agent._spawn import (
     update_parent_budget as _spawn_update_parent_budget,
 )
 from syrin.agent._tool_exec import execute_tool as _tool_execute
-from syrin.agent.config import AgentConfig
 from syrin.audit import AuditLog
 from syrin.budget import (
     Budget,
@@ -141,14 +142,14 @@ from syrin.context.config import ContextStats
 from syrin.cost import calculate_cost, estimate_cost_for_call
 from syrin.domain_events import EventBus
 from syrin.enums import (
+    AgentRole,
     CircuitState,
     FallbackStrategy,
     GuardrailStage,
     Hook,
-    LoopStrategy,
     Media,
-    MemoryPreset,
     MemoryType,
+    ToolErrorMode,
 )
 from syrin.events import EventContext, Events
 from syrin.exceptions import (
@@ -158,6 +159,7 @@ from syrin.exceptions import (
     ToolExecutionError,
 )
 from syrin.guardrails import Guardrail, GuardrailChain, GuardrailResult
+from syrin.hitl import ApprovalGate
 from syrin.loop import Loop
 from syrin.memory import Memory
 from syrin.memory.backends import InMemoryBackend
@@ -273,7 +275,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
     budget, memory, guardrails, and more.
 
     Main methods:
-        response(user_input) — Sync run; returns Response.
+        run(user_input) — Sync run; returns Response.
         arun(user_input) — Async run; returns Response.
         stream(user_input) / astream(user_input) — Streaming.
         estimate_cost(messages, max_output_tokens=...) — Estimate USD before calling.
@@ -288,10 +290,9 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         - Trace and debug with events and spans.
 
     How to create one:
-        - Recommended: ``Agent.builder(model).with_system_prompt(...).with_budget(...).build()``
-        - Or presets: ``Agent.basic(model)``, ``Agent.with_memory(model)``
-        - Or constructor: ``Agent(model=..., system_prompt=...)``
-        - Or subclass and set class attributes: ``model = Model.OpenAI(...)``
+        - **Primary:** ``Agent(model=..., system_prompt=..., tools=[...], budget=...)``
+        - **Advanced:** Subclass ``Agent`` and set class attributes: ``model = Model.OpenAI(...)``
+          Then override ``run()``, ``_pre_run()``, etc. for custom behaviour.
 
     Subclass attributes (set on your Agent subclass; override parent defaults):
         model: Model | None — LLM to use (Model.OpenAI, Model.Anthropic, etc.). Required.
@@ -355,6 +356,22 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             team = [BackendEngineer, FrontendEngineer]
     """
 
+    role: ClassVar[AgentRole] = AgentRole.WORKER
+    """Swarm authority role for this agent class.
+
+    When set on an :class:`Agent` subclass, the swarm uses this to build
+    :class:`~syrin.swarm._authority.SwarmAuthorityGuard` entries automatically
+    via :func:`~syrin.swarm._authority.build_guard_from_agents`.
+
+    Defaults to :attr:`~syrin.enums.AgentRole.WORKER`.
+
+    Example::
+
+        class Supervisor(Agent):
+            role = AgentRole.SUPERVISOR
+            team = [WorkerAgent]
+    """
+
     # Instance state initialized by `_agent_init`.
     _agent_name: str
     _runtime: _AgentRuntime
@@ -376,7 +393,9 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
     _child_count: int
     _max_child_agents: int | None
     _parent_agent: Agent | None
-    _config: AgentConfig | None
+    _spotlight_tool_outputs: bool
+    _normalize_inputs: bool
+    _tool_error_mode: ToolErrorMode
     _context_component: AgentContextComponent
     _memory_component: AgentMemoryComponent
     _budget_component: AgentBudgetComponent
@@ -416,7 +435,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
     _run_report: AgentReport
     _approval_gate: object | None
     _human_approval_timeout: int
-    _max_tool_result_length: int
+    _max_tool_result_length: int | None
     _retry_on_transient: bool
     _max_retries: int
     _retry_backoff_base: float
@@ -539,7 +558,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             >>> snap.agent_id
             'my-agent-prod'
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from syrin.remote_config._core import RemoteConfigSnapshot
 
@@ -555,7 +574,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             agent_id=str(agent_name),
             version=version,
             values=values,
-            captured_at=datetime.now(tz=timezone.utc),
+            captured_at=datetime.now(tz=UTC),
         )
 
     @property
@@ -786,15 +805,14 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         tools: list[ToolSpec] | None = NOT_PROVIDED,  # type: ignore[assignment]
         budget: Budget | None = NOT_PROVIDED,  # type: ignore[assignment]
         *,
-        output: Output | None = None,
+        output: type | Output | None = None,
         max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
         budget_store: BudgetStore | None = None,
-        memory: Memory | MemoryPreset | None = NOT_PROVIDED,  # type: ignore[assignment]
-        loop_strategy: LoopStrategy = LoopStrategy.REACT,
+        memory: Memory | None = NOT_PROVIDED,  # type: ignore[assignment]
         loop: Loop | type[Loop] | None = None,
         guardrails: list[Guardrail] | GuardrailChain | None = NOT_PROVIDED,  # type: ignore[assignment]
         human_approval_timeout: int = 300,
-        max_tool_result_length: int = 0,
+        max_tool_result_length: int | None = None,
         retry_on_transient: bool = True,
         max_retries: int = 3,
         retry_backoff_base: float = 1.0,
@@ -805,8 +823,18 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         template_variables: dict[str, object] | None = None,
         inject_template_vars: bool = True,
         max_child_agents: int | None = None,
-        config: AgentConfig | None = None,
-        context: Context | None = None,
+        context: Context | DefaultContextManager | None = None,
+        rate_limit: APIRateLimit | RateLimitManager | None = None,
+        checkpoint: CheckpointConfig | Checkpointer | None = None,
+        circuit_breaker: CircuitBreaker | None = None,
+        approval_gate: ApprovalGate | None = None,
+        tracer: Tracer | None = None,
+        event_bus: EventBus[object] | None = None,  # type: ignore[type-var]
+        audit: AuditLog | None = None,
+        dependencies: object | None = None,
+        spotlight_tool_outputs: bool = False,
+        normalize_inputs: bool = False,
+        tool_error_mode: ToolErrorMode = ToolErrorMode.PROPAGATE,
         model_router: ModelRouter | RoutingConfig | None = None,
         input_media: set[Media] | None = None,
         output_media: set[Media] | None = None,
@@ -838,9 +866,9 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
 
         **Memory:**
             memory: Memory for conversation and optional persistent recall.
-                memory=None or MemoryPreset.DISABLED: no memory (stateless).
-                memory=MemoryPreset.DEFAULT: core+episodic, top_k=10.
-                memory=Memory(): full config.
+                memory=None: no memory (stateless agent).
+                memory=Memory(): full config (all types enabled by default).
+                memory=Memory(types=[MemoryType.FACTS, MemoryType.HISTORY], top_k=5): restricted types.
 
         **Routing:**
             model_router: RoutingConfig or ModelRouter for model selection when using multiple models.
@@ -851,9 +879,8 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         **Advanced:**
             output: Structured output config (Pydantic model). Validates responses.
             max_tool_iterations: Max tool-call loops per response (default 10).
-            loop_strategy: REACT (tool loop) or SINGLE_SHOT. Ignored when loop is set.
             loop: Loop instance or class. Use SingleShotLoop(), ReactLoop(), PlanExecuteLoop(),
-                CodeActionLoop(), or HumanInTheLoop(). Overrides loop_strategy when provided.
+                CodeActionLoop(), or HumanInTheLoop(). Default: ReactLoop (tool-calling loop).
             guardrails: List of Guardrail or GuardrailChain. Validate input/output.
                 Why: Block harmful content, PII, or policy violations.
                 When: Production agents handling user input or regulated domains.
@@ -861,17 +888,31 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
                 Why: Quick visibility into agent behavior.
                 When: Development and debugging.
             human_approval_timeout: Seconds to wait for HITL approval. On timeout, reject. Default 300.
-            max_tool_result_length: Max chars for tool results sent to the LLM; 0 = no truncation
+            max_tool_result_length: Max chars for tool results sent to the LLM; None = no truncation
                 (default). Display in traces/playground is truncated to 2000 chars.
             retry_on_transient: Retry tool calls on transient errors (429, 503, timeouts). Default True.
             max_retries: Max retries for transient tool failures (default 3).
             retry_backoff_base: Base delay in seconds for exponential backoff (default 1.0).
-            config: AgentConfig for advanced options (context, rate_limit, checkpoint, etc.).
-                Use config=AgentConfig(context=Context(max_tokens=100_000)) for context window
-                and compaction; prevents unbounded message growth in long conversations.
             context: Context settings (max_tokens, token_limits, compaction strategy).
-                Shortcut for config=AgentConfig(context=...). If both are set, this
-                takes precedence over config.context.
+                Use Context(max_tokens=100_000) for context window and compaction;
+                prevents unbounded message growth in long conversations.
+            rate_limit: APIRateLimit or RateLimitManager for RPM/TPM enforcement.
+            checkpoint: CheckpointConfig or Checkpointer for save/restore state.
+            circuit_breaker: CircuitBreaker for LLM provider failure handling.
+            approval_gate: ApprovalGate for human-in-the-loop tool approval.
+            tracer: Custom Tracer for observability (spans, traces).
+            event_bus: EventBus for typed domain events (BudgetThresholdReached, etc.).
+            audit: AuditLog for compliance logging (LLM calls, tool calls, handoffs).
+            dependencies: Injected deps for tools (RunContext.deps). Enables testing
+                and multi-tenant (different deps per user).
+            spotlight_tool_outputs: Wrap tool output in trust-label delimiters
+                (spotlighting) before inserting into context. Reduces prompt injection
+                risk from tool outputs. Default: False.
+            normalize_inputs: Apply NFKC normalization + control-char stripping
+                to user input before processing. Default: False.
+            tool_error_mode: How tool exceptions are handled. PROPAGATE (default) re-raises
+                immediately. RETURN_AS_STRING returns error message to LLM. STOP raises
+                ToolExecutionError to the caller.
             template_variables: Template vars for system prompts (e.g. {"user_name": "Alice"}).
                 Merged with inject_template_vars ({date}, {agent_id}, {conversation_id}).
             inject_template_vars: If True (default), inject {date}, {agent_id}, {conversation_id}
@@ -901,15 +942,6 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             ...     memory=Memory(top_k=5),
             ... )
         """
-        # Merge top-level context shortcut into config
-        if context is not None:
-            if config is None:
-                from syrin.agent.config import AgentConfig
-
-                config = AgentConfig(context=context)
-            else:
-                # context= takes precedence over config.context
-                object.__setattr__(config, "context", context)
         # Deferred runtime bootstrap remains part of Agent construction:
         # _auto_trace_check, _auto_debug_check, and _auto_log_level_check run in
         # syrin.agent._construction.init_agent before instance setup continues.
@@ -923,7 +955,6 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             max_tool_iterations=max_tool_iterations,
             budget_store=budget_store,
             memory=memory,
-            loop_strategy=loop_strategy,
             loop=loop,
             guardrails=guardrails,
             human_approval_timeout=human_approval_timeout,
@@ -938,7 +969,18 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             template_variables=template_variables,
             inject_template_vars=inject_template_vars,
             max_child_agents=max_child_agents,
-            config=config,
+            context=context,
+            rate_limit=rate_limit,
+            checkpoint=checkpoint,
+            circuit_breaker=circuit_breaker,
+            approval_gate=approval_gate,
+            tracer=tracer,
+            event_bus=event_bus,
+            audit=audit,
+            dependencies=dependencies,
+            spotlight_tool_outputs=spotlight_tool_outputs,
+            normalize_inputs=normalize_inputs,
+            tool_error_mode=tool_error_mode,
             model_router=model_router,
             input_media=input_media,
             output_media=output_media,
@@ -973,6 +1015,40 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             return self._persistent_memory.get_conversation_messages()  # type: ignore[return-value]
         return []
 
+    def reset(self) -> None:
+        """Clear conversation history and start a fresh session.
+
+        Resets the agent to a clean state as if it was just constructed.
+        Clears the in-memory context window (accumulated conversation messages)
+        and the persistent conversation memory (if configured).
+
+        Does **not** clear episodic, semantic, or procedural memories — only the
+        active conversation history.  Use ``agent.forget()`` to remove specific
+        memories, or create a new agent instance to drop everything.
+
+        Example::
+
+            agent = Agent(model=Model.mock(), memory=Memory())
+
+            agent.run("My name is Alice")
+            agent.run("What's my name?")  # → "Alice"
+
+            agent.reset()
+
+            agent.run("What's my name?")  # → no context, cannot know
+        """
+        # Reset the context manager's accumulated messages
+        ctx = getattr(self, "_context", None)
+        if ctx is not None and hasattr(ctx, "_current_messages"):
+            ctx._current_messages = None
+
+        # Clear conversation segments from persistent memory
+        mem = self._persistent_memory
+        if mem is not None:
+            seg_store = getattr(mem, "_segment_store", None)
+            if seg_store is not None and hasattr(seg_store, "clear"):
+                seg_store.clear()
+
     @property
     def checkpointer(self) -> Checkpointer | None:
         """Checkpointer for manual save/load. None if checkpointing disabled."""
@@ -997,7 +1073,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             Checkpoint ID (str) for load_checkpoint, or None if disabled.
 
         Example:
-            >>> agent = Agent(model=m, config=AgentConfig(checkpoint=CheckpointConfig(storage="memory")))
+            >>> agent = Agent(model=m, checkpoint=CheckpointConfig(storage="memory"))
             >>> cid = agent.save_checkpoint(reason="before_expensive_step")
             >>> agent.load_checkpoint(cid)
         """
@@ -1314,8 +1390,8 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         if self._budget is None or self._budget.max_cost is None:
             return None
         effective = (
-            (self._budget.max_cost - self._budget.reserve)
-            if self._budget.max_cost > self._budget.reserve
+            (self._budget.max_cost - self._budget.safety_margin)
+            if self._budget.max_cost > self._budget.safety_margin
             else self._budget.max_cost
         )
         spent = self._budget_tracker.current_run_cost
@@ -1356,7 +1432,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         }
         if budget is not None:
             result["max_cost"] = budget.max_cost
-            result["reserve"] = budget.reserve
+            result["safety_margin"] = budget.safety_margin
             result["exceed_policy"] = (
                 budget.exceed_policy.value if budget.exceed_policy is not None else None
             )
@@ -1611,7 +1687,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
     def remember(
         self,
         content: str,
-        memory_type: MemoryType = MemoryType.EPISODIC,
+        memory_type: MemoryType = MemoryType.HISTORY,
         importance: float = 1.0,
         **metadata: object,
     ) -> str:
@@ -1620,14 +1696,14 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         Why: Let the agent remember user preferences, past events, or learned facts
         across sessions. Recalled automatically before each request based on relevance.
 
-        Memory types: CORE (identity/prefs), EPISODIC (events), SEMANTIC (facts),
-        PROCEDURAL (patterns). Importance 0.0–1.0 affects recall ranking.
+        Memory types: FACTS (identity/prefs), HISTORY (events), KNOWLEDGE (facts),
+        INSTRUCTIONS (patterns). Importance 0.0–1.0 affects recall ranking.
 
-        Requires persistent memory (Memory). Use memory=None or MemoryPreset.DISABLED to disable.
+        Requires persistent memory (Memory). Use memory=None to disable.
 
         Args:
             content: Text to store (e.g. "User prefers dark mode").
-            memory_type: CORE, EPISODIC, SEMANTIC, or PROCEDURAL. Default EPISODIC.
+            memory_type: FACTS, HISTORY, KNOWLEDGE, or INSTRUCTIONS. Default HISTORY.
             importance: 0.0–1.0. Higher = more likely to be recalled.
             **metadata: Optional fields (user_id, session_id, etc.).
 
@@ -1635,7 +1711,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             Memory ID (str) for forget(memory_id=...).
 
         Example:
-            >>> agent.remember("User name is Alice", memory_type=MemoryType.CORE)
+            >>> agent.remember("User name is Alice", memory_type=MemoryType.FACTS)
             'uuid-abc-123'
             >>> agent.run("What's my name?")  # Recalls automatically
         """
@@ -1656,14 +1732,14 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
 
         Args:
             query: Search text (e.g. "user preferences"). None = list all.
-            memory_type: Filter to CORE, EPISODIC, SEMANTIC, or PROCEDURAL.
+            memory_type: Filter to FACTS, HISTORY, KNOWLEDGE, or INSTRUCTIONS.
             limit: Max results. Default 10.
 
         Returns:
             List of MemoryEntry (id, content, type, importance, metadata).
 
         Example:
-            >>> entries = agent.recall("name", memory_type=MemoryType.CORE)
+            >>> entries = agent.recall("name", memory_type=MemoryType.FACTS)
             >>> print([e.content for e in entries])
             ['User name is Alice']
         """
@@ -2068,7 +2144,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
         messages: list[object],
         max_output_tokens: int = 1024,
     ) -> None:
-        """If run budget would be exceeded after an estimated call, call on_exceeded and raise.
+        """If run budget would be exceeded after an estimated call, invoke the exceed handler.
 
         Best-effort: uses estimated cost; actual cost may differ. Call before complete().
         Skipped when run limit is 0 (post-call check only).
@@ -2433,11 +2509,7 @@ class Agent(Watchable, Servable, metaclass=_AgentMeta):
             )
         _validate_user_input(user_input, "run", self._max_input_length)
         # 6.1: Normalize user input if enabled
-        if (
-            isinstance(user_input, str)
-            and self._config is not None
-            and getattr(self._config, "normalize_inputs", False)
-        ):
+        if isinstance(user_input, str) and getattr(self, "_normalize_inputs", False):
             from syrin.guardrails.injection._normalize import normalize_input
 
             user_input = normalize_input(user_input)

@@ -17,7 +17,7 @@ This is the feature built in direct response to the $47,000 incident. Shared bud
 ```python
 import asyncio
 from syrin import Agent, Budget, Model
-from syrin.enums import ExceedPolicy
+from syrin.enums import ExceedPolicy, AgentRole
 from syrin.swarm import Swarm, SwarmConfig
 from syrin.enums import SwarmTopology
 
@@ -35,7 +35,7 @@ class EditorAgent(Agent):
 
 async def main():
     swarm = Swarm(
-        agents=[ResearchAgent(), WriterAgent(), EditorAgent()],
+        agents=[ResearchAgent, WriterAgent, EditorAgent],  # class references, auto-instantiated
         goal="Write a brief overview of Python programming language",
         budget=Budget(max_cost=1.00, exceed_policy=ExceedPolicy.WARN),
         config=SwarmConfig(topology=SwarmTopology.PARALLEL),
@@ -98,7 +98,7 @@ class WriterAgent(Agent):
 
 async def main():
     swarm = Swarm(
-        agents=[ResearchAgent(), WriterAgent()],
+        agents=[ResearchAgent, WriterAgent],  # class references, auto-instantiated
         goal="Write an overview of machine learning",
         budget=Budget(
             max_cost=1.00,         # Total pool: $1.00 for all agents
@@ -157,7 +157,7 @@ class SummarizerAgent(Agent):
 
 async def main():
     swarm = Swarm(
-        agents=[AnalystAgent(), SummarizerAgent()],
+        agents=[AnalystAgent, SummarizerAgent],  # class references
         goal="Analyze Q4 sales data and summarize findings",
         config=SwarmConfig(topology=SwarmTopology.PARALLEL),
     )
@@ -267,7 +267,7 @@ class WriterAgent(Agent):
     system_prompt = "You write clear summaries based on research."
 
 swarm = Swarm(
-    agents=[ResearchAgent(), WriterAgent()],
+    agents=[ResearchAgent, WriterAgent],  # class references, auto-instantiated
     goal="Write a brief overview of Python programming language",
     budget=Budget(max_cost=1.00, exceed_policy=ExceedPolicy.WARN),
     config=SwarmConfig(topology=SwarmTopology.PARALLEL),
@@ -290,10 +290,18 @@ import asyncio
 from syrin import Agent, Model
 from syrin.swarm import Swarm
 
+class ResearchAgent(Agent):
+    model = Model.mock()
+    system_prompt = "You research topics."
+
+class WriterAgent(Agent):
+    model = Model.mock()
+    system_prompt = "You write summaries."
+
 async def main():
     swarm = Swarm(
-        agents=[...],
-        goal="...",
+        agents=[ResearchAgent, WriterAgent],
+        goal="Research and summarize recent AI news",
     )
     
     handle = swarm.play()       # Starts in background, returns immediately
@@ -308,17 +316,46 @@ async def main():
     print(result.content[:60])
 ```
 
+### SwarmController via handle.controller
+
+Get a `SwarmController` bound to the live swarm without any manual wiring:
+
+```python
+async def main():
+    researcher = ResearchAgent()
+    writer = WriterAgent()
+    
+    swarm = Swarm(agents=[researcher, writer], goal="...")
+    handle = swarm.play()
+    
+    # Get the controller directly from the handle
+    ctrl = handle.controller
+    
+    # Pass agent objects — no string IDs needed
+    await ctrl.pause_agent(researcher)
+    await ctrl.change_context(writer, "Focus on key bullet points only")
+    await ctrl.resume_agent(researcher)
+    
+    result = await handle.wait()
+```
+
+Each `Agent()` instance is automatically assigned a unique `agent_id` (`ClassName-<hex>`) at creation time. Pass the object directly to controller methods instead of managing string IDs manually.
+
 You can also cancel a specific agent while letting the others continue:
 
 ```python
 await swarm.cancel_agent("ResearchAgent")  # Cancel by class name
 ```
 
+The cancelled agent is terminated immediately; its partial output (if any) goes into `result.partial_results`. The remaining agents continue running.
+
 Check the status of each agent mid-run:
 
 ```python
 for entry in swarm.agent_statuses():
     print(f"{entry.agent_name}: {entry.state}")
+    # entry.agent_name — class name of the agent
+    # entry.state      — AgentStatus (IDLE, RUNNING, PAUSED, KILLED, ...)
 ```
 
 ## Serving the Swarm
@@ -327,7 +364,7 @@ Give your swarm an HTTP interface:
 
 ```python
 swarm = Swarm(
-    agents=[ResearchAgent(), WriterAgent()],
+    agents=[ResearchAgent, WriterAgent],  # class references
     goal="AI research assistant",
 )
 swarm.serve(port=8000)
@@ -336,6 +373,49 @@ swarm.serve(port=8000)
 This exposes:
 - `POST /chat` — send a goal, get back the swarm result
 - `GET /graph` — returns the execution graph as Mermaid diagram (for WORKFLOW topology)
+
+## Agent Roles
+
+Declare an agent's authority role at the class level using the `role` class attribute (default: `AgentRole.WORKER`):
+
+```python
+from syrin import Agent, Model
+from syrin.enums import AgentRole
+
+class SupervisorAgent(Agent):
+    role = AgentRole.SUPERVISOR
+    team = [ResearchAgent, WriterAgent]
+    model = Model.mock()
+    system_prompt = "You coordinate the research and writing team."
+
+class ResearchAgent(Agent):
+    model = Model.mock()
+    system_prompt = "You research topics."
+
+class WriterAgent(Agent):
+    model = Model.mock()
+    system_prompt = "You write summaries."
+```
+
+To build the authority guard from class metadata — no string IDs required:
+
+```python
+from syrin.swarm import build_guard_from_agents
+
+supervisor = SupervisorAgent()
+researcher = ResearchAgent()
+writer = WriterAgent()
+
+guard = build_guard_from_agents([supervisor, researcher, writer])
+
+swarm = Swarm(
+    agents=[supervisor, researcher, writer],
+    goal="Research and write a report on quantum computing",
+    authority_guard=guard,
+)
+```
+
+`build_guard_from_agents()` reads each agent's `role` and `team` class attributes to construct the `SwarmAuthorityGuard` automatically. See [Agent Authority](/multi-agent/authority) for the full permissions model.
 
 ## What's Next
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from syrin import Agent, CheckpointConfig, Model
-from syrin.agent.config import AgentConfig
 from syrin.memory import Memory
 
 
@@ -20,7 +19,7 @@ class TestCheckpointStoresMessages:
             model=Model.Almock(),
             system_prompt="You are helpful.",
             memory=mem,
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory")),
+            checkpoint=CheckpointConfig(storage="memory"),
         )
         checkpoint_id = agent.save_checkpoint()
 
@@ -36,7 +35,7 @@ class TestCheckpointStoresMessages:
         agent = Agent(
             model=Model.Almock(),
             system_prompt="Hi",
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory")),
+            checkpoint=CheckpointConfig(storage="memory"),
         )
         checkpoint_id = agent.save_checkpoint()
         assert checkpoint_id is not None
@@ -51,7 +50,7 @@ class TestCheckpointStoresMessages:
             model=Model.Almock(),
             system_prompt="Hi",
             memory=mem,
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory")),
+            checkpoint=CheckpointConfig(storage="memory"),
         )
         # Run a response to trigger prepare and populate snapshot
         agent.run("Hello")
@@ -78,7 +77,7 @@ class TestLoadCheckpointRestoresMessages:
             model=Model.Almock(),
             system_prompt="Hi",
             memory=mem,
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory")),
+            checkpoint=CheckpointConfig(storage="memory"),
         )
         cid = agent.save_checkpoint()
 
@@ -98,7 +97,7 @@ class TestLoadCheckpointRestoresMessages:
         agent = Agent(
             model=Model.Almock(),
             system_prompt="Hi",
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory")),
+            checkpoint=CheckpointConfig(storage="memory"),
         )
         agent._last_iteration = 5
         cid = agent.save_checkpoint()
@@ -114,7 +113,7 @@ class TestLoadCheckpointRestoresMessages:
             model=Model.Almock(),
             system_prompt="Hi",
             memory=None,
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory")),
+            checkpoint=CheckpointConfig(storage="memory"),
         )
         agent._last_iteration = 3
         cid = agent.save_checkpoint()
@@ -129,7 +128,7 @@ class TestLoadCheckpointRestoresMessages:
         """Loading nonexistent checkpoint returns False."""
         agent = Agent(
             model=Model.Almock(),
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory")),
+            checkpoint=CheckpointConfig(storage="memory"),
         )
         ok = agent.load_checkpoint("nonexistent_xyz")
         assert ok is False
@@ -145,7 +144,7 @@ class TestCheckpointRoundtrip:
             model=Model.Almock(),
             system_prompt="You are helpful.",
             memory=mem,
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory")),
+            checkpoint=CheckpointConfig(storage="memory"),
         )
         agent.run("What is 2+2?")
         agent.run("And 3+3?")
@@ -158,7 +157,7 @@ class TestCheckpointRoundtrip:
             model=Model.Almock(),
             system_prompt="You are helpful.",
             memory=mem2,
-            config=AgentConfig(checkpoint=agent._checkpointer),
+            checkpoint=agent._checkpointer,
         )
         ok = agent2.load_checkpoint(cid)
         assert ok is True

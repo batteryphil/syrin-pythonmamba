@@ -24,8 +24,7 @@ if str(_root) not in sys.path:
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock
-from syrin import Agent
+from syrin import Agent, Model
 from syrin.enums import ServeProtocol
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -34,7 +33,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 class Assistant(Agent):
     name = "assistant"
     description = "Helpful assistant"
-    model = almock
+    model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
     system_prompt = "You are a helpful assistant."
 
 

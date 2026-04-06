@@ -25,7 +25,7 @@ import statistics
 import threading
 import warnings
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import ClassVar, Protocol, runtime_checkable
 
@@ -200,7 +200,7 @@ def _compute_trend_weekly_pct(
     """
     from datetime import timedelta  # noqa: PLC0415
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     recent_cutoff = now
     mid_cutoff = now - timedelta(days=7)
     prior_cutoff = now - timedelta(days=14)
@@ -215,7 +215,7 @@ def _compute_trend_weekly_pct(
         try:
             ts = datetime.fromisoformat(str(raw_ts))
             if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
+                ts = ts.replace(tzinfo=UTC)
         except (ValueError, TypeError):
             continue
         cost = float(r["cost"])  # type: ignore[arg-type]
@@ -281,7 +281,7 @@ class FileBudgetStore:
             agent_name: The agent's class name.
             cost: Actual USD cost of the run.
         """
-        timestamp = datetime.now(tz=timezone.utc).isoformat()
+        timestamp = datetime.now(tz=UTC).isoformat()
         entry = {"agent_name": agent_name, "cost": cost, "timestamp": timestamp}
         with self._lock, self._path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(entry) + "\n")
@@ -499,7 +499,7 @@ class HMACFileBudgetStore(FileBudgetStore):
             cost: Actual USD cost of the run.
         """
         with self._lock:
-            timestamp = datetime.now(tz=timezone.utc).isoformat()
+            timestamp = datetime.now(tz=UTC).isoformat()
             entry = {"agent_name": agent_name, "cost": cost, "timestamp": timestamp}
             with self._path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry) + "\n")

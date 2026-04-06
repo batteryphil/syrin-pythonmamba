@@ -591,7 +591,7 @@ class A2ARouter:
 
         try:
             await asyncio.wait_for(fut, timeout=timeout)
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             self._ack_futures.pop(envelope.message_id, None)
             self._fire(
                 Hook.A2A_MESSAGE_TIMEOUT,
@@ -632,7 +632,7 @@ class A2ARouter:
                 envelope = await asyncio.wait_for(queue.get(), timeout=timeout)
             else:
                 envelope = await queue.get()
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
         self._fire(

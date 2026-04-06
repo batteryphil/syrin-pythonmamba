@@ -38,7 +38,46 @@ Roles map to sets of `AgentPermission` values:
 
 The default rules: ADMIN has every permission on every agent. ORCHESTRATOR has CONTROL, CONTEXT, and SPAWN on agents in its team. SUPERVISOR has CONTROL on agents in its team. WORKER has SIGNAL only.
 
-## SwarmAuthorityGuard
+## Declaring Roles on Agent Classes
+
+The recommended way to assign roles is via a `role` class attribute on the `Agent` subclass:
+
+```python
+from syrin import Agent, Model
+from syrin.enums import AgentRole
+
+class SupervisorAgent(Agent):
+    role = AgentRole.SUPERVISOR
+    team = [WorkerAgent]          # agents this supervisor can control
+    model = Model.mock()
+    system_prompt = "You coordinate the team."
+
+class WorkerAgent(Agent):
+    # role defaults to AgentRole.WORKER
+    model = Model.mock()
+    system_prompt = "You execute tasks."
+```
+
+`role` and `team` are `ClassVar` fields. `team` is a list of `Agent` subclasses that this agent has authority over. The `WORKER` role is the default and does not need to be declared explicitly.
+
+## build_guard_from_agents()
+
+Build the `SwarmAuthorityGuard` directly from instantiated agents — no free strings, no manual ID management:
+
+```python
+from syrin.swarm import build_guard_from_agents
+
+supervisor = SupervisorAgent()
+worker = WorkerAgent()
+
+guard = build_guard_from_agents([supervisor, worker])
+```
+
+`build_guard_from_agents()` reads each agent's `role` and `team` class attributes and maps `agent_id` values automatically. Each `Agent()` instance is assigned a unique `agent_id` (`ClassName-<hex>`) at creation time.
+
+## SwarmAuthorityGuard (manual setup)
+
+You can still build the guard manually when you need explicit control:
 
 ```python
 from syrin.swarm import SwarmAuthorityGuard
@@ -46,21 +85,20 @@ from syrin.enums import AgentRole, AgentPermission
 
 guard = SwarmAuthorityGuard(
     roles={
-        "supervisor-1": AgentRole.SUPERVISOR,
-        "worker-1":     AgentRole.WORKER,
-        "worker-2":     AgentRole.WORKER,
+        supervisor.agent_id: AgentRole.SUPERVISOR,
+        worker.agent_id:     AgentRole.WORKER,
     },
     teams={
-        "supervisor-1": ["worker-1", "worker-2"],  # supervisor's team
+        supervisor.agent_id: [worker.agent_id],
     },
 )
 
 # Check without raising — returns True/False
-if guard.check("supervisor-1", AgentPermission.CONTROL, "worker-1"):
+if guard.check(supervisor.agent_id, AgentPermission.CONTROL, worker.agent_id):
     print("Permission granted")
 
 # Require — raises AgentPermissionError if denied
-guard.require("supervisor-1", AgentPermission.CONTROL, "worker-1")
+guard.require(supervisor.agent_id, AgentPermission.CONTROL, worker.agent_id)
 ```
 
 `check()` returns `True` or `False`. Use it when you want to branch on permission. `require()` raises `AgentPermissionError` if the permission is denied — use it when a denied permission should stop execution.
@@ -100,56 +138,97 @@ Three hooks fire for authority events:
 
 ## Audit Log
 
-Every successful control action is recorded and retrievable:
+Every successful control action is recorded and retrievable. `AuditEntry.action` is a `ControlAction` enum value — not a free string:
 
 ```python
-guard.record_action("supervisor-1", "worker-1", "pause")
+from syrin.enums import ControlAction
+
+guard.record_action(supervisor.agent_id, worker.agent_id, ControlAction.PAUSE)
 log = guard.audit_log()
-# [AuditEntry(actor_id="supervisor-1", target_id="worker-1", action="pause", timestamp=...)]
+# [AuditEntry(actor_id="SupervisorAgent-a1b2", target_id="WorkerAgent-c3d4",
+#             action=ControlAction.PAUSE, timestamp=...)]
+
+for entry in log:
+    print(f"{entry.actor_id} → {entry.target_id}: {entry.action}")
 ```
 
-Use this for compliance, debugging, or tracing how agents interacted.
+`ControlAction` values: `PAUSE`, `RESUME`, `SKIP`, `KILL`, `CHANGE_CONTEXT`, `DELEGATE`, `REVOKE`. See the [Enums reference](/reference/enums#controlaction) for the full table.
+
+Use the audit log for compliance, debugging, or tracing how agents interacted.
 
 ## SwarmController
 
-`SwarmController` is the high-level API for taking control actions — it combines the guard check with the actual state modification:
+`SwarmController` is the high-level API for taking control actions — it combines the guard check with the actual state modification.
+
+### Getting the controller from a live swarm
+
+The easiest way to get a controller is via `handle.controller` after calling `swarm.play()`:
+
+```python
+from syrin.swarm import Swarm, build_guard_from_agents
+
+supervisor = SupervisorAgent()
+worker = WorkerAgent()
+
+swarm = Swarm(
+    agents=[supervisor, worker],
+    goal="...",
+    authority_guard=build_guard_from_agents([supervisor, worker]),
+)
+handle = swarm.play()
+
+# Bound to the live swarm — no manual wiring needed
+ctrl = handle.controller
+
+# Pass agent objects directly
+await ctrl.pause_agent(worker)
+await ctrl.change_context(worker, "Be more concise")
+await ctrl.resume_agent(worker)
+snap = await ctrl.read_agent_state(worker)
+
+result = await handle.wait()
+```
+
+### Manual wiring
 
 ```python
 from syrin.swarm import SwarmController, SwarmAuthorityGuard, AgentStateSnapshot
 from syrin.enums import AgentRole, AgentStatus
 
-guard = SwarmAuthorityGuard(
-    roles={"sup": AgentRole.SUPERVISOR, "w1": AgentRole.WORKER},
-    teams={"sup": ["w1"]},
-)
+supervisor = SupervisorAgent()
+worker = WorkerAgent()
+guard = build_guard_from_agents([supervisor, worker])
 
 state = {
-    "w1": AgentStateSnapshot(
-        agent_id="w1",
+    worker.agent_id: AgentStateSnapshot(
+        agent_id=worker.agent_id,
         status=AgentStatus.RUNNING,
         role=AgentRole.WORKER,
         last_output_summary="Processing...",
         cost_spent=0.10,
         task="analyse data",
         context_override=None,
-        supervisor_id="sup",
+        supervisor_id=supervisor.agent_id,
     )
 }
 
 ctrl = SwarmController(
-    actor_id="sup",
+    actor_id=supervisor.agent_id,
     guard=guard,
     state_registry=state,
     task_registry={},
 )
 
-await ctrl.pause_agent("w1")
-await ctrl.change_context("w1", "Be more concise")
-await ctrl.resume_agent("w1")
-snap = await ctrl.read_agent_state("w1")
+await ctrl.pause_agent(worker)
+await ctrl.change_context(worker, "Be more concise")
+await ctrl.resume_agent(worker)
 ```
 
-Five control methods are available. `pause_agent(id)` requires CONTROL permission and sets the agent's status to PAUSED. `resume_agent(id)` requires CONTROL and returns the agent to RUNNING. `skip_agent(id)` requires CONTROL and sets status to IDLE, cancelling the current task. `kill_agent(id)` requires CONTROL and sets status to KILLED. `change_context(id, ctx)` requires CONTROL and sets the agent's `context_override` string. `read_agent_state(id)` requires READ permission and returns an `AgentStateSnapshot`.
+### Control methods
+
+`pause_agent(agent)` requires CONTROL permission and sets the agent's status to PAUSED. `resume_agent(agent)` requires CONTROL and returns the agent to RUNNING. `skip_agent(agent)` requires CONTROL and sets status to IDLE, cancelling the current task. `kill_agent(agent)` requires CONTROL and sets status to KILLED. `change_context(agent, ctx)` requires CONTROL and sets the agent's `context_override` string. `read_agent_state(agent)` requires READ permission and returns an `AgentStateSnapshot`.
+
+All methods accept an `Agent` instance (recommended) or a string `agent_id`. The string form still works but using objects is preferred — IDs are managed for you.
 
 The `AgentStateSnapshot` has these fields: `agent_id`, `status` (an `AgentStatus` value), `role` (an `AgentRole` value), `last_output_summary` (always 500 characters or fewer), `cost_spent`, `task`, `context_override`, and `supervisor_id`.
 

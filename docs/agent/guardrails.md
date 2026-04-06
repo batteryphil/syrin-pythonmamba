@@ -230,6 +230,132 @@ agent.events.on(Hook.GUARDRAIL_OUTPUT, lambda ctx: print(
 ))
 ```
 
+## More Built-in Guardrails
+
+### CitationGuardrail
+
+Ensures factual statements in output include source citations. Use when your agent accesses knowledge bases or documents and you need verifiable claims.
+
+```python
+from syrin.guardrails import CitationGuardrail
+from syrin.enums import DecisionAction
+
+guardrail = CitationGuardrail(
+    require_source=True,    # Factual sentences must cite a source
+    require_page=False,     # Whether page numbers are required
+    missing_marker="[UNVERIFIED]",  # Suffix added when citation is missing
+    action=DecisionAction.FLAG,     # FLAG annotates without blocking; BLOCK rejects
+)
+```
+
+When a paragraph contains numbers, percentages, or named entities but no citation marker (e.g. `[Source: doc.pdf]`, `[1]`, `(page 5)`), the guardrail fires. With `action=FLAG` it annotates the response; with `action=BLOCK` it rejects it.
+
+### FactVerificationGuardrail
+
+Verifies output claims against grounded facts produced by knowledge search. A no-op when no grounding data is present.
+
+```python
+from syrin.guardrails import FactVerificationGuardrail
+from syrin.enums import DecisionAction
+
+guardrail = FactVerificationGuardrail(
+    action=DecisionAction.FLAG,  # FLAG or BLOCK
+    min_confidence=0.7,          # Minimum confidence for a grounded fact to count
+)
+```
+
+The guardrail reads `grounded_facts` from the context metadata populated when grounding-enabled knowledge is used. If the agent's output makes a numerical claim not found in verified facts, the guardrail fires.
+
+Pair with a knowledge store that has `grounding=True`:
+
+```python
+from syrin import Agent, Model
+from syrin.guardrails import FactVerificationGuardrail
+from syrin.knowledge import Knowledge
+
+agent = Agent(
+    model=Model.mock(),
+    knowledge=Knowledge(..., grounding=True),
+    guardrails=[FactVerificationGuardrail(action=DecisionAction.FLAG)],
+)
+```
+
+### CapabilityGuardrail
+
+Checks that the user has a valid capability token with the required scope before the request proceeds. Use for role-based or quota-based access control.
+
+```python
+from syrin.guardrails import CapabilityGuardrail
+
+guardrail = CapabilityGuardrail(
+    required_capability="finance:transfer",  # Required capability scope
+    consume_budget=True,                     # Decrement the token budget on each call
+)
+```
+
+The user object in the guardrail context must have a `get_capability_token()` method or `capability_token` attribute that returns a token with `.is_valid()`, `.can(scope)`, and `.consume(n)` methods.
+
+Blocks if: no user in context, no capability token, token expired, token scope doesn't match, or budget exhausted.
+
+## Chaining Guardrails
+
+`GuardrailChain` evaluates guardrails in sequence and stops at the first failure. Use it when order matters or when cheap checks should gate expensive ones.
+
+```python
+from syrin.guardrails import GuardrailChain, ContentFilter, LengthGuardrail, PIIScanner
+
+chain = GuardrailChain(
+    guardrails=[
+        LengthGuardrail(min_length=1, max_length=5000),  # Cheap: check length first
+        ContentFilter(blocked_words=["password", "secret"]),  # Then keyword scan
+        PIIScanner(redact=True),  # Most expensive: PII detection last
+    ],
+    timeout_s=30.0,  # Max seconds per guardrail evaluation
+)
+
+agent = Agent(
+    model=Model.mock(),
+    system_prompt="You are helpful.",
+    guardrails=[chain],  # Chain is itself a guardrail
+)
+```
+
+The chain stops as soon as one guardrail returns `passed=False`. This is more efficient than running all guardrails in parallel when early failures are common.
+
+Add guardrails dynamically:
+
+```python
+chain = GuardrailChain()
+chain.add(LengthGuardrail(min_length=1, max_length=5000))
+chain.add(ContentFilter(blocked_words=["banned"]))
+```
+
+## Stage: Input vs. Output
+
+Every guardrail can run on the input (before the LLM sees it), the output (before the user sees it), or both. Set `stage` on each guardrail:
+
+```python
+from syrin.enums import GuardrailStage
+from syrin.guardrails import ContentFilter, LengthGuardrail
+
+agent = Agent(
+    model=Model.mock(),
+    system_prompt="You are helpful.",
+    guardrails=[
+        ContentFilter(
+            blocked_words=["password"],
+            stage=GuardrailStage.INPUT,   # Input only (default)
+        ),
+        LengthGuardrail(
+            max_length=2000,
+            stage=GuardrailStage.OUTPUT,  # Output only
+        ),
+    ],
+)
+```
+
+`GuardrailStage` values: `INPUT` (before LLM call), `OUTPUT` (before returning to user), `ACTION` (before tool execution).
+
 ## What's Next
 
 - [Security](/agent-kit/security/pii-guardrail) — PII guardrail in depth

@@ -125,41 +125,257 @@ entry = MemoryEntry(
 
 ## Using the Bus in a Swarm
 
-In a real multi-agent system, you create one `MemoryBus` and share it between agents. Agents publish findings, and others read them:
+The `Swarm` class does not have a built-in `memory_bus` parameter.  Instead, inject the bus into each agent that needs it via `__init__`.  Create the bus first, pass it when constructing agent instances, then pass those instances (not classes) to the `Swarm`.
 
 ```python
 import asyncio
-from syrin import Agent, Model
+from datetime import datetime
+from syrin import Agent, Budget, Model
+from syrin.response import Response
+from syrin.swarm import Swarm, SwarmConfig
 from syrin.swarm._memory_bus import MemoryBus
 from syrin.memory.config import MemoryEntry
-from syrin.enums import MemoryType
-from datetime import datetime
+from syrin.enums import MemoryType, SwarmTopology
 
+# 1. Create the shared bus
 bus = MemoryBus(allow_types=[MemoryType.SEMANTIC])
 
-async def researcher_task():
-    # Simulate a researcher agent finding something
-    finding = MemoryEntry(
-        id="finding-1",
-        content="Large language models perform better with chain-of-thought prompting",
-        type=MemoryType.SEMANTIC,
-        importance=0.85,
-        keywords=["LLM", "prompting", "chain-of-thought"],
-        created_at=datetime.now(),
+
+class ResearchAgent(Agent):
+    model = Model.mock()
+    system_prompt = "You research topics and surface key facts."
+
+    def __init__(self, memory_bus: MemoryBus) -> None:
+        super().__init__()
+        self._bus = memory_bus
+
+    async def arun(self, input_text: str) -> Response[str]:
+        finding = "Chain-of-thought prompting improves LLM accuracy by 30-40% on reasoning tasks"
+        # 2. Publish finding to the shared bus
+        await self._bus.publish(
+            MemoryEntry(
+                id="finding-cot",
+                content=finding,
+                type=MemoryType.SEMANTIC,
+                importance=0.9,
+                keywords=["prompting", "reasoning", "chain-of-thought"],
+                created_at=datetime.now(),
+            ),
+            agent_id=self.agent_id,
+        )
+        return Response(content=finding)
+
+
+class WriterAgent(Agent):
+    model = Model.mock()
+    system_prompt = "You write concise summaries from research findings."
+
+    def __init__(self, memory_bus: MemoryBus) -> None:
+        super().__init__()
+        self._bus = memory_bus
+
+    async def arun(self, input_text: str) -> Response[str]:
+        # 3. Read relevant findings from the bus
+        findings = await self._bus.read(query="prompting strategies", agent_id=self.agent_id)
+        context = "\n".join(f.content for f in findings)
+        return Response(content=f"Summary based on {len(findings)} finding(s):\n{context}")
+
+
+async def main() -> None:
+    # 4. Pass agent instances (not classes) so the injected bus is preserved
+    swarm = Swarm(
+        agents=[ResearchAgent(bus), WriterAgent(bus)],
+        goal="Summarise best practices for LLM prompting",
+        budget=Budget(max_cost=1.00),
+        config=SwarmConfig(topology=SwarmTopology.PARALLEL),
     )
-    published = await bus.publish(finding, agent_id="researcher")
-    print(f"Researcher published: {published}")
+    result = await swarm.run()
+    print(result.content)
 
-async def writer_task():
-    # Simulate a writer agent looking for relevant content
-    relevant = await bus.read(query="prompting strategies", agent_id="writer")
-    print(f"Writer found {len(relevant)} relevant entries")
-    for entry in relevant:
-        print(f"  - {entry.content[:60]}")
+asyncio.run(main())
+```
 
-async def main():
-    await researcher_task()
-    await writer_task()
+**Why instances, not classes?**  When you pass a class like `ResearchAgent`, `Swarm` calls `ResearchAgent()` with no arguments.  That works for agents with no dependencies, but breaks when `__init__` requires a `memory_bus`.  Pass pre-constructed instances instead and the injected state is preserved.
+
+### Timing: Parallel vs. Staged
+
+In `PARALLEL` topology all agents start simultaneously — a writer querying the bus before the researcher finishes will find nothing.  Two ways to handle ordering:
+
+**Option A — ORCHESTRATOR topology:** Make the synthesiser the orchestrator.  It spawns researchers via `self.spawn_many()`, which blocks until they finish, then reads the bus.
+
+```python
+class SynthesisAgent(Agent):
+    def __init__(self, memory_bus: MemoryBus) -> None:
+        super().__init__()
+        self._bus = memory_bus
+
+    async def arun(self, input_text: str) -> Response[str]:
+        # Spawn researchers and wait for them to publish
+        await self.spawn_many([
+            SpawnSpec(agent=BiologyAgent(self._bus), task=input_text, budget=1.00),
+            SpawnSpec(agent=ChemistryAgent(self._bus), task=input_text, budget=1.00),
+        ])
+        # Now the bus has all findings
+        findings = await self._bus.read(query=input_text, agent_id=self.agent_id)
+        return Response(content="\n".join(f.content for f in findings))
+```
+
+**Option B — Workflow:** Run research steps in parallel, then the synthesis step sequentially.  See [Workflow](/multi-agent/workflow) for the `parallel_step` + `step` API.
+
+**Option C — Pre-loaded bus:** If you have existing knowledge (from a previous run, a database, or domain data), load it into the bus before the swarm starts.  All agents can then query it immediately, regardless of topology.
+
+```python
+# Pre-load domain knowledge before the swarm runs
+async def seed_bus(bus: MemoryBus) -> None:
+    await bus.publish(MemoryEntry(
+        id="domain-001",
+        content="Compound X shows 80% bioavailability in phase-1 trials",
+        type=MemoryType.SEMANTIC,
+        importance=0.95,
+        keywords=["compound-x", "bioavailability", "phase-1"],
+        created_at=datetime.now(),
+    ), agent_id="seed")
+```
+
+## Research Swarm Pattern (End-to-End)
+
+This is the recommended pattern for a team of specialist agents collaborating on a shared research goal — for example, a biotech drug research swarm.  Researchers publish findings independently; the synthesis agent reads the complete set when it runs.
+
+```python
+import asyncio
+from datetime import datetime
+from syrin import Agent, Budget, Model
+from syrin.response import Response
+from syrin.swarm import Swarm, SwarmConfig
+from syrin.swarm._spawn import SpawnSpec
+from syrin.swarm._memory_bus import MemoryBus
+from syrin.memory.config import MemoryEntry
+from syrin.enums import MemoryType, SwarmTopology
+
+# Shared bus — one instance, injected into every agent that needs it
+bus = MemoryBus(
+    allow_types=[MemoryType.SEMANTIC],
+    filter=lambda e: e.importance >= 0.7,  # only high-confidence findings
+)
+
+
+# ── Specialist researchers ─────────────────────────────────────────────────────
+
+class BiologyResearchAgent(Agent):
+    """Studies the biological mechanism of a compound."""
+
+    model = Model.mock()
+    system_prompt = (
+        "You are a molecular biologist. Research the mechanism of action "
+        "for the given compound and summarise your findings."
+    )
+
+    def __init__(self, memory_bus: MemoryBus) -> None:
+        super().__init__()
+        self._bus = memory_bus
+
+    async def arun(self, input_text: str) -> Response[str]:
+        finding = (
+            "Compound X inhibits ACE2 receptor binding by 73% in-vitro "
+            "through competitive antagonism at the S1 domain."
+        )
+        await self._bus.publish(
+            MemoryEntry(
+                id="bio-001",
+                content=finding,
+                type=MemoryType.SEMANTIC,
+                importance=0.92,
+                keywords=["biology", "ACE2", "mechanism", "compound-x"],
+                created_at=datetime.now(),
+            ),
+            agent_id=self.agent_id,
+        )
+        return Response(content=finding)
+
+
+class ChemistryResearchAgent(Agent):
+    """Analyses the chemical and pharmacokinetic properties."""
+
+    model = Model.mock()
+    system_prompt = (
+        "You are a medicinal chemist. Analyse the ADMET profile and "
+        "synthesis pathway for the given compound."
+    )
+
+    def __init__(self, memory_bus: MemoryBus) -> None:
+        super().__init__()
+        self._bus = memory_bus
+
+    async def arun(self, input_text: str) -> Response[str]:
+        finding = (
+            "Compound X: MW=412 Da, LogP=2.1, t½=8h, >90% oral bioavailability. "
+            "Synthesis feasible in 6 steps from commercially available precursors."
+        )
+        await self._bus.publish(
+            MemoryEntry(
+                id="chem-001",
+                content=finding,
+                type=MemoryType.SEMANTIC,
+                importance=0.88,
+                keywords=["chemistry", "ADMET", "pharmacokinetics", "compound-x"],
+                created_at=datetime.now(),
+            ),
+            agent_id=self.agent_id,
+        )
+        return Response(content=finding)
+
+
+# ── Orchestrator / synthesiser ─────────────────────────────────────────────────
+
+class DrugResearchOrchestrator(Agent):
+    """Spawns specialist researchers, then synthesises all findings."""
+
+    model = Model.mock()
+    system_prompt = (
+        "You are a drug development lead. Coordinate biology and chemistry "
+        "research, read all published findings, and produce a go/no-go recommendation."
+    )
+
+    def __init__(self, memory_bus: MemoryBus) -> None:
+        super().__init__()
+        self._bus = memory_bus
+
+    async def arun(self, input_text: str) -> Response[str]:
+        # 1. Run specialist agents and wait for them to publish their findings
+        await self.spawn_many([
+            SpawnSpec(agent=BiologyResearchAgent(self._bus),  task=input_text, budget=1.00),
+            SpawnSpec(agent=ChemistryResearchAgent(self._bus), task=input_text, budget=1.00),
+        ])
+
+        # 2. Read all findings that were published to the shared bus
+        findings = await self._bus.read(
+            query="compound-x mechanism pharmacokinetics",
+            agent_id=self.agent_id,
+        )
+
+        # 3. Synthesise
+        context = "\n".join(f"- {f.content}" for f in findings)
+        recommendation = (
+            f"Drug Research Report — {input_text}\n\n"
+            f"Findings ({len(findings)}):\n{context}\n\n"
+            "Recommendation: PROCEED to Phase 1 clinical trial."
+        )
+        return Response(content=recommendation, cost=0.0)
+
+
+# ── Swarm ──────────────────────────────────────────────────────────────────────
+
+async def main() -> None:
+    orchestrator = DrugResearchOrchestrator(bus)
+
+    swarm = Swarm(
+        agents=[orchestrator],
+        goal="Research Compound X as a treatment for Disease Y",
+        budget=Budget(max_cost=5.00),
+        config=SwarmConfig(topology=SwarmTopology.ORCHESTRATOR),
+    )
+    result = await swarm.run()
+    print(result.content)
 
 asyncio.run(main())
 ```
@@ -167,10 +383,24 @@ asyncio.run(main())
 Output:
 
 ```
-Researcher published: True
-Writer found 1 relevant entries
-  - Large language models perform better with chain-of-thought pr
+Drug Research Report — Research Compound X as a treatment for Disease Y
+
+Findings (2):
+- Compound X inhibits ACE2 receptor binding by 73% in-vitro through competitive antagonism at the S1 domain.
+- Compound X: MW=412 Da, LogP=2.1, t½=8h, >90% oral bioavailability. Synthesis feasible in 6 steps from commercially available precursors.
+
+Recommendation: PROCEED to Phase 1 clinical trial.
 ```
+
+**What makes this work:**
+
+| Step | What happens |
+|------|-------------|
+| `DrugResearchOrchestrator.arun()` starts | ORCHESTRATOR topology runs this as the first (and only) swarm agent |
+| `spawn_many()` | Spawns biology and chemistry agents **in parallel**, blocks until both finish |
+| Each researcher's `arun()` | Publishes a finding to the shared `bus` via `self._bus.publish()` |
+| `self._bus.read(...)` | Reads all published findings — guaranteed to be present because `spawn_many()` already returned |
+| Orchestrator returns | The synthesis becomes `SwarmResult.content` |
 
 ## Hooks
 

@@ -1,9 +1,7 @@
-"""Swarm Example — Multi-agent coordination with shared budget.
+"""Basic swarm — multiple agents on a shared goal.
 
-Demonstrates:
-- Creating a Swarm with multiple specialized agents
-- Shared budget across swarm members
-- Running a task via swarm.run()
+The simplest way to use a Swarm: declare agent classes, pass them to Swarm,
+and call run(). Each agent tackles the same goal from its specialist angle.
 
 Run: python examples/07_multi_agent/team.py
 """
@@ -11,53 +9,47 @@ Run: python examples/07_multi_agent/team.py
 from __future__ import annotations
 
 import asyncio
+import os
+from pathlib import Path
 
-from syrin import Agent, Budget, Model, prompt
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+from syrin import Agent, Budget, Model
 from syrin.enums import SwarmTopology
 from syrin.swarm import Swarm, SwarmConfig
 
-model = Model.mock()
-
-
-@prompt
-def researcher_prompt(domain: str) -> str:
-    return f"You are a researcher specializing in {domain}."
-
-
-@prompt
-def writer_prompt(style: str) -> str:
-    return f"You are a writer with a {style} style."
+_MODEL = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
 
 
 class Researcher(Agent):
-    name = "researcher"
-    description = "Researches topics (technology)"
-    model = Model.mock()
-    system_prompt = researcher_prompt(domain="technology")
+    model = _MODEL
+    system_prompt = "You research topics and summarise findings concisely."
 
 
 class Writer(Agent):
-    name = "writer"
-    description = "Writes content in engaging style"
-    model = Model.mock()
-    system_prompt = writer_prompt(style="engaging")
+    model = _MODEL
+    system_prompt = "You write clear, engaging summaries."
+
+
+class FactChecker(Agent):
+    model = _MODEL
+    system_prompt = "You verify claims and flag any inaccuracies."
 
 
 async def main() -> None:
-    # Swarm with shared budget — run routes to the best agent
-    print("=== Swarm with shared budget ===\n")
+    # Pass class references — Swarm instantiates them automatically
     swarm = Swarm(
-        agents=[Researcher, Writer],
-        config=SwarmConfig(
-            topology=SwarmTopology.CONSENSUS,
-            budget=Budget(
-                max_cost=0.50,
-            ),
-        ),
+        agents=[Researcher, Writer, FactChecker],  # classes, not instances
+        goal="Summarise the impact of AI on software engineering",
+        budget=Budget(max_cost=1.00),
+        config=SwarmConfig(topology=SwarmTopology.PARALLEL),
     )
-    result = await swarm.run("Research AI trends")
-    print(f"Result: {result.content[:80]}...")
-    print(f"Cost: ${result.cost:.6f}\n")
+    result = await swarm.run()
+    print(result.content[:200])
+    total = sum(result.cost_breakdown.values())
+    print(f"Cost: ${total:.4f}")
 
 
 if __name__ == "__main__":

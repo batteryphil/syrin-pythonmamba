@@ -1,8 +1,8 @@
 """Memory Types and Decay — Comprehensive memory features demo.
 
 Demonstrates:
-- 4 memory types: Core, Episodic, Semantic, Procedural
-- Memory type classes (CoreMemory, EpisodicMemory, etc.)
+- 4 memory types: Facts, History, Knowledge, Instructions
+- Memory type classes (FactsMemory, HistoryMemory, etc.)
 - Factory function create_memory()
 - MemoryStore: add, recall, forget
 - Decay strategies (exponential, linear)
@@ -21,11 +21,11 @@ from datetime import datetime, timedelta
 from syrin import Agent, Decay, Memory, MemoryEntry, Model
 from syrin.enums import DecayStrategy, MemoryBackend, MemoryType
 from syrin.memory import (
-    CoreMemory,
-    EpisodicMemory,
+    FactsMemory,
+    HistoryMemory,
+    InstructionsMemory,
+    KnowledgeMemory,
     MemoryStore,
-    ProceduralMemory,
-    SemanticMemory,
     create_memory,
     get_backend,
 )
@@ -37,19 +37,19 @@ def main() -> None:
     print("1. Memory Type Classes")
     print("=" * 60)
 
-    core = CoreMemory(id="core-1", content="My name is John Smith", importance=0.95)
-    episodic = EpisodicMemory(id="ep-1", content="Yesterday I visited the Eiffel Tower")
-    semantic = SemanticMemory(id="sem-1", content="Python is a programming language")
-    procedural = ProceduralMemory(
+    core = FactsMemory(id="core-1", content="My name is John Smith", importance=0.95)
+    episodic = HistoryMemory(id="ep-1", content="Yesterday I visited the Eiffel Tower")
+    semantic = KnowledgeMemory(id="sem-1", content="Python is a programming language")
+    procedural = InstructionsMemory(
         id="proc-1", content="How to make coffee: boil water, add grounds"
     )
-    factory = create_memory(MemoryType.CORE, "factory-1", "Created via factory")
+    factory = create_memory(MemoryType.FACTS, "factory-1", "Created via factory")
 
     for label, mem in [
-        ("Core", core),
-        ("Episodic", episodic),
-        ("Semantic", semantic),
-        ("Procedural", procedural),
+        ("Facts", core),
+        ("History", episodic),
+        ("Knowledge", semantic),
+        ("Instructions", procedural),
         ("Factory", factory),
     ]:
         print(f"  {label:12s} | type={mem.type.value:12s} | {mem.content[:40]}")
@@ -60,14 +60,14 @@ def main() -> None:
     print("=" * 60)
 
     store = MemoryStore()
-    store.add(content="User prefers dark mode", memory_type=MemoryType.CORE)
-    store.add(content="Yesterday's meeting was at 3pm", memory_type=MemoryType.EPISODIC)
-    store.add(content="Paris is the capital of France", memory_type=MemoryType.SEMANTIC)
+    store.add(content="User prefers dark mode", memory_type=MemoryType.FACTS)
+    store.add(content="Yesterday's meeting was at 3pm", memory_type=MemoryType.HISTORY)
+    store.add(content="Paris is the capital of France", memory_type=MemoryType.KNOWLEDGE)
     store.add(
-        content="How to reset password: click forgot password", memory_type=MemoryType.PROCEDURAL
+        content="How to reset password: click forgot password", memory_type=MemoryType.INSTRUCTIONS
     )
 
-    core_memories = store.recall(memory_type=MemoryType.CORE)
+    core_memories = store.recall(memory_type=MemoryType.FACTS)
     print(f"  Core memories ({len(core_memories)}):")
     for m in core_memories:
         print(f"    - {m.content}")
@@ -92,7 +92,7 @@ def main() -> None:
     old_memory = MemoryEntry(
         id="old-1",
         content="Old information",
-        type=MemoryType.EPISODIC,
+        type=MemoryType.HISTORY,
         importance=1.0,
         created_at=datetime.now() - timedelta(hours=24),
     )
@@ -116,7 +116,7 @@ def main() -> None:
         # return without raising → warn-only; store still proceeds
 
     budgeted_store = MemoryStore(budget_extraction=0.001, budget_on_exceeded=warn_handler)
-    added = budgeted_store.add(content="Short fact", memory_type=MemoryType.SEMANTIC)
+    added = budgeted_store.add(content="Short fact", memory_type=MemoryType.KNOWLEDGE)
     print(f"  Added with budget constraint: {added}")
 
     # ── 5. Agent with persistent memory (all 4 types) ─────────────────
@@ -132,13 +132,13 @@ def main() -> None:
         ),
     )
 
-    agent.remember("My name is John", memory_type=MemoryType.CORE)
-    agent.remember("I live in San Francisco", memory_type=MemoryType.CORE)
-    agent.remember("Yesterday I had pizza", memory_type=MemoryType.EPISODIC)
-    agent.remember("Python uses indentation", memory_type=MemoryType.SEMANTIC)
-    agent.remember("How to make tea: boil water, steep", memory_type=MemoryType.PROCEDURAL)
+    agent.remember("My name is John", memory_type=MemoryType.FACTS)
+    agent.remember("I live in San Francisco", memory_type=MemoryType.FACTS)
+    agent.remember("Yesterday I had pizza", memory_type=MemoryType.HISTORY)
+    agent.remember("Python uses indentation", memory_type=MemoryType.KNOWLEDGE)
+    agent.remember("How to make tea: boil water, steep", memory_type=MemoryType.INSTRUCTIONS)
 
-    agent_core = agent.recall(memory_type=MemoryType.CORE)
+    agent_core = agent.recall(memory_type=MemoryType.FACTS)
     print(f"  Core memories ({len(agent_core)}):")
     for m in agent_core:
         print(f"    - {m.content}")
@@ -158,7 +158,7 @@ def main() -> None:
     print("=" * 60)
 
     mem_backend = get_backend(MemoryBackend.MEMORY)
-    mem_backend.add(MemoryEntry(id="mem-1", content="In-memory is fast", type=MemoryType.SEMANTIC))
+    mem_backend.add(MemoryEntry(id="mem-1", content="In-memory is fast", type=MemoryType.KNOWLEDGE))
     results = mem_backend.search("fast")
     print(f"  In-memory search 'fast': {results[0].content if results else 'none'}")
 
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     # agent = Agent(
     #     model=Model.mock(),
     #     memory=Memory(
-    #         types=[MemoryType.CORE, MemoryType.EPISODIC, MemoryType.SEMANTIC, MemoryType.PROCEDURAL],
+    #         types=[MemoryType.FACTS, MemoryType.HISTORY, MemoryType.KNOWLEDGE, MemoryType.INSTRUCTIONS],
     #         top_k=5,
     #     ),
     # )

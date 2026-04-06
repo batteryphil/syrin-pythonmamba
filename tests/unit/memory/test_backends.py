@@ -20,7 +20,7 @@ class TestInMemoryBackend:
         entry = MemoryEntry(
             id="test-1",
             content="Test memory",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
         )
         backend.add(entry)
         result = backend.get("test-1")
@@ -29,22 +29,22 @@ class TestInMemoryBackend:
 
     def test_search(self) -> None:
         backend = InMemoryBackend()
-        backend.add(MemoryEntry(id="1", content="Python is great", type=MemoryType.SEMANTIC))
-        backend.add(MemoryEntry(id="2", content="JavaScript too", type=MemoryType.SEMANTIC))
+        backend.add(MemoryEntry(id="1", content="Python is great", type=MemoryType.KNOWLEDGE))
+        backend.add(MemoryEntry(id="2", content="JavaScript too", type=MemoryType.KNOWLEDGE))
         # InMemoryBackend search is a simple filter
         backend.search("Python")
         # Note: InMemoryBackend returns all, filtering is done by search implementation
 
     def test_list(self) -> None:
         backend = InMemoryBackend()
-        backend.add(MemoryEntry(id="1", content="Test 1", type=MemoryType.CORE))
-        backend.add(MemoryEntry(id="2", content="Test 2", type=MemoryType.EPISODIC))
+        backend.add(MemoryEntry(id="1", content="Test 1", type=MemoryType.FACTS))
+        backend.add(MemoryEntry(id="2", content="Test 2", type=MemoryType.HISTORY))
         results = backend.list()
         assert len(results) == 2
 
     def test_delete(self) -> None:
         backend = InMemoryBackend()
-        backend.add(MemoryEntry(id="to-delete", content="Test", type=MemoryType.EPISODIC))
+        backend.add(MemoryEntry(id="to-delete", content="Test", type=MemoryType.HISTORY))
         backend.delete("to-delete")
         assert backend.get("to-delete") is None
 
@@ -65,7 +65,7 @@ class TestSQLiteBackend:
         entry = MemoryEntry(
             id="test-1",
             content="Test memory",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=0.8,
         )
         backend.add(entry)
@@ -77,8 +77,8 @@ class TestSQLiteBackend:
 
     def test_search(self, temp_db: str) -> None:
         backend = SQLiteBackend(path=temp_db)
-        backend.add(MemoryEntry(id="1", content="Python is great", type=MemoryType.SEMANTIC))
-        backend.add(MemoryEntry(id="2", content="JavaScript too", type=MemoryType.SEMANTIC))
+        backend.add(MemoryEntry(id="1", content="Python is great", type=MemoryType.KNOWLEDGE))
+        backend.add(MemoryEntry(id="2", content="JavaScript too", type=MemoryType.KNOWLEDGE))
         results = backend.search("Python")
         assert len(results) == 1
         assert results[0].content == "Python is great"
@@ -86,12 +86,12 @@ class TestSQLiteBackend:
 
     def test_list_filtered(self, temp_db: str) -> None:
         backend = SQLiteBackend(path=temp_db)
-        backend.add(MemoryEntry(id="1", content="Core fact", type=MemoryType.CORE))
-        backend.add(MemoryEntry(id="2", content="Episodic event", type=MemoryType.EPISODIC))
+        backend.add(MemoryEntry(id="1", content="Core fact", type=MemoryType.FACTS))
+        backend.add(MemoryEntry(id="2", content="Episodic event", type=MemoryType.HISTORY))
 
-        core = backend.list(memory_type=MemoryType.CORE)
+        core = backend.list(memory_type=MemoryType.FACTS)
         assert len(core) == 1
-        assert core[0].type == MemoryType.CORE
+        assert core[0].type == MemoryType.FACTS
 
         all_mem = backend.list()
         assert len(all_mem) == 2
@@ -99,7 +99,7 @@ class TestSQLiteBackend:
 
     def test_update(self, temp_db: str) -> None:
         backend = SQLiteBackend(path=temp_db)
-        entry = MemoryEntry(id="update-test", content="Original", type=MemoryType.EPISODIC)
+        entry = MemoryEntry(id="update-test", content="Original", type=MemoryType.HISTORY)
         backend.add(entry)
 
         entry.content = "Updated"
@@ -112,22 +112,22 @@ class TestSQLiteBackend:
 
     def test_delete(self, temp_db: str) -> None:
         backend = SQLiteBackend(path=temp_db)
-        backend.add(MemoryEntry(id="to-delete", content="Test", type=MemoryType.EPISODIC))
+        backend.add(MemoryEntry(id="to-delete", content="Test", type=MemoryType.HISTORY))
         backend.delete("to-delete")
         assert backend.get("to-delete") is None
         backend.close()
 
     def test_clear(self, temp_db: str) -> None:
         backend = SQLiteBackend(path=temp_db)
-        backend.add(MemoryEntry(id="1", content="Test 1", type=MemoryType.EPISODIC))
-        backend.add(MemoryEntry(id="2", content="Test 2", type=MemoryType.EPISODIC))
+        backend.add(MemoryEntry(id="1", content="Test 1", type=MemoryType.HISTORY))
+        backend.add(MemoryEntry(id="2", content="Test 2", type=MemoryType.HISTORY))
         backend.clear()
         assert len(backend.list()) == 0
         backend.close()
 
     def test_persistence(self, temp_db: str) -> None:
         """Test that data persists across backend instances."""
-        entry = MemoryEntry(id="persist", content="Persistent data", type=MemoryType.CORE)
+        entry = MemoryEntry(id="persist", content="Persistent data", type=MemoryType.FACTS)
 
         # Add to first backend
         backend1 = SQLiteBackend(path=temp_db)
@@ -181,7 +181,7 @@ class TestInMemoryBackendEdgeCases:
     def test_add_empty_content(self):
         """Add entry with empty content."""
         backend = InMemoryBackend()
-        entry = MemoryEntry(id="empty", content="", type=MemoryType.CORE)
+        entry = MemoryEntry(id="empty", content="", type=MemoryType.FACTS)
         backend.add(entry)
         result = backend.get("empty")
         assert result is not None
@@ -191,7 +191,7 @@ class TestInMemoryBackendEdgeCases:
         """Add entry with very long content."""
         backend = InMemoryBackend()
         long_content = "x" * 100000
-        entry = MemoryEntry(id="long", content=long_content, type=MemoryType.CORE)
+        entry = MemoryEntry(id="long", content=long_content, type=MemoryType.FACTS)
         backend.add(entry)
         result = backend.get("long")
         assert result is not None
@@ -200,7 +200,7 @@ class TestInMemoryBackendEdgeCases:
     def test_add_unicode_content(self):
         """Add entry with unicode content."""
         backend = InMemoryBackend()
-        entry = MemoryEntry(id="unicode", content="Hello 🌍 你好 🔥", type=MemoryType.CORE)
+        entry = MemoryEntry(id="unicode", content="Hello 🌍 你好 🔥", type=MemoryType.FACTS)
         backend.add(entry)
         result = backend.get("unicode")
         assert "🌍" in result.content
@@ -215,14 +215,14 @@ class TestInMemoryBackendEdgeCases:
         """List with many entries."""
         backend = InMemoryBackend()
         for i in range(100):
-            backend.add(MemoryEntry(id=f"entry-{i}", content=f"Content {i}", type=MemoryType.CORE))
+            backend.add(MemoryEntry(id=f"entry-{i}", content=f"Content {i}", type=MemoryType.FACTS))
         results = backend.list()
         assert len(results) == 100
 
     def test_search_no_results(self):
         """Search with no matching results."""
         backend = InMemoryBackend()
-        backend.add(MemoryEntry(id="1", content="Python code", type=MemoryType.SEMANTIC))
+        backend.add(MemoryEntry(id="1", content="Python code", type=MemoryType.KNOWLEDGE))
         backend.search("nonexistent")
         # May return all or empty depending on implementation
 
@@ -252,12 +252,12 @@ class TestSQLiteBackendEdgeCases:
     def test_add_with_importance(self, temp_db):
         """Add entry with importance values."""
         backend = SQLiteBackend(path=temp_db)
-        entry = MemoryEntry(id="test", content="Test", type=MemoryType.CORE, importance=0.0)
+        entry = MemoryEntry(id="test", content="Test", type=MemoryType.FACTS, importance=0.0)
         backend.add(entry)
         result = backend.get("test")
         assert result.importance == 0.0
 
-        entry2 = MemoryEntry(id="test2", content="Test2", type=MemoryType.CORE, importance=1.0)
+        entry2 = MemoryEntry(id="test2", content="Test2", type=MemoryType.FACTS, importance=1.0)
         backend.add(entry2)
         result2 = backend.get("test2")
         assert result2.importance == 1.0
@@ -267,7 +267,7 @@ class TestSQLiteBackendEdgeCases:
         """List with limit."""
         backend = SQLiteBackend(path=temp_db)
         for i in range(10):
-            backend.add(MemoryEntry(id=f"entry-{i}", content=f"Content {i}", type=MemoryType.CORE))
+            backend.add(MemoryEntry(id=f"entry-{i}", content=f"Content {i}", type=MemoryType.FACTS))
 
         results = backend.list(limit=5)
         assert len(results) <= 5
@@ -276,7 +276,7 @@ class TestSQLiteBackendEdgeCases:
     def test_update_nonexistent(self, temp_db):
         """Update nonexistent entry."""
         backend = SQLiteBackend(path=temp_db)
-        entry = MemoryEntry(id="nonexistent", content="Test", type=MemoryType.CORE)
+        entry = MemoryEntry(id="nonexistent", content="Test", type=MemoryType.FACTS)
         # Should handle gracefully
         backend.update(entry)
         backend.close()
@@ -284,7 +284,7 @@ class TestSQLiteBackendEdgeCases:
     def test_search_empty_query(self, temp_db):
         """Search with empty query."""
         backend = SQLiteBackend(path=temp_db)
-        backend.add(MemoryEntry(id="1", content="Test", type=MemoryType.SEMANTIC))
+        backend.add(MemoryEntry(id="1", content="Test", type=MemoryType.KNOWLEDGE))
         backend.search("")
         # Should return results or empty
         backend.close()

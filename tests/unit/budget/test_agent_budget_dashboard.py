@@ -3,7 +3,7 @@
 Verifies:
 - budget_summary() returns correct keys and values
 - budget_summary() without budget omits budget-specific keys
-- budget_summary() with budget includes max_cost, reserve, policy, remaining, percent_used
+- budget_summary() with budget includes max_cost, safety_margin, policy, remaining, percent_used
 - budget_summary() after recording costs reflects updated totals
 - export_costs() returns list of dicts by default
 - export_costs(format="json") returns valid JSON string
@@ -74,7 +74,7 @@ class TestBudgetSummaryNoBudget:
         agent = _agent(budget=None)
         summary = agent.budget_summary()
         assert "max_cost" not in summary
-        assert "reserve" not in summary
+        assert "safety_margin" not in summary
         assert "exceed_policy" not in summary
         assert "budget_remaining" not in summary
 
@@ -107,13 +107,13 @@ class TestBudgetSummaryWithBudget:
         agent = _agent(budget=Budget(max_cost=5.0))
         assert agent.budget_summary()["max_cost"] == pytest.approx(5.0)
 
-    def test_reserve_present(self) -> None:
-        agent = _agent(budget=Budget(max_cost=5.0, reserve=0.5))
-        assert agent.budget_summary()["reserve"] == pytest.approx(0.5)
+    def test_safety_margin_present(self) -> None:
+        agent = _agent(budget=Budget(max_cost=5.0, safety_margin=0.5))
+        assert agent.budget_summary()["safety_margin"] == pytest.approx(0.5)
 
-    def test_reserve_zero_when_not_set(self) -> None:
+    def test_safety_margin_zero_when_not_set(self) -> None:
         agent = _agent(budget=Budget(max_cost=5.0))
-        assert agent.budget_summary()["reserve"] == pytest.approx(0.0)
+        assert agent.budget_summary()["safety_margin"] == pytest.approx(0.0)
 
     def test_budget_remaining_present(self) -> None:
         agent = _agent(budget=Budget(max_cost=5.0))
@@ -163,11 +163,11 @@ class TestBudgetSummaryWithBudget:
         assert isinstance(remaining, float)
         assert remaining >= 0.0
 
-    def test_with_reserve_reduces_effective_limit(self) -> None:
-        # max_cost=5.0, reserve=1.0 → effective limit 4.0
-        agent = _agent(budget=Budget(max_cost=5.0, reserve=1.0))
+    def test_with_safety_margin_reduces_effective_limit(self) -> None:
+        # max_cost=5.0, safety_margin=1.0 → effective limit 4.0
+        agent = _agent(budget=Budget(max_cost=5.0, safety_margin=1.0))
         summary = agent.budget_summary()
-        assert summary["reserve"] == pytest.approx(1.0)
+        assert summary["safety_margin"] == pytest.approx(1.0)
         # Remaining starts at effective limit (4.0)
         remaining = summary["budget_remaining"]
         assert isinstance(remaining, float)

@@ -62,9 +62,9 @@ class TestStructuredOutputValidation:
             return_value=mock_resp,
         ):
             r = agent.run("Return JSON.")
-        assert r.data is not None
-        assert r.data.get("name") == "Bob"
-        assert r.data.get("value") == 10
+        assert r.output is not None
+        assert r.output.name == "Bob"  # type: ignore[union-attr]
+        assert r.output.value == 10  # type: ignore[union-attr]
 
     def test_invalid_json_raises_output_validation_error(self) -> None:
         """When LLM returns invalid JSON/schema and retries exhausted, OutputValidationError is raised."""

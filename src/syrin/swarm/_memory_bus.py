@@ -69,7 +69,7 @@ class MemoryBus:
 
     Example — substring mode (default)::
 
-        bus = MemoryBus(allow_types=[MemoryType.SEMANTIC], ttl=3600)
+        bus = MemoryBus(allow_types=[MemoryType.KNOWLEDGE], ttl=3600)
         await bus.publish(entry, agent_id="researcher")
         results = await bus.read(query="machine learning", agent_id="writer")
 

@@ -17,8 +17,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock
-from syrin import Agent, Budget, tool
+from syrin import Agent, Budget, ExceedPolicy, Model, tool
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -33,7 +32,7 @@ def repeat(text: str, count: int = 1) -> str:
 class BaseAgent(Agent):
     name = "base-agent"
     description = "Base agent with repeat tool"
-    model = almock
+    model = Model.mock()
     system_prompt = "You are a helpful assistant."
     tools = [repeat]
 
@@ -67,7 +66,7 @@ print(f"GreetingAgent tools: {[t.name for t in agent._tools]}")
 
 # 3. Budget override
 class BudgetBase(Agent):
-    model = almock
+    model = Model.mock()
     budget = Budget(max_cost=10.0, exceed_policy=ExceedPolicy.WARN)
 
 
@@ -81,7 +80,7 @@ tight = TightBudgetAgent()
 
 # 4. Multi-level inheritance
 class Level1(Agent):
-    model = almock
+    model = Model.mock()
     system_prompt = "Level 1 base."
 
 

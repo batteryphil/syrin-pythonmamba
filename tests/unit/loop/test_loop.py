@@ -982,16 +982,16 @@ class TestToolResultTruncation:
     """Tool result truncation: no truncation for LLM by default; display uses 2000."""
 
     def test_empty_result_unchanged(self) -> None:
-        assert _truncate_tool_result_for_context("", max_len=0) == ""
+        assert _truncate_tool_result_for_context("", max_len=None) == ""
         assert _truncate_tool_result_for_context("", max_len=100) == ""
 
-    def test_short_text_no_truncation_when_max_len_zero(self) -> None:
+    def test_short_text_no_truncation_when_max_len_none(self) -> None:
         text = "Short search result."
-        assert _truncate_tool_result_for_context(text, max_len=0) == text
+        assert _truncate_tool_result_for_context(text, max_len=None) == text
 
-    def test_long_text_capped_at_safety_when_max_len_zero(self) -> None:
+    def test_long_text_capped_at_safety_when_max_len_none(self) -> None:
         text = "x" * (MAX_TOOL_RESULT_SAFETY_CAP + 1000)
-        out = _truncate_tool_result_for_context(text, max_len=0)
+        out = _truncate_tool_result_for_context(text, max_len=None)
         assert len(out) == MAX_TOOL_RESULT_SAFETY_CAP + len(" [...] (truncated)")
         assert out.endswith(" [...] (truncated)")
 
@@ -1003,14 +1003,14 @@ class TestToolResultTruncation:
 
     def test_image_data_url_replaced_with_short_message(self) -> None:
         result = "Generated image: data:image/png;base64," + ("A" * 5000)
-        out = _truncate_tool_result_for_context(result, max_len=0)
+        out = _truncate_tool_result_for_context(result, max_len=None)
         assert "base64 data omitted" in out
         assert "image" in out or "png" in out
         assert "A" not in out or out.count("A") < 100
 
     def test_video_data_url_replaced_with_short_message(self) -> None:
         result = "Generated video: data:video/mp4;base64," + ("B" * 5000)
-        out = _truncate_tool_result_for_context(result, max_len=0)
+        out = _truncate_tool_result_for_context(result, max_len=None)
         assert "base64 data omitted" in out
         assert "video" in out
 

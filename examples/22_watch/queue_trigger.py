@@ -4,7 +4,7 @@ Demonstrates:
 - QueueProtocol: consume messages from Redis (BLPOP) and fire agent per message
 - QueueBackend Protocol: implement a custom in-memory backend (no Redis needed)
 - ack_on_success / nack_on_error for reliable message processing
-- pipeline.watch(protocol=QueueProtocol(...)) — trigger a Pipeline from a queue
+- agent.watch(protocol=QueueProtocol(...)) — trigger an Agent from a queue
 - Hook.WATCH_TRIGGER to observe each consumed message
 
 Run (uses the in-memory backend — no Redis required):
@@ -28,8 +28,7 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from examples.models.models import almock  # noqa: E402
-from syrin import Agent  # noqa: E402
+from syrin import Agent, Model  # noqa: E402
 from syrin.enums import Hook  # noqa: E402
 from syrin.watch import QueueProtocol, TriggerEvent  # noqa: E402
 from syrin.watch._queue import QueueBackend  # noqa: E402
@@ -66,7 +65,7 @@ class InMemoryQueueBackend:
             try:
                 text = await asyncio.wait_for(self._queue.get(), timeout=0.5)
                 yield text, text
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if self._queue.empty() and self._running:
                     # No more messages — signal done
                     self._running = False
@@ -91,7 +90,7 @@ assert isinstance(InMemoryQueueBackend([]), QueueBackend)
 class TaskAgent(Agent):
     name = "task_agent"
     description = "Processes queued tasks"
-    model = almock
+    model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
     system_prompt = (
         "You are an operations task processor. "
         "Respond concisely with a 1-sentence status for each task."
@@ -166,83 +165,13 @@ async def demo_agent_queue() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Demo 2: Pipeline consuming from a queue
-# ---------------------------------------------------------------------------
-
-
-async def demo_pipeline_queue() -> None:
-    print("=" * 60)
-    print("Demo 2 — Pipeline consuming from a queue")
-    print("=" * 60)
-
-    from syrin.agent.multi_agent import Pipeline
-
-    class ResearchAgent(Agent):
-        name = "researcher"
-        model = almock
-        system_prompt = "You research topics and provide a 1-sentence summary."
-
-    class SummaryAgent(Agent):
-        name = "summarizer"
-        model = almock
-        system_prompt = "You condense research into a 1-sentence executive summary."
-
-    # Pipeline pre-configured with agents — required for watch()/trigger()
-    pipeline = Pipeline(agents=[ResearchAgent, SummaryAgent])
-
-    results: list[str] = []
-
-    def on_trigger(event: TriggerEvent) -> None:
-        print(f"  → pipeline trigger: {event.input!r}")
-
-    def on_result(event: TriggerEvent, result: object) -> None:
-        content = getattr(result, "content", str(result))
-        results.append(content)
-        print(f"     pipeline result: {content[:100]}")
-
-    def on_error(event: TriggerEvent, exc: Exception) -> None:
-        print(f"     ✗ pipeline error: {exc}")
-
-    backend = InMemoryQueueBackend(
-        [
-            "Latest developments in quantum computing",
-            "Impact of AI on software engineering workflows",
-        ]
-    )
-
-    protocol = QueueProtocol(
-        source=backend,
-        queue="pipeline_tasks",
-        concurrency=1,
-    )
-
-    # pipeline.watch() works because Pipeline now inherits Watchable
-    pipeline.watch(
-        protocol=protocol,
-        on_trigger=on_trigger,
-        on_result=on_result,
-        on_error=on_error,
-    )
-
-    handler = pipeline.watch_handler(
-        concurrency=1,
-        on_result=on_result,
-        on_error=on_error,
-    )
-
-    await protocol.start(handler)
-
-    print(f"\n  Pipeline processed {len(results)} task(s)\n")
-
-
-# ---------------------------------------------------------------------------
-# Demo 3: Note on real Redis usage
+# Demo 2: Note on real Redis usage
 # ---------------------------------------------------------------------------
 
 
 def demo_redis_note(redis_url: str | None) -> None:
     print("=" * 60)
-    print("Demo 3 — Real Redis usage")
+    print("Demo 2 — Real Redis usage")
     print("=" * 60)
 
     if redis_url:
@@ -295,7 +224,6 @@ async def main() -> None:
             redis_url = sys.argv[idx + 1]
 
     await demo_agent_queue()
-    await demo_pipeline_queue()
     demo_redis_note(redis_url)
 
 

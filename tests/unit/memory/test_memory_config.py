@@ -1,9 +1,9 @@
-"""Memory configuration: budget and consolidation flat fields, restrict_to API.
+"""Memory configuration: budget and consolidation flat fields, Memory.types API.
 
 Verifies:
 - MemoryBudget and Consolidation classes removed; their fields absorbed as flat
   prefixed params on Memory
-- Memory.types renamed to Memory.restrict_to
+- Memory.types field (None = all types, list = restrict to subset)
 """
 
 from __future__ import annotations
@@ -112,7 +112,7 @@ class TestMemoryBudgetFlatFields:
             budget_on_exceeded=raiser,
             write_mode=WriteMode.SYNC,  # ASYNC would return True immediately
         )
-        result = mem.remember("x" * 5000, memory_type=MemoryType.EPISODIC)
+        result = mem.remember("x" * 5000, memory_type=MemoryType.HISTORY)
         assert result is False
 
     def test_budget_allows_store_when_on_exceeded_returns(self) -> None:
@@ -130,7 +130,7 @@ class TestMemoryBudgetFlatFields:
             budget_on_exceeded=warn_handler,
             write_mode=WriteMode.SYNC,
         )
-        result = mem.remember("x" * 5000, memory_type=MemoryType.EPISODIC)
+        result = mem.remember("x" * 5000, memory_type=MemoryType.HISTORY)
         assert result is True  # warn-only, store allowed
         assert len(warnings) > 0
 
@@ -205,8 +205,8 @@ class TestMemoryConsolidationFlatFields:
     def test_consolidate_uses_consolidation_deduplicate(self) -> None:
         """consolidate() method uses consolidation_deduplicate flat field."""
         mem = Memory(consolidation_deduplicate=True)
-        mem.remember("same content", memory_type=MemoryType.EPISODIC)
-        mem.remember("same content", memory_type=MemoryType.EPISODIC)
+        mem.remember("same content", memory_type=MemoryType.HISTORY)
+        mem.remember("same content", memory_type=MemoryType.HISTORY)
         removed = mem.consolidate()
         assert isinstance(removed, int)
         assert removed >= 0
@@ -214,48 +214,42 @@ class TestMemoryConsolidationFlatFields:
     def test_consolidate_with_deduplicate_false(self) -> None:
         """consolidate(deduplicate=False) overrides consolidation_deduplicate."""
         mem = Memory(consolidation_deduplicate=True)
-        mem.remember("dup", memory_type=MemoryType.EPISODIC)
-        mem.remember("dup", memory_type=MemoryType.EPISODIC)
+        mem.remember("dup", memory_type=MemoryType.HISTORY)
+        mem.remember("dup", memory_type=MemoryType.HISTORY)
         removed = mem.consolidate(deduplicate=False)
         assert removed == 0  # override to False → nothing removed
 
 
 # ---------------------------------------------------------------------------
-# Memory.types → Memory.restrict_to
+# Memory.types API
 # ---------------------------------------------------------------------------
 
 
 class TestMemoryRestrictTo:
-    """Memory.types renamed to Memory.restrict_to."""
+    """Memory.types field API (was restrict_to)."""
 
-    def test_default_restrict_to_all_types(self) -> None:
-        """Memory() default: restrict_to contains all 4 types."""
+    def test_default_types_is_none(self) -> None:
+        """Memory() default: types is None (meaning all types enabled)."""
         mem = Memory()
-        all_types = {
-            MemoryType.CORE,
-            MemoryType.EPISODIC,
-            MemoryType.SEMANTIC,
-            MemoryType.PROCEDURAL,
-        }
-        assert set(mem.restrict_to) == all_types
+        assert mem.types is None
 
-    def test_restrict_to_accepts_subset(self) -> None:
-        """restrict_to accepts a subset of memory types."""
-        mem = Memory(restrict_to=[MemoryType.CORE, MemoryType.EPISODIC])
-        assert MemoryType.CORE in mem.restrict_to
-        assert MemoryType.EPISODIC in mem.restrict_to
-        assert MemoryType.SEMANTIC not in mem.restrict_to
-        assert MemoryType.PROCEDURAL not in mem.restrict_to
+    def test_types_accepts_subset(self) -> None:
+        """types accepts a subset of memory types."""
+        mem = Memory(types=[MemoryType.FACTS, MemoryType.HISTORY])
+        assert MemoryType.FACTS in (mem.types or [])
+        assert MemoryType.HISTORY in (mem.types or [])
+        assert MemoryType.KNOWLEDGE not in (mem.types or [])
+        assert MemoryType.INSTRUCTIONS not in (mem.types or [])
 
-    def test_restrict_to_single_type(self) -> None:
-        """restrict_to accepts a single memory type."""
-        mem = Memory(restrict_to=[MemoryType.CORE])
-        assert mem.restrict_to == [MemoryType.CORE]
+    def test_types_accepts_single_type(self) -> None:
+        """types accepts a single memory type."""
+        mem = Memory(types=[MemoryType.FACTS])
+        assert mem.types == [MemoryType.FACTS]
 
-    def test_types_field_does_not_exist(self) -> None:
-        """Memory no longer has a 'types' field — only restrict_to."""
+    def test_restrict_to_field_does_not_exist(self) -> None:
+        """Memory no longer has a 'restrict_to' field — use types instead."""
         mem = Memory()
-        assert not hasattr(mem, "types"), "Memory.types must be removed; use restrict_to"
+        assert not hasattr(mem, "restrict_to"), "Memory.restrict_to must be removed; use types"
 
     def test_memory_budget_not_accepted_as_kwarg(self) -> None:
         """memory_budget= kwarg no longer accepted by Memory constructor."""
@@ -279,7 +273,7 @@ class TestMemoryStoreBudgetParams:
     def test_store_default_no_budget(self) -> None:
         """MemoryStore() with no args has no budget constraints."""
         store = MemoryStore()
-        entry = MemoryEntry(id="1", content="hello", type=MemoryType.EPISODIC)
+        entry = MemoryEntry(id="1", content="hello", type=MemoryType.HISTORY)
         result = store.add(entry)
         assert result is True
 
@@ -295,7 +289,7 @@ class TestMemoryStoreBudgetParams:
             budget_extraction=0.000001,  # 0.000001 USD; 5000 chars → 5000/10000 = 0.5 USD estimated
             budget_on_exceeded=on_exceeded,
         )
-        entry = MemoryEntry(id="2", content="x" * 5000, type=MemoryType.EPISODIC)
+        entry = MemoryEntry(id="2", content="x" * 5000, type=MemoryType.HISTORY)
         result = store.add(entry)
         assert result is False
         assert len(blocked) > 0
@@ -303,7 +297,7 @@ class TestMemoryStoreBudgetParams:
     def test_store_budget_extraction_allows_small_content(self) -> None:
         """MemoryStore with reasonable budget allows normal content."""
         store = MemoryStore(budget_extraction=10.0)
-        entry = MemoryEntry(id="3", content="small", type=MemoryType.EPISODIC)
+        entry = MemoryEntry(id="3", content="small", type=MemoryType.HISTORY)
         result = store.add(entry)
         assert result is True
 

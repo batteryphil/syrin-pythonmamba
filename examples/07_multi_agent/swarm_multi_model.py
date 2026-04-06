@@ -26,17 +26,15 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 from syrin import Agent, Budget, Model
 from syrin.enums import SwarmTopology
 from syrin.swarm import Swarm, SwarmConfig
 
-missing = [k for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY") if not os.environ.get(k)]
-if missing:
-    print(f"Error: {', '.join(missing)} must be set.")
-    print("This example compares real model outputs — mocks defeat the purpose.")
-    sys.exit(1)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
 # ── Agent definitions ─────────────────────────────────────────────────────────

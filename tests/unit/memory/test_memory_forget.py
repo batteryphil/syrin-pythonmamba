@@ -15,7 +15,7 @@ from syrin.memory.config import MemoryEntry
 
 
 def _make_entry(id: str, content: str) -> MemoryEntry:
-    return MemoryEntry(id=id, content=content, type=MemoryType.EPISODIC, importance=1.0)
+    return MemoryEntry(id=id, content=content, type=MemoryType.HISTORY, importance=1.0)
 
 
 class TestInMemoryBackendSearch:

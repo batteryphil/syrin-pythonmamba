@@ -6,7 +6,7 @@ Run:
     python examples/01_minimal/quick_run.py
 """
 
-from syrin import Agent, Budget, Model
+from syrin import Agent, Budget, ExceedPolicy, Model
 
 model = Model.mock()  # No API key needed
 

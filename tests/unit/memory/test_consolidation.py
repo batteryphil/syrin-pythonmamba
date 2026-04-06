@@ -14,17 +14,17 @@ class TestStoreConsolidate:
         store = MemoryStore()
         store.add(
             content="same text",
-            memory_type=MemoryType.EPISODIC,
+            memory_type=MemoryType.HISTORY,
             importance=0.5,
         )
         store.add(
             content="same text",
-            memory_type=MemoryType.EPISODIC,
+            memory_type=MemoryType.HISTORY,
             importance=0.9,
         )
         store.add(
             content="same text",
-            memory_type=MemoryType.EPISODIC,
+            memory_type=MemoryType.HISTORY,
             importance=0.3,
         )
         before = len(store._backend)
@@ -40,8 +40,8 @@ class TestStoreConsolidate:
     def test_consolidate_no_duplicates_returns_zero(self) -> None:
         """When no duplicates, consolidate returns 0."""
         store = MemoryStore()
-        store.add(content="a", memory_type=MemoryType.EPISODIC)
-        store.add(content="b", memory_type=MemoryType.EPISODIC)
+        store.add(content="a", memory_type=MemoryType.HISTORY)
+        store.add(content="b", memory_type=MemoryType.HISTORY)
         removed = store.consolidate(deduplicate=True)
         assert removed == 0
         assert len(store._backend) == 2
@@ -49,8 +49,8 @@ class TestStoreConsolidate:
     def test_consolidate_deduplicate_false_returns_zero(self) -> None:
         """When deduplicate=False, consolidate does nothing."""
         store = MemoryStore()
-        store.add(content="x", memory_type=MemoryType.EPISODIC)
-        store.add(content="x", memory_type=MemoryType.EPISODIC)
+        store.add(content="x", memory_type=MemoryType.HISTORY)
+        store.add(content="x", memory_type=MemoryType.HISTORY)
         removed = store.consolidate(deduplicate=False)
         assert removed == 0
         assert len(store._backend) == 2
@@ -62,8 +62,8 @@ class TestMemoryConsolidate:
     def test_memory_consolidate_delegates(self) -> None:
         """Memory with store: consolidate() returns count from store."""
         mem = Memory(write_mode=WriteMode.SYNC)
-        mem.remember("dupe", memory_type=MemoryType.EPISODIC)
-        mem.remember("dupe", memory_type=MemoryType.EPISODIC)
+        mem.remember("dupe", memory_type=MemoryType.HISTORY)
+        mem.remember("dupe", memory_type=MemoryType.HISTORY)
         removed = mem.consolidate()
         assert removed == 1
         recalled = mem.recall(count=10)
@@ -79,8 +79,8 @@ class TestMemoryEntries:
         out = mem.entries(limit=10)
         assert isinstance(out, list)
         assert len(out) == 0
-        mem.remember("one", memory_type=MemoryType.EPISODIC)
-        mem.remember("two", memory_type=MemoryType.EPISODIC)
+        mem.remember("one", memory_type=MemoryType.HISTORY)
+        mem.remember("two", memory_type=MemoryType.HISTORY)
         out = mem.entries(limit=10)
         assert len(out) == 2
 
@@ -88,6 +88,6 @@ class TestMemoryEntries:
         """entries(limit=N) returns at most N entries."""
         mem = Memory(write_mode=WriteMode.SYNC)
         for i in range(5):
-            mem.remember(f"item{i}", memory_type=MemoryType.EPISODIC)
+            mem.remember(f"item{i}", memory_type=MemoryType.HISTORY)
         out = mem.entries(limit=2)
         assert len(out) == 2

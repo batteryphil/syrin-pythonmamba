@@ -38,7 +38,7 @@ class BudgetExceededError(SyrinError):
 class BudgetThresholdError(SyrinError):
     """Raised when a budget threshold triggers a stop action.
 
-    When a BudgetThreshold action raises stop_on_exceeded or similar,
+    When a BudgetThreshold action raises to stop the run,
     this is raised. Use for graceful handling when budget is nearly exhausted.
 
     Attributes:

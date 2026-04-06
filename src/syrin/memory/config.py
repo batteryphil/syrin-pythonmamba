@@ -178,8 +178,8 @@ class Memory(BaseModel):  # type: ignore[explicit-any]
         redis: Redis-specific config when backend=REDIS. Host, port, prefix, ttl.
         postgres: Postgres-specific config when backend=POSTGRES. Host, database,
             user, password, table.
-        restrict_to: Memory types to enable. Default: all four (CORE, EPISODIC,
-            SEMANTIC, PROCEDURAL). Pass a subset to restrict which types the agent uses.
+        types: Memory types to enable. None (default) = all types enabled. Set to a list
+            to restrict (e.g. [MemoryType.FACTS, MemoryType.HISTORY]).
         auto_extract: When implemented, extract facts from turns into semantic memory. Currently a placeholder.
         extraction_model: Model for extraction when auto_extract is used. None = use agent's model.
         top_k: Max memories to recall per query. Higher = more context, higher cost.
@@ -260,14 +260,9 @@ class Memory(BaseModel):  # type: ignore[explicit-any]
         description="Postgres-specific config when backend=POSTGRES.",
     )
 
-    restrict_to: list[MemoryType] = Field(
-        default=[
-            MemoryType.CORE,
-            MemoryType.EPISODIC,
-            MemoryType.SEMANTIC,
-            MemoryType.PROCEDURAL,
-        ],
-        description="Memory types to enable. Default: all four (CORE, EPISODIC, SEMANTIC, PROCEDURAL).",
+    types: list[MemoryType] | None = Field(
+        default=None,
+        description="Memory types to enable. None (default) = all types. Set to a list to restrict (e.g. [MemoryType.FACTS, MemoryType.HISTORY]).",
     )
 
     auto_extract: bool = Field(
@@ -410,7 +405,7 @@ class Memory(BaseModel):  # type: ignore[explicit-any]
         chroma: ChromaConfig | None = None,
         redis: RedisConfig | None = None,
         postgres: PostgresConfig | None = None,
-        restrict_to: list[MemoryType] | None = None,
+        types: list[MemoryType] | None = None,
         auto_extract: bool = False,
         extraction_model: str | None = None,
         top_k: int = 10,
@@ -442,9 +437,7 @@ class Memory(BaseModel):  # type: ignore[explicit-any]
             chroma=chroma,
             redis=redis,
             postgres=postgres,
-            restrict_to=restrict_to
-            if restrict_to is not None
-            else [MemoryType.CORE, MemoryType.EPISODIC, MemoryType.SEMANTIC, MemoryType.PROCEDURAL],
+            types=types,
             auto_extract=auto_extract,
             extraction_model=extraction_model,
             top_k=top_k,
@@ -550,7 +543,7 @@ class Memory(BaseModel):  # type: ignore[explicit-any]
 
         Example:
             >>> mem = Memory()
-            >>> mem.remember("User prefers Python", memory_type=MemoryType.CORE)
+            >>> mem.remember("User prefers Python", memory_type=MemoryType.FACTS)
             >>> entries = mem.recall(query="Python", limit=5)
             >>> [e.content for e in entries]
             ['User prefers Python']
@@ -644,7 +637,7 @@ class Memory(BaseModel):  # type: ignore[explicit-any]
     def remember(
         self,
         content: str,
-        memory_type: MemoryType = MemoryType.EPISODIC,
+        memory_type: MemoryType = MemoryType.HISTORY,
         importance: float = 1.0,
         metadata: dict[str, object] | None = None,
     ) -> bool | concurrent.futures.Future[bool]:
@@ -652,8 +645,8 @@ class Memory(BaseModel):  # type: ignore[explicit-any]
 
         Args:
             content: Memory content (e.g. "User prefers Python").
-            memory_type: Type of memory. Default: EPISODIC.
-                CORE=identity/prefs, EPISODIC=events, SEMANTIC=facts, PROCEDURAL=how-to.
+            memory_type: Type of memory. Default: HISTORY.
+                FACTS=identity/prefs, HISTORY=events, KNOWLEDGE=facts, INSTRUCTIONS=how-to.
             importance: Importance score (0.0-1.0). Default: 1.0.
             metadata: Optional metadata dict. Default: None.
 
@@ -665,7 +658,7 @@ class Memory(BaseModel):  # type: ignore[explicit-any]
 
         Example:
             >>> mem = Memory()
-            >>> mem.remember("User name is Alice", memory_type=MemoryType.CORE)
+            >>> mem.remember("User name is Alice", memory_type=MemoryType.FACTS)
             True
         """
         importance_val = min(1.0, max(0.0, importance))
@@ -734,7 +727,7 @@ class Memory(BaseModel):  # type: ignore[explicit-any]
 
         Example:
             >>> mem = Memory()
-            >>> mem.remember("Old fact", memory_type=MemoryType.EPISODIC)
+            >>> mem.remember("Old fact", memory_type=MemoryType.HISTORY)
             True
             >>> mem.forget(query="Old fact")
             1
@@ -799,8 +792,8 @@ class Memory(BaseModel):  # type: ignore[explicit-any]
             try:
                 mem_type = (
                     MemoryType(m.type)
-                    if m.type in ("core", "episodic", "semantic", "procedural")
-                    else MemoryType.EPISODIC
+                    if m.type in ("facts", "history", "knowledge", "instructions")
+                    else MemoryType.HISTORY
                 )
                 ok = self._remember_sync(
                     content=m.content,
@@ -1045,6 +1038,187 @@ class Memory(BaseModel):  # type: ignore[explicit-any]
             return
         object.__setattr__(
             agent, "_persistent_memory", merge_nested_update(current, update, Memory)
+        )
+
+    @classmethod
+    def from_sqlite(cls, path: str = "syrin_memory.db", **kwargs: object) -> Memory:
+        """Create a SQLite-backed Memory instance.
+
+        Persistent, single-file, zero-config. Good for development and
+        single-process deployments. No extra dependencies.
+
+        Args:
+            path: Path to the SQLite database file. Default: ``syrin_memory.db``.
+            **kwargs: Additional Memory constructor arguments.
+
+        Example:
+            >>> mem = Memory.from_sqlite("agent_memory.db")
+            >>> agent = Agent(model=model, memory=mem)
+        """
+        return cls(backend=MemoryBackend.SQLITE, path=path, **kwargs)  # type: ignore[arg-type]
+
+    @classmethod
+    def from_postgres(
+        cls,
+        *,
+        host: str = "localhost",
+        port: int = 5432,
+        database: str = "syrin",
+        user: str = "postgres",
+        password: str = "",
+        table: str = "memories",
+        vector_size: int = 0,
+        **kwargs: object,
+    ) -> Memory:
+        """Create a PostgreSQL-backed Memory instance.
+
+        Enterprise-grade, persistent, supports semantic search via pgvector
+        when ``vector_size > 0``. Requires: ``pip install psycopg2-binary``.
+
+        Args:
+            host: PostgreSQL host. Default: localhost.
+            port: PostgreSQL port. Default: 5432.
+            database: Database name. Default: syrin.
+            user: Database user. Default: postgres.
+            password: Database password. Default: empty string.
+            table: Table name for memories. Default: memories.
+            vector_size: Enable pgvector for semantic search when > 0. Default: 0.
+            **kwargs: Additional Memory constructor arguments.
+
+        Example:
+            >>> mem = Memory.from_postgres(database="myapp", password="secret")
+            >>> agent = Agent(model=model, memory=mem)
+        """
+        return cls(
+            backend=MemoryBackend.POSTGRES,
+            postgres=PostgresConfig(
+                host=host,
+                port=port,
+                database=database,
+                user=user,
+                password=password,
+                table=table,
+                vector_size=vector_size,
+            ),
+            **kwargs,  # type: ignore[arg-type]
+        )
+
+    @classmethod
+    def from_redis(
+        cls,
+        *,
+        host: str = "localhost",
+        port: int = 6379,
+        db: int = 0,
+        password: str | None = None,
+        prefix: str = "syrin:memory:",
+        ttl: int | None = None,
+        **kwargs: object,
+    ) -> Memory:
+        """Create a Redis-backed Memory instance.
+
+        Ultra-fast, distributed cache. Best for high-throughput agents or
+        shared memory across processes. Requires: ``pip install redis``.
+
+        Args:
+            host: Redis host. Default: localhost.
+            port: Redis port. Default: 6379.
+            db: Redis database number. Default: 0.
+            password: Optional auth password. Default: None.
+            prefix: Key prefix for all memory keys. Default: ``syrin:memory:``.
+            ttl: Optional TTL in seconds for auto-expiring memories. Default: None.
+            **kwargs: Additional Memory constructor arguments.
+
+        Example:
+            >>> mem = Memory.from_redis(host="redis.internal", prefix="myapp:mem:")
+            >>> agent = Agent(model=model, memory=mem)
+        """
+        return cls(
+            backend=MemoryBackend.REDIS,
+            redis=RedisConfig(
+                host=host,
+                port=port,
+                db=db,
+                password=password,
+                prefix=prefix,
+                ttl=ttl,
+            ),
+            **kwargs,  # type: ignore[arg-type]
+        )
+
+    @classmethod
+    def from_qdrant(
+        cls,
+        *,
+        url: str | None = None,
+        api_key: str | None = None,
+        host: str = "localhost",
+        port: int = 6333,
+        path: str | None = None,
+        collection: str = "syrin_memory",
+        vector_size: int = 384,
+        **kwargs: object,
+    ) -> Memory:
+        """Create a Qdrant-backed Memory instance.
+
+        High-performance vector search. Use ``url`` for Qdrant Cloud, ``path``
+        for local embedded, or ``host``/``port`` for a local server.
+        Requires: ``pip install qdrant-client``.
+
+        Args:
+            url: Qdrant Cloud URL. Default: None (use host/port or path).
+            api_key: API key for Qdrant Cloud. Default: None.
+            host: Qdrant server host. Default: localhost.
+            port: Qdrant server port. Default: 6333.
+            path: Local embedded Qdrant path. Default: None.
+            collection: Collection name. Default: syrin_memory.
+            vector_size: Embedding dimension. Default: 384.
+            **kwargs: Additional Memory constructor arguments.
+
+        Example:
+            >>> mem = Memory.from_qdrant(url="https://xyz.cloud.qdrant.io", api_key="key")
+            >>> agent = Agent(model=model, memory=mem)
+        """
+        return cls(
+            backend=MemoryBackend.QDRANT,
+            qdrant=QdrantConfig(
+                url=url,
+                api_key=api_key,
+                host=host,
+                port=port,
+                path=path,
+                collection=collection,
+                vector_size=vector_size,
+            ),
+            **kwargs,  # type: ignore[arg-type]
+        )
+
+    @classmethod
+    def from_chroma(
+        cls,
+        *,
+        path: str | None = None,
+        collection: str = "syrin_memory",
+        **kwargs: object,
+    ) -> Memory:
+        """Create a Chroma-backed Memory instance.
+
+        Open-source vector database. Use ``path`` for persistent local storage;
+        omit for ephemeral in-memory mode. Requires: ``pip install chromadb``.
+
+        Args:
+            path: Persistent storage path. None = ephemeral in-memory. Default: None.
+            collection: Collection name. Default: syrin_memory.
+            **kwargs: Additional Memory constructor arguments.
+
+        Example:
+            >>> mem = Memory.from_chroma(path="./chroma_db")
+            >>> agent = Agent(model=model, memory=mem)
+        """
+        return cls(
+            backend=MemoryBackend.CHROMA,
+            chroma=ChromaConfig(path=path, collection=collection),
+            **kwargs,  # type: ignore[arg-type]
         )
 
     async def __aenter__(self) -> Memory:

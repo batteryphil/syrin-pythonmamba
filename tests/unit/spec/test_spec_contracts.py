@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from syrin.budget import Budget, raise_on_exceeded
+from syrin.budget import Budget
 from syrin.checkpoint import CheckpointConfig, CheckpointTrigger
 from syrin.context import Context
 from syrin.enums import ExceedPolicy, StopReason
@@ -49,6 +49,9 @@ RESPONSE_CONTRACT_FIELDS = [
     "report",
     "context_stats",
     "context",
+    "blocked",
+    "block_reason",
+    "output",
 ]
 
 
@@ -69,10 +72,10 @@ def test_response_budget_property_returns_budget_status() -> None:
     assert b.cost == 0.5 or b.cost == r.cost
 
 
-def test_response_data_property_when_structured_none() -> None:
-    """response.data is None when structured is None."""
+def test_response_output_property_when_structured_none() -> None:
+    """response.output returns content string when structured is None (plain text agent)."""
     r = Response(content="x")
-    assert r.data is None
+    assert r.output == "x"
 
 
 def test_response_stop_reason_is_enum() -> None:
@@ -127,11 +130,11 @@ def test_validation_error_has_attempts_and_last_error() -> None:
 # -----------------------------------------------------------------------------
 
 
-def test_budget_valid_run_and_callback() -> None:
-    """Budget accepts run=float and on_exceeded=callable."""
+def test_budget_valid_max_cost_and_policy() -> None:
+    """Budget accepts max_cost=float and exceed_policy=ExceedPolicy."""
     b = Budget(max_cost=0.5, exceed_policy=ExceedPolicy.STOP)
     assert b.max_cost == 0.5
-    assert b.on_exceeded is raise_on_exceeded
+    assert callable(b._handler)
 
 
 def test_budget_valid_with_thresholds() -> None:
@@ -151,10 +154,10 @@ def test_budget_invalid_threshold_not_budget_threshold_raises() -> None:
         Budget(max_cost=1.0, thresholds=[{"at": 80}])  # type: ignore[arg-type]
 
 
-def test_budget_valid_reserve() -> None:
-    """Budget accepts reserve."""
-    b = Budget(max_cost=10.0, reserve=1.0)
-    assert b.reserve == 1.0
+def test_budget_valid_safety_margin() -> None:
+    """Budget accepts safety_margin."""
+    b = Budget(max_cost=10.0, safety_margin=1.0)
+    assert b.safety_margin == 1.0
 
 
 # -----------------------------------------------------------------------------

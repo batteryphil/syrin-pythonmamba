@@ -160,7 +160,7 @@ class TestMemoryDecayLock:
             entry = MemoryEntry(
                 id=str(uuid.uuid4()),
                 content=f"test memory {i}",
-                type=MemoryType.EPISODIC,
+                type=MemoryType.HISTORY,
                 scope=MemoryScope.SESSION,
             )
             store._backend[entry.id] = entry
@@ -436,7 +436,7 @@ class TestSQLiteThreadSafety:
                     entry = MemoryEntry(
                         id=str(uuid.uuid4()),
                         content="concurrent test",
-                        type=MemoryType.EPISODIC,
+                        type=MemoryType.HISTORY,
                         scope=MemoryScope.SESSION,
                     )
                     backend.add(entry)

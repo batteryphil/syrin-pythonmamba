@@ -402,7 +402,6 @@ def test_tool_returns_appears_in_toon_description() -> None:
 def test_tool_error_mode_propagate_reraises_original() -> None:
     """ToolErrorMode.PROPAGATE (default) re-raises the original exception."""
     from syrin import Agent, Model
-    from syrin.agent.config import AgentConfig
     from syrin.enums import ToolErrorMode
 
     @tool
@@ -412,7 +411,7 @@ def test_tool_error_mode_propagate_reraises_original() -> None:
     agent = Agent(
         model=Model.mock(),
         tools=[explode],
-        config=AgentConfig(tool_error_mode=ToolErrorMode.PROPAGATE),
+        tool_error_mode=ToolErrorMode.PROPAGATE,
     )
     with pytest.raises(ValueError, match="boom"):
         agent._execute_tool("explode", {})
@@ -421,7 +420,6 @@ def test_tool_error_mode_propagate_reraises_original() -> None:
 def test_tool_error_mode_stop_wraps_in_tool_execution_error() -> None:
     """ToolErrorMode.STOP wraps the error in ToolExecutionError."""
     from syrin import Agent, Model
-    from syrin.agent.config import AgentConfig
     from syrin.enums import ToolErrorMode
     from syrin.exceptions import ToolExecutionError
 
@@ -432,7 +430,7 @@ def test_tool_error_mode_stop_wraps_in_tool_execution_error() -> None:
     agent = Agent(
         model=Model.mock(),
         tools=[explode],
-        config=AgentConfig(tool_error_mode=ToolErrorMode.STOP),
+        tool_error_mode=ToolErrorMode.STOP,
     )
     with pytest.raises(ToolExecutionError, match="original error"):
         agent._execute_tool("explode", {})
@@ -441,7 +439,6 @@ def test_tool_error_mode_stop_wraps_in_tool_execution_error() -> None:
 def test_tool_error_mode_return_as_string_returns_error_message() -> None:
     """ToolErrorMode.RETURN_AS_STRING returns error as a string instead of raising."""
     from syrin import Agent, Model
-    from syrin.agent.config import AgentConfig
     from syrin.enums import ToolErrorMode
 
     @tool
@@ -451,7 +448,7 @@ def test_tool_error_mode_return_as_string_returns_error_message() -> None:
     agent = Agent(
         model=Model.mock(),
         tools=[explode],
-        config=AgentConfig(tool_error_mode=ToolErrorMode.RETURN_AS_STRING),
+        tool_error_mode=ToolErrorMode.RETURN_AS_STRING,
     )
     result = agent._execute_tool("explode", {})
     assert isinstance(result, str)

@@ -156,8 +156,10 @@ class TestConsensusMajority:
         swarm = Swarm(
             agents=[a, b, c],
             goal="Capital?",
-            config=SwarmConfig(topology=SwarmTopology.CONSENSUS),
-            consensus_config=ConsensusConfig(strategy=ConsensusStrategy.MAJORITY),
+            config=SwarmConfig(
+                topology=SwarmTopology.CONSENSUS,
+                consensus=ConsensusConfig(strategy=ConsensusStrategy.MAJORITY),
+            ),
         )
         result = await swarm.run()
         assert result.consensus_result is not None
@@ -172,8 +174,10 @@ class TestConsensusMajority:
         swarm = Swarm(
             agents=[a, b, c],
             goal="Capital?",
-            config=SwarmConfig(topology=SwarmTopology.CONSENSUS),
-            consensus_config=ConsensusConfig(strategy=ConsensusStrategy.MAJORITY),
+            config=SwarmConfig(
+                topology=SwarmTopology.CONSENSUS,
+                consensus=ConsensusConfig(strategy=ConsensusStrategy.MAJORITY),
+            ),
         )
         result = await swarm.run()
         assert result.content == "Berlin"
@@ -196,8 +200,10 @@ class TestConsensusUnanimity:
         swarm = Swarm(
             agents=[a, b, c],
             goal="Capital?",
-            config=SwarmConfig(topology=SwarmTopology.CONSENSUS),
-            consensus_config=ConsensusConfig(strategy=ConsensusStrategy.UNANIMITY),
+            config=SwarmConfig(
+                topology=SwarmTopology.CONSENSUS,
+                consensus=ConsensusConfig(strategy=ConsensusStrategy.UNANIMITY),
+            ),
         )
         result = await swarm.run()
         assert result.consensus_result is not None
@@ -209,8 +215,10 @@ class TestConsensusUnanimity:
         swarm = Swarm(
             agents=agents,
             goal="Capital?",
-            config=SwarmConfig(topology=SwarmTopology.CONSENSUS),
-            consensus_config=ConsensusConfig(strategy=ConsensusStrategy.UNANIMITY),
+            config=SwarmConfig(
+                topology=SwarmTopology.CONSENSUS,
+                consensus=ConsensusConfig(strategy=ConsensusStrategy.UNANIMITY),
+            ),
         )
         result = await swarm.run()
         assert result.consensus_result is not None
@@ -223,8 +231,10 @@ class TestConsensusUnanimity:
         swarm = Swarm(
             agents=[a, b],
             goal="Capital?",
-            config=SwarmConfig(topology=SwarmTopology.CONSENSUS),
-            consensus_config=ConsensusConfig(strategy=ConsensusStrategy.UNANIMITY),
+            config=SwarmConfig(
+                topology=SwarmTopology.CONSENSUS,
+                consensus=ConsensusConfig(strategy=ConsensusStrategy.UNANIMITY),
+            ),
         )
         result = await swarm.run()
         assert result.consensus_result is not None
@@ -249,10 +259,12 @@ class TestConsensusMinAgreement:
         swarm = Swarm(
             agents=[a, b, c],
             goal="Capital?",
-            config=SwarmConfig(topology=SwarmTopology.CONSENSUS),
-            consensus_config=ConsensusConfig(
-                strategy=ConsensusStrategy.MAJORITY,
-                min_agreement=0.67,
+            config=SwarmConfig(
+                topology=SwarmTopology.CONSENSUS,
+                consensus=ConsensusConfig(
+                    strategy=ConsensusStrategy.MAJORITY,
+                    min_agreement=0.67,
+                ),
             ),
         )
         result = await swarm.run()
@@ -267,10 +279,12 @@ class TestConsensusMinAgreement:
         swarm = Swarm(
             agents=[a, b, c],
             goal="Capital?",
-            config=SwarmConfig(topology=SwarmTopology.CONSENSUS),
-            consensus_config=ConsensusConfig(
-                strategy=ConsensusStrategy.MAJORITY,
-                min_agreement=0.60,
+            config=SwarmConfig(
+                topology=SwarmTopology.CONSENSUS,
+                consensus=ConsensusConfig(
+                    strategy=ConsensusStrategy.MAJORITY,
+                    min_agreement=0.60,
+                ),
             ),
         )
         result = await swarm.run()
@@ -588,10 +602,12 @@ class TestConsensusWeighted:
         swarm = Swarm(
             agents=[a, b, c],
             goal="Capital?",
-            config=SwarmConfig(topology=SwarmTopology.CONSENSUS),
-            consensus_config=ConsensusConfig(
-                strategy=ConsensusStrategy.WEIGHTED,
-                min_agreement=0.5,
+            config=SwarmConfig(
+                topology=SwarmTopology.CONSENSUS,
+                consensus=ConsensusConfig(
+                    strategy=ConsensusStrategy.WEIGHTED,
+                    min_agreement=0.5,
+                ),
             ),
         )
         result = await swarm.run()
@@ -617,8 +633,10 @@ class TestConsensusWeighted:
         swarm = Swarm(
             agents=agents,
             goal="Capital?",
-            config=SwarmConfig(topology=SwarmTopology.CONSENSUS),
-            consensus_config=ConsensusConfig(strategy=ConsensusStrategy.WEIGHTED),
+            config=SwarmConfig(
+                topology=SwarmTopology.CONSENSUS,
+                consensus=ConsensusConfig(strategy=ConsensusStrategy.WEIGHTED),
+            ),
         )
         result = await swarm.run()
         assert result.consensus_result is not None

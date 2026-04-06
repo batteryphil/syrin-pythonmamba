@@ -1,7 +1,8 @@
-"""Serve adapter — converts Pipeline and DynamicPipeline to agent-like interface.
+"""Serve adapter — converts AgentRouter to an agent-like serveable interface.
 
-Enables build_router() and AgentRouter to serve pipelines directly without
-requiring users to write a wrapper agent.
+Enables build_router() to serve AgentRouter instances via HTTP/CLI/STDIO without
+requiring users to write a wrapper agent.  Plain :class:`~syrin.agent.Agent`
+instances are returned as-is.
 """
 
 from __future__ import annotations
@@ -17,35 +18,33 @@ from syrin.types import TokenUsage
 
 if TYPE_CHECKING:
     from syrin.agent import Agent
-    from syrin.agent.multi_agent import DynamicPipeline, Pipeline
+    from syrin.agent.agent_router import AgentRouter
 
 
-def to_serveable(obj: Agent | Pipeline | DynamicPipeline) -> Agent:
-    """Convert Agent, Pipeline, or DynamicPipeline to a serveable Agent.
+def to_serveable(obj: Agent | AgentRouter) -> Agent:
+    """Convert an Agent or AgentRouter to a serveable Agent-compatible object.
 
-    Used internally by build_router() and AgentRouter. Agent is returned as-is.
-    Pipeline and DynamicPipeline are wrapped in adapters that implement arun,
-    astream, events, budget_state, etc., so they can be served via HTTP/CLI/STDIO.
+    Agent instances are returned as-is.  AgentRouter instances are wrapped in
+    :class:`_AgentRouterAdapter` which exposes ``arun``, ``astream``, ``events``,
+    and ``budget_state`` so they can be served via HTTP/CLI/STDIO.
 
     Args:
-        obj: Agent, Pipeline, or DynamicPipeline to convert.
+        obj: Agent or AgentRouter to convert.
 
     Returns:
-        Agent-compatible object (same interface as Agent).
+        Agent-compatible object.
 
     Raises:
-        TypeError: If obj is not Agent, Pipeline, or DynamicPipeline.
+        TypeError: If ``obj`` is not an Agent or AgentRouter.
     """
     from syrin.agent import Agent
-    from syrin.agent.multi_agent import DynamicPipeline, Pipeline
+    from syrin.agent.agent_router import AgentRouter
 
     if isinstance(obj, Agent):
         return obj
-    if isinstance(obj, DynamicPipeline):
-        return cast(Agent, _DynamicPipelineAdapter(obj))
-    if isinstance(obj, Pipeline):
-        return cast(Agent, _PipelineAdapter(obj))
-    raise TypeError(f"Expected Agent, Pipeline, or DynamicPipeline, got {type(obj).__name__}")
+    if isinstance(obj, AgentRouter):
+        return cast("Agent", _AgentRouterAdapter(obj))
+    raise TypeError(f"Expected Agent or AgentRouter, got {type(obj).__name__}")
 
 
 def _budget_state_from_budget(budget: object) -> BudgetState | None:
@@ -66,17 +65,22 @@ def _budget_state_from_budget(budget: object) -> BudgetState | None:
     )
 
 
-class _PipelineAdapter:
-    """Internal adapter: Pipeline -> agent-like interface for HTTP serving."""
+class _AgentRouterAdapter:
+    """Internal adapter: AgentRouter → agent-like interface for HTTP serving.
 
-    def __init__(self, pipeline: Pipeline) -> None:
+    Wraps an :class:`~syrin.agent.agent_router.AgentRouter` so it can be
+    mounted via :func:`~syrin.serve.http.build_router` without subclassing
+    :class:`~syrin.agent.Agent`.
+    """
 
-        self._pipeline = pipeline
-        self.name = "pipeline"
-        self.description = "Sequential agent pipeline"
+    def __init__(self, router: AgentRouter) -> None:
+        self._router = router
+        self.name = "agent-router"
+        self.description = "AgentRouter — LLM-driven dynamic multi-agent orchestration"
+        self.internal_agents = list(getattr(router, "_agent_names", {}).keys())
         self.tools: list[object] = []
         self._events = Events(lambda _h, _c: None)
-        pipeline.events.on_all(lambda h, c: self._forward_event(h, c))
+        router.events.on_all(lambda h, c: self._forward_event(h, c))
 
     def _forward_event(self, hook: object, ctx: EventContext) -> None:
         self._events._trigger_before(hook, ctx)  # type: ignore[arg-type]
@@ -85,11 +89,13 @@ class _PipelineAdapter:
 
     @property
     def events(self) -> Events:
+        """Router lifecycle events."""
         return self._events
 
     @property
     def budget_state(self) -> BudgetState | None:
-        return _budget_state_from_budget(getattr(self._pipeline, "_budget", None))
+        """Current budget utilisation, or ``None`` if no budget is set."""
+        return _budget_state_from_budget(getattr(self._router, "_budget", None))
 
     async def arun(
         self,
@@ -97,30 +103,21 @@ class _PipelineAdapter:
         context: object = None,
         template_variables: dict[str, object] | None = None,
     ) -> Response[str]:
-        del context, template_variables
-        agents = getattr(self._pipeline, "_agents", None)
-        if not agents:
-            return Response(content="Pipeline has no default agents", cost=0, tokens=TokenUsage())
-        first_item = agents[0]
-        first_class, first_task = (
-            (first_item[0], first_item[1]) if isinstance(first_item, tuple) else (first_item, "")
-        )
-        from syrin.agent import Agent as _AgentType
+        """Async run delegating to ``AgentRouter.run()`` in a thread.
 
-        run_agents: list[tuple[type[_AgentType], str]] = [
-            (first_class, user_input),
-        ]
-        for item in agents[1:]:
-            ac, task = (item[0], item[1]) if isinstance(item, tuple) else (item, "")
-            run_agents.append((ac, task or "Process the previous output"))
-        result = await asyncio.to_thread(
-            self._pipeline.run_sequential,
-            cast(list[type[_AgentType] | tuple[type[_AgentType], str]], run_agents),
-        )
-        return result
+        Args:
+            user_input: Task string for the router.
+            context: Ignored (AgentRouter does not use context).
+            template_variables: Ignored.
+
+        Returns:
+            :class:`~syrin.response.Response` from the router.
+        """
+        del context, template_variables
+        return await asyncio.to_thread(self._router.run, user_input, "parallel")
 
     def run(self, user_input: str) -> Response[str]:
-        """Sync run for CLI/STDIO. Blocks until complete."""
+        """Synchronous run. Blocks until complete."""
         return asyncio.run(self.arun(user_input))
 
     async def astream(
@@ -129,66 +126,18 @@ class _PipelineAdapter:
         context: object = None,
         template_variables: dict[str, object] | None = None,
     ) -> object:
-        result = await self.arun(user_input, context, template_variables)
-        yield StreamChunk(
-            index=0,
-            text=result.content,
-            accumulated_text=result.content,
-            cost_so_far=result.cost,
-            tokens_so_far=result.tokens or TokenUsage(),
-            is_final=True,
-            response=result,
-        )
+        """Async streaming run.  Emits intermediate hook chunks then the final result.
 
+        Args:
+            user_input: Task string for the router.
+            context: Ignored.
+            template_variables: Ignored.
 
-class _DynamicPipelineAdapter:
-    """Internal adapter: DynamicPipeline -> agent-like interface for HTTP serving."""
-
-    def __init__(self, pipeline: DynamicPipeline) -> None:
-
-        self._pipeline = pipeline
-        self.name = "dynamic-pipeline"
-        self.description = "Dynamic pipeline — LLM plans which agents to spawn"
-        self.internal_agents = list(getattr(pipeline, "_agent_names", {}).keys())
-        self.tools: list[object] = []
-        self._events = Events(lambda _h, _c: None)
-        pipeline.events.on_all(lambda h, c: self._forward_event(h, c))
-
-    def _forward_event(self, hook: object, ctx: EventContext) -> None:
-        self._events._trigger_before(hook, ctx)  # type: ignore[arg-type]
-        self._events._trigger(hook, ctx)  # type: ignore[arg-type]
-        self._events._trigger_after(hook, ctx)  # type: ignore[arg-type]
-
-    @property
-    def events(self) -> Events:
-        return self._events
-
-    @property
-    def budget_state(self) -> BudgetState | None:
-        return _budget_state_from_budget(getattr(self._pipeline, "_budget", None))
-
-    async def arun(
-        self,
-        user_input: str,
-        context: object = None,
-        template_variables: dict[str, object] | None = None,
-    ) -> Response[str]:
-        del context, template_variables
-        return await asyncio.to_thread(self._pipeline.run, user_input, "parallel")
-
-    def run(self, user_input: str) -> Response[str]:
-        """Sync run for CLI/STDIO. Blocks until complete."""
-        return asyncio.run(self.arun(user_input))
-
-    async def astream(
-        self,
-        user_input: str,
-        context: object = None,
-        template_variables: dict[str, object] | None = None,
-    ) -> object:
+        Yields:
+            :class:`~syrin.response.StreamChunk` objects.
+        """
         del context, template_variables
 
-        # Queue for hooks emitted during pipeline run (enables real-time streaming)
         hook_queue: asyncio.Queue[tuple[str, dict[str, object]]] = asyncio.Queue()
 
         def on_hook(h: object, c: object) -> None:
@@ -197,27 +146,25 @@ class _DynamicPipelineAdapter:
             with contextlib.suppress(asyncio.QueueFull):
                 hook_queue.put_nowait((h_val, c_dict))
 
-        self._pipeline.events.on_all(on_hook)
+        self._router.events.on_all(on_hook)
         result_container: list[Response[str]] = []
 
-        async def run_pipeline() -> None:
+        async def run_router() -> None:
             result_container.append(
-                await asyncio.to_thread(self._pipeline.run, user_input, "parallel")
+                await asyncio.to_thread(self._router.run, user_input, "parallel")
             )
 
-        task = asyncio.create_task(run_pipeline())
+        task = asyncio.create_task(run_router())
 
-        # Yield hooks as they arrive, until pipeline completes
         while not task.done():
             try:
                 h, c = await asyncio.wait_for(hook_queue.get(), timeout=0.05)
                 chunk = StreamChunk()
                 object.__setattr__(chunk, "_hook", (h, c))
                 yield chunk
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
 
-        # Drain any remaining hooks
         while not hook_queue.empty():
             try:
                 h, c = hook_queue.get_nowait()

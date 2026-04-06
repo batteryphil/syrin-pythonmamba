@@ -18,7 +18,7 @@ class TestDecayApply:
         entry = MemoryEntry(
             id="e1",
             content="test",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=1.0,
             created_at=datetime.now() - timedelta(days=30),
         )
@@ -31,7 +31,7 @@ class TestDecayApply:
         entry = MemoryEntry(
             id="e1",
             content="old",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=1.0,
             created_at=datetime.now() - timedelta(hours=24 * 7),
         )
@@ -49,7 +49,7 @@ class TestDecayApply:
         entry = MemoryEntry(
             id="e1",
             content="very old",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=0.5,
             created_at=datetime.now() - timedelta(days=365),
         )
@@ -66,7 +66,7 @@ class TestReinforceOnAccess:
         entry = MemoryEntry(
             id="e1",
             content="test",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=0.5,
             access_count=0,
         )
@@ -81,7 +81,7 @@ class TestReinforceOnAccess:
         entry = MemoryEntry(
             id="e1",
             content="test",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=0.5,
             access_count=0,
         )
@@ -96,7 +96,7 @@ class TestReinforceOnAccess:
         entry = MemoryEntry(
             id="e1",
             content="test",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=0.5,
             access_count=0,
         )
@@ -119,7 +119,7 @@ class TestStoreRecallAppliesDecay:
         entry = MemoryEntry(
             id="e1",
             content="memory",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=1.0,
             access_count=0,
         )
@@ -138,7 +138,7 @@ class TestStoreRecallAppliesDecay:
         entry = MemoryEntry(
             id="e1",
             content="memory",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=0.8,
             access_count=0,
         )

@@ -14,7 +14,7 @@ Run:
 
 from __future__ import annotations
 
-from syrin import Agent, Budget, Model
+from syrin import Agent, Budget, ExceedPolicy, Model
 from syrin.enums import ThresholdMetric
 from syrin.threshold import BudgetThreshold, ThresholdContext
 

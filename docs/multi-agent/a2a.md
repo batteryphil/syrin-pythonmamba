@@ -63,7 +63,7 @@ Every message is wrapped in an `A2AMessageEnvelope` with routing metadata:
 - `envelope.message_id` — unique UUID for this message
 - `envelope.message_type` — the message class name as a string
 - `envelope.timestamp` — when the message was sent
-- `envelope.channel` — `"direct"` or `"broadcast"`
+- `envelope.channel` — `"direct"`, `"broadcast"`, or `"topic"`
 
 ## Delivery Channels
 
@@ -103,6 +103,31 @@ await router.send(
 
 # All registered agents except "orchestrator" receive this
 ```
+
+### Topic (Pub/Sub)
+
+Subscribe agents to named topics, then fan out messages to all subscribers at once:
+
+```python
+from syrin.enums import A2AChannel
+
+# Subscribe agents to a topic
+router.subscribe("researcher-1", "findings")
+router.subscribe("researcher-2", "findings")
+router.subscribe("researcher-3", "findings")
+
+# Send to all subscribers of "findings"
+await router.send_topic(
+    from_agent="orchestrator",
+    topic="findings",
+    message=StatusUpdate(status="Phase complete", progress=1.0),
+)
+
+# All three researchers receive it
+envelope = await router.receive(agent_id="researcher-1", timeout=2.0)
+```
+
+`router.subscribe(agent, topic)` registers an agent as a subscriber to a topic name. `router.send_topic(from_agent, topic, message)` delivers the message to all subscribed agents. The sender is not excluded from receiving its own topic broadcasts (unlike `BROADCAST` which excludes the sender).
 
 ## Acknowledgment
 

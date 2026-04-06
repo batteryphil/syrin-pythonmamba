@@ -1,7 +1,7 @@
 """Tests that enforce module dependency layering.
 
 Loop must not import from syrin.agent except syrin.agent._run_context
-(AgentRunContext). Bottom/mid must not import top (agent, multi_agent, cli).
+(AgentRunContext). Bottom/mid must not import top (agent, cli).
 """
 
 from __future__ import annotations
@@ -41,13 +41,13 @@ def test_loop_imports_only_agent_run_context() -> None:
 
 
 def test_no_agent_import_in_bottom_mid_modules() -> None:
-    """Bottom and mid layers must not import top (agent, multi_agent, cli)."""
+    """Bottom and mid layers must not import top (agent, cli)."""
     root = Path(__file__).resolve().parent.parent.parent.parent
     src = root / "src" / "syrin"
     # Bottom: enums, exceptions, types, domain_events, config
     # Mid: cost, budget, budget_store, threshold, events, response, prompt, tool, task, output, validation, pipe
     # Upper (may import mid/bottom but not agent): model, providers, loop, memory, context, guardrails, checkpoint, ratelimit, observability
-    # Top: agent, multi_agent
+    # Top: agent
     bottom_mid = {
         "enums",
         "exceptions",
@@ -67,7 +67,7 @@ def test_no_agent_import_in_bottom_mid_modules() -> None:
         "validation",
         "pipe",
     }
-    top_modules = {"syrin.agent", "syrin.agent.multi_agent"}
+    top_modules = {"syrin.agent"}
     # Check main __init__.py of each package (not submodules) for simplicity
     for name in bottom_mid:
         pkg = src / name
@@ -90,5 +90,5 @@ def test_no_agent_import_in_bottom_mid_modules() -> None:
                         continue
                     raise AssertionError(
                         f"{path.relative_to(root)} must not import top layer {mod} "
-                        "(dependency direction: bottom/mid do not import agent, multi_agent, cli)"
+                        "(dependency direction: bottom/mid do not import agent, cli)"
                     )

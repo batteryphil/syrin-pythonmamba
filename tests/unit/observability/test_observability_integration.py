@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from syrin.agent.config import AgentConfig
 from syrin.observability import (
     InMemoryExporter,
     SpanKind,
@@ -40,7 +39,7 @@ class TestSpanCoverageAgentSpan:
         agent = Agent(
             model=model,
             system_prompt="Be brief.",
-            config=AgentConfig(tracer=tracer),
+            tracer=tracer,
         )
         with patch.object(
             agent._provider,
@@ -75,7 +74,7 @@ class TestSpanCoverageAgentSpan:
         agent = Agent(
             model=Model("openai/gpt-4o-mini"),
             system_prompt="Be brief.",
-            config=AgentConfig(tracer=tracer),
+            tracer=tracer,
         )
         with patch.object(
             agent._provider,
@@ -116,7 +115,7 @@ class TestSpanCoverageLLMSpan:
             model=Model("openai/gpt-4o-mini"),
             system_prompt="Be brief.",
             loop=SingleShotLoop(),
-            config=AgentConfig(tracer=tracer),
+            tracer=tracer,
         )
         with patch.object(
             agent._provider,
@@ -150,7 +149,7 @@ class TestSpanCoverageLLMSpan:
             model=Model("openai/gpt-4o-mini"),
             system_prompt="Be brief.",
             loop=ReactLoop(max_iterations=3),
-            config=AgentConfig(tracer=tracer),
+            tracer=tracer,
         )
         # First call returns content (no tools), so one iteration
         with patch.object(
@@ -194,7 +193,7 @@ class TestSpanCoverageToolSpan:
             system_prompt="Use tools.",
             tools=[echo],
             loop=ReactLoop(max_iterations=5),
-            config=AgentConfig(tracer=tracer),
+            tracer=tracer,
         )
         call_count = 0
 
@@ -247,7 +246,7 @@ class TestSessionTracking:
         agent = Agent(
             model=Model("openai/gpt-4o-mini"),
             system_prompt="Be brief.",
-            config=AgentConfig(tracer=tracer),
+            tracer=tracer,
         )
         with (
             patch.object(
@@ -282,7 +281,7 @@ class TestSessionTracking:
         agent = Agent(
             model=Model("openai/gpt-4o-mini"),
             system_prompt="Be brief.",
-            config=AgentConfig(tracer=tracer),
+            tracer=tracer,
         )
         with patch.object(
             agent._provider,
@@ -407,7 +406,7 @@ class TestDebugMode:
             model=Model("openai/gpt-4o-mini"),
             system_prompt="Be brief.",
             debug=True,
-            config=AgentConfig(tracer=tracer),
+            tracer=tracer,
         )
         assert any(isinstance(e, ConsoleExporter) for e in agent._tracer._exporters)
 
@@ -422,7 +421,7 @@ class TestDebugMode:
             model=Model("openai/gpt-4o-mini"),
             system_prompt="Be brief.",
             debug=True,
-            config=AgentConfig(tracer=tracer),
+            tracer=tracer,
         )
         assert agent._tracer.debug_mode is True
 

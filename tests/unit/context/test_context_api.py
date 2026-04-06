@@ -40,25 +40,25 @@ def test_context_config_not_in_syrin_root() -> None:
 
 
 def test_agent_config_accepts_context_directly() -> None:
-    """AgentConfig(context=Context(...)) works — no need for ContextConfig."""
-    from syrin.agent.config import AgentConfig
+    """Agent(context=Context(...)) works directly."""
+    from syrin import Agent
     from syrin.context import Context
+    from syrin.model import Model
 
-    cfg = AgentConfig(context=Context(max_tokens=4000))
-    assert cfg.context is not None
+    agent = Agent(model=Model.Almock(), context=Context(max_tokens=4000))
+    assert agent is not None
 
 
 def test_agent_accepts_context_via_config() -> None:
-    """Agent accepts context=Context(...) via AgentConfig."""
+    """Agent accepts context=Context(...) directly."""
     from syrin import Agent
-    from syrin.agent.config import AgentConfig
     from syrin.context import Context
     from syrin.model import Model
 
     agent = Agent(
         model=Model.Almock(),
         system_prompt="test",
-        config=AgentConfig(context=Context(max_tokens=8000)),
+        context=Context(max_tokens=8000),
     )
     assert agent is not None
 

@@ -7,7 +7,7 @@ Run:
     python examples/10_observability/events_and_hooks.py
 """
 
-from syrin import Agent, Budget, Hook, Memory, Model
+from syrin import Agent, Budget, ExceedPolicy, Hook, Memory, Model
 from syrin.enums import MemoryType
 
 model = Model.mock()
@@ -83,7 +83,7 @@ agent5 = Agent(model=model, memory=Memory())
 agent5.events.on(Hook.MEMORY_STORE, lambda _: memory_ops.append("store"))
 agent5.events.on(Hook.MEMORY_RECALL, lambda _: memory_ops.append("recall"))
 
-agent5.remember("Python is great", memory_type=MemoryType.CORE)
+agent5.remember("Python is great", memory_type=MemoryType.FACTS)
 agent5.recall("Python")
 print(f"Memory operations: {memory_ops}")
 print()

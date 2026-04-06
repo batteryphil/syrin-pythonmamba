@@ -26,18 +26,18 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sys
+from pathlib import Path
 from typing import ClassVar
+
+from dotenv import load_dotenv
 
 from syrin import Agent, Budget, Model
 from syrin.enums import SwarmTopology
 from syrin.swarm import Swarm, SwarmConfig
 
-if not os.environ.get("OPENAI_API_KEY"):
-    print("Error: OPENAI_API_KEY is not set. This example requires a real API key.")
-    sys.exit(1)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-_MODEL = Model.OpenAI("gpt-4o-mini")
+_MODEL = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # ── Leaf workers ──────────────────────────────────────────────────────────────

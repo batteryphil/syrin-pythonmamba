@@ -182,8 +182,7 @@ def execute_tool(agent: Agent, name: str, arguments: dict[str, object]) -> str |
                 return result  # Caller must await
             result_str = str(result) if result is not None else ""
             # 6.2: Spotlight tool output if enabled
-            config = getattr(agent, "_config", None)
-            if config is not None and getattr(config, "spotlight_tool_outputs", False):
+            if getattr(agent, "_spotlight_tool_outputs", False):
                 from syrin.guardrails.injection._spotlight import spotlight_wrap
 
                 result_str = spotlight_wrap(result_str, source=name)
@@ -191,8 +190,7 @@ def execute_tool(agent: Agent, name: str, arguments: dict[str, object]) -> str |
         except (ToolExecutionError, ToolArgumentError):
             raise
         except Exception as e:
-            _config = getattr(agent, "_config", None)
-            _mode = getattr(_config, "tool_error_mode", ToolErrorMode.PROPAGATE)
+            _mode = getattr(agent, "_tool_error_mode", ToolErrorMode.PROPAGATE)
             if _mode == ToolErrorMode.RETURN_AS_STRING:
                 return f"Tool error ({name}): {e}"
             elif _mode == ToolErrorMode.STOP:

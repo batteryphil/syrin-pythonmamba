@@ -1,4 +1,4 @@
-"""Memory type classes for Core, Episodic, Semantic, and Procedural memory."""
+"""Memory type classes for Facts, History, Knowledge, and Instructions memory."""
 
 from __future__ import annotations
 
@@ -24,10 +24,10 @@ class MemoryEntryKwargs(TypedDict, total=False):
     metadata: dict[str, object]
 
 
-class CoreMemory(MemoryEntry):  # type: ignore[explicit-any]
-    """Core memory - persistent facts about the agent/user.
+class FactsMemory(MemoryEntry):  # type: ignore[explicit-any]
+    """Facts memory - persistent facts about the agent/user.
 
-    Core memories are high-importance, long-lasting facts that should
+    Facts memories are high-importance, long-lasting facts that should
     rarely decay. Examples: user name, preferences, identity.
     """
 
@@ -42,17 +42,17 @@ class CoreMemory(MemoryEntry):  # type: ignore[explicit-any]
         super().__init__(
             id=id,
             content=content,
-            type=MemoryType.CORE,
-            importance=min(importance, 0.9),  # Core defaults high
+            type=MemoryType.FACTS,
+            importance=min(importance, 0.9),  # Facts defaults high
             scope=scope,
             **kwargs,
         )
 
 
-class EpisodicMemory(MemoryEntry):  # type: ignore[explicit-any]
-    """Episodic memory - specific events and experiences.
+class HistoryMemory(MemoryEntry):  # type: ignore[explicit-any]
+    """History memory - specific events and experiences.
 
-    Episodic memories capture specific moments, conversations, or events.
+    History memories capture specific moments, conversations, or events.
     They decay over time unless reinforced. Examples: what happened yesterday.
     """
 
@@ -67,17 +67,17 @@ class EpisodicMemory(MemoryEntry):  # type: ignore[explicit-any]
         super().__init__(
             id=id,
             content=content,
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=importance,
             scope=scope,
             **kwargs,
         )
 
 
-class SemanticMemory(MemoryEntry):  # type: ignore[explicit-any]
-    """Semantic memory - facts and knowledge.
+class KnowledgeMemory(MemoryEntry):  # type: ignore[explicit-any]
+    """Knowledge memory - facts and knowledge.
 
-    Semantic memories store factual knowledge that can be recalled
+    Knowledge memories store factual knowledge that can be recalled
     regardless of when it was learned. Examples: facts, definitions.
     """
 
@@ -92,17 +92,17 @@ class SemanticMemory(MemoryEntry):  # type: ignore[explicit-any]
         super().__init__(
             id=id,
             content=content,
-            type=MemoryType.SEMANTIC,
+            type=MemoryType.KNOWLEDGE,
             importance=importance,
             scope=scope,
             **kwargs,
         )
 
 
-class ProceduralMemory(MemoryEntry):  # type: ignore[explicit-any]
-    """Procedural memory - how-to knowledge and skills.
+class InstructionsMemory(MemoryEntry):  # type: ignore[explicit-any]
+    """Instructions memory - how-to knowledge and skills.
 
-    Procedural memories store instructions and procedures. They should
+    Instructions memories store instructions and procedures. They should
     decay slowly as they represent learned skills. Examples: how to make coffee.
     """
 
@@ -117,7 +117,7 @@ class ProceduralMemory(MemoryEntry):  # type: ignore[explicit-any]
         super().__init__(
             id=id,
             content=content,
-            type=MemoryType.PROCEDURAL,
+            type=MemoryType.INSTRUCTIONS,
             importance=importance,
             scope=scope,
             **kwargs,
@@ -144,35 +144,35 @@ def create_memory(
         A MemoryEntry of the appropriate type
 
     Example:
-        >>> mem = create_memory(MemoryType.CORE, "user-name", "My name is John")
-        >>> assert mem.type == MemoryType.CORE
+        >>> mem = create_memory(MemoryType.FACTS, "user-name", "My name is John")
+        >>> assert mem.type == MemoryType.FACTS
     """
     defaults = {
-        MemoryType.CORE: 0.9,
-        MemoryType.EPISODIC: 0.7,
-        MemoryType.SEMANTIC: 0.8,
-        MemoryType.PROCEDURAL: 0.85,
+        MemoryType.FACTS: 0.9,
+        MemoryType.HISTORY: 0.7,
+        MemoryType.KNOWLEDGE: 0.8,
+        MemoryType.INSTRUCTIONS: 0.85,
     }
 
     imp = importance if importance is not None else defaults.get(memory_type, 0.5)
 
-    if memory_type == MemoryType.CORE:
-        return CoreMemory(id=id, content=content, importance=imp, **kwargs)
-    elif memory_type == MemoryType.EPISODIC:
-        return EpisodicMemory(id=id, content=content, importance=imp, **kwargs)
-    elif memory_type == MemoryType.SEMANTIC:
-        return SemanticMemory(id=id, content=content, importance=imp, **kwargs)
-    elif memory_type == MemoryType.PROCEDURAL:
-        return ProceduralMemory(id=id, content=content, importance=imp, **kwargs)
+    if memory_type == MemoryType.FACTS:
+        return FactsMemory(id=id, content=content, importance=imp, **kwargs)
+    elif memory_type == MemoryType.HISTORY:
+        return HistoryMemory(id=id, content=content, importance=imp, **kwargs)
+    elif memory_type == MemoryType.KNOWLEDGE:
+        return KnowledgeMemory(id=id, content=content, importance=imp, **kwargs)
+    elif memory_type == MemoryType.INSTRUCTIONS:
+        return InstructionsMemory(id=id, content=content, importance=imp, **kwargs)
     else:
         return MemoryEntry(id=id, content=content, type=memory_type, importance=imp, **kwargs)
 
 
 __all__ = [
-    "CoreMemory",
-    "EpisodicMemory",
+    "FactsMemory",
+    "HistoryMemory",
+    "InstructionsMemory",
+    "KnowledgeMemory",
     "MemoryEntryKwargs",
-    "ProceduralMemory",
-    "SemanticMemory",
     "create_memory",
 ]

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from syrin import Agent, AgentConfig, Model, RunContext
+from syrin import Agent, Model, RunContext
 from syrin.tool import tool
 
 # -----------------------------------------------------------------------------
@@ -63,7 +63,7 @@ def test_tool_with_ctx_receives_deps() -> None:
     """Tool with ctx receives RunContext with deps."""
     counter: list[int] = []
     deps = DIExampleDeps(value="injected", counter=counter)
-    agent = DIAgent(config=AgentConfig(dependencies=deps))
+    agent = DIAgent(dependencies=deps)
     result = agent._execute_tool("tool_with_ctx", {"key": "foo"})
     assert len(counter) >= 1
     assert result == "injected:foo"

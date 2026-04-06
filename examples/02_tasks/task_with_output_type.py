@@ -1,41 +1,51 @@
 """Task with Output Type -- Returning structured data from an agent method.
 
 Demonstrates:
-- A triage method that returns a dict with structured fields
-- TriageAgent that classifies items by priority, category, and summary
-- Parsing agent output into a structured result
+- Output(Model): agent returns a typed Pydantic instance via result.output
+- A triage method that unwraps result.output instead of manually parsing text
+- Type-safe access — no dict keys, no string splitting
 
 Run: python examples/02_tasks/task_with_output_type.py
 """
 
 from __future__ import annotations
 
-from syrin import Agent, Model
+from typing import Literal
+
+from pydantic import BaseModel
+
+from syrin import Agent, Model, Output
+
+
+class TriageResult(BaseModel):
+    """Structured triage result."""
+
+    priority: Literal["high", "medium", "low"]
+    category: str
+    summary: str
+
+
+_triage_json = (
+    '{"priority": "high", "category": "infrastructure", '
+    '"summary": "CPU has been at 98% for 10 minutes — likely runaway process or traffic spike."}'
+)
 
 
 class TriageAgent(Agent):
-    """Agent that triages items with structured output."""
+    """Classifies incidents by priority, category, and summary."""
 
     name = "triage"
-    description = "Triage agent returning priority, category, summary"
-    model = Model.mock()
+    model = Model.mock(response_mode="custom", custom_response=_triage_json)
     system_prompt = (
-        "You are a triage assistant. For each item, return priority (high/medium/low), "
-        "category, and a brief summary. Be concise."
+        "You are a triage assistant. Return a JSON object with: "
+        "priority (high/medium/low), category, and summary."
     )
+    output = Output(TriageResult)
 
-    def triage(self, item: str) -> dict:
-        """Triage an item. Returns dict with priority, category, summary."""
-        response = self.run(
-            f"Triage this item: {item}. "
-            "Respond with: priority (high/medium/low), category, and summary."
-        )
-        content = response.content or ""
-        return {
-            "priority": "medium",
-            "category": "general",
-            "summary": content[:100] if content else "No summary",
-        }
+    def triage(self, item: str) -> TriageResult:
+        """Triage an item and return a typed TriageResult."""
+        result = self.run(f"Triage: {item}")
+        return result.output  # type: ignore[return-value]
 
 
 if __name__ == "__main__":
@@ -43,5 +53,6 @@ if __name__ == "__main__":
 
     result = agent.triage("Server CPU at 98% for the last 10 minutes")
     print("Triage result:")
-    for key, value in result.items():
-        print(f"  {key}: {value}")
+    print(f"  priority: {result.priority}")
+    print(f"  category: {result.category}")
+    print(f"  summary:  {result.summary}")

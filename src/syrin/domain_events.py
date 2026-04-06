@@ -5,14 +5,14 @@ domain events are typed dataclasses that observability and other consumers
 can subscribe to without parsing strings.
 
 Usage:
-    >>> from syrin import Agent, AgentConfig
+    >>> from syrin import Agent
     >>> from syrin.domain_events import BudgetThresholdReached, ContextCompacted, EventBus
     >>>
     >>> bus = EventBus()
     >>> bus.subscribe(BudgetThresholdReached, lambda e: print(f"Budget at {e.percentage}%"))
     >>> bus.subscribe(ContextCompacted, lambda e: print(f"Compacted: {e.method}"))
     >>>
-    >>> agent = Agent(model=..., config=AgentConfig(event_bus=bus))
+    >>> agent = Agent(model=..., event_bus=bus)
 """
 
 from __future__ import annotations

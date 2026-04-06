@@ -25,12 +25,12 @@ def main() -> None:
 
     # Store some memories, including intentional duplicates
     entries = [
-        ("User prefers dark mode", MemoryType.CORE, 0.9),
-        ("User prefers dark mode", MemoryType.CORE, 0.7),  # duplicate, lower importance
-        ("User prefers dark mode", MemoryType.CORE, 0.5),  # duplicate, even lower
-        ("Python is a programming language", MemoryType.SEMANTIC, 0.8),
-        ("Python is a programming language", MemoryType.SEMANTIC, 0.6),  # duplicate
-        ("Yesterday had a team standup", MemoryType.EPISODIC, 0.7),
+        ("User prefers dark mode", MemoryType.FACTS, 0.9),
+        ("User prefers dark mode", MemoryType.FACTS, 0.7),  # duplicate, lower importance
+        ("User prefers dark mode", MemoryType.FACTS, 0.5),  # duplicate, even lower
+        ("Python is a programming language", MemoryType.KNOWLEDGE, 0.8),
+        ("Python is a programming language", MemoryType.KNOWLEDGE, 0.6),  # duplicate
+        ("Yesterday had a team standup", MemoryType.HISTORY, 0.7),
     ]
 
     print("\nStoring memories (with duplicates):")
@@ -38,14 +38,14 @@ def main() -> None:
         memory.remember(content, memory_type=mem_type, importance=importance)
         print(f"  [{mem_type.value:12s}] importance={importance:.1f} | {content}")
 
-    before = memory.recall(count=100)
+    before = memory.recall(limit=100)
     print(f"\nTotal memories before consolidation: {len(before)}")
 
     # Run consolidation — deduplicates by content, keeps highest importance
     removed = memory.consolidate(deduplicate=True)
     print(f"Duplicates removed: {removed}")
 
-    after = memory.recall(count=100)
+    after = memory.recall(limit=100)
     print(f"Total memories after consolidation: {len(after)}")
 
     print("\nRemaining memories:")

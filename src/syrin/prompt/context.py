@@ -7,7 +7,7 @@ Full access to agent, memory, budget, and built-in vars.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -71,7 +71,7 @@ def make_prompt_context(
             "remaining": getattr(agent._budget, "remaining", None),
             "spent": getattr(agent._budget, "_spent", 0),
         }
-    date_val = datetime.now(timezone.utc)
+    date_val = datetime.now(UTC)
     builtins: dict[str, object] = {}
     if inject_template_vars:
         builtins = {

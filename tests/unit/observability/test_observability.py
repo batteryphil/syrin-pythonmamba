@@ -356,7 +356,7 @@ class TestConvenienceFunctions:
         """Test memory_span convenience function."""
         from syrin.observability import memory_span
 
-        with memory_span("recall", memory_type="episodic") as span:
+        with memory_span("recall", memory_type="history") as span:
             pass
 
         assert span.kind == SpanKind.MEMORY

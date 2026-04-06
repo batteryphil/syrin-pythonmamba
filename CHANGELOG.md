@@ -9,134 +9,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.11.0] - 2026-04-03
+## [0.11.0] - 2026-04-06
 
-### Theme: Multi-Agent Swarms & Budget Intelligence
+**Theme: Multi-Agent Swarms**
 
-This release delivers first-class multi-agent orchestration (5 topologies), a full Budget Intelligence layer, AgentRegistry, security hardening, and a live TUI debugger for multi-agent workflows.
-
----
+First-class multi-agent orchestration with shared budget control, cross-agent memory, agent-to-agent communication, and enterprise security hardening.
 
 ### Added
 
-#### Multi-Agent Swarms — 5 Topologies
-- `Swarm` class with `SwarmConfig(topology=SwarmTopology.*)` — the entry point for all multi-agent coordination
-- **PARALLEL** — all agents run concurrently; results merged; `SKIP_AND_CONTINUE` and `ABORT_SWARM` failure strategies
-- **CONSENSUS** — multiple agents vote; `ConsensusConfig(min_agreement=0.67, voting_strategy=VotingStrategy.MAJORITY)`
-- **REFLECTION** — writer/critic loop; `ReflectionConfig(producer=Cls, critic=Cls, max_rounds=3, score_threshold=7.0)`
-- **ORCHESTRATOR** — first agent routes work to the rest dynamically
-- **WORKFLOW** — swarm wraps a `Workflow` for complex multi-step coordination
+**Multi-Agent Swarm System**
+- `Swarm` with 5 topologies: `ORCHESTRATOR`, `PARALLEL`, `CONSENSUS`, `REFLECTION`, `WORKFLOW`
+- Shared `BudgetPool` — hard per-agent caps enforced; no agent can exceed its allocation even if pool has funds
+- `MemoryBus` — selective cross-agent memory sharing with type filters and custom backends
+- `A2ARouter` — typed agent-to-agent messaging (direct, broadcast, topic pub/sub) with ack support and audit log
+- `SwarmController.topup_budget()` / `reallocate_budget()` — runtime budget reallocation without restarting agents; backed by `asyncio.Lock`
+- `BroadcastBus` — pub/sub with wildcard topic patterns (`"research.*"`)
+- `MonitorLoop` — async supervisor loop: heartbeat polling, quality assessment, bounded interventions with `MaxInterventionsExceeded` escalation
+- `SwarmAuthorityGuard` — role-based permission model (`ORCHESTRATOR > SUPERVISOR > WORKER`); every control action permission-checked and audit-logged
+- `AgentRouter` — LLM-driven agent selection from a pool (replaces removed `DynamicPipeline`)
+- `Workflow` — sequential, parallel, branch, and dynamic fan-out steps with `HandoffContext`; full `play()`/`pause()`/`resume()`/`cancel()` lifecycle
 - `SwarmResult` — unified result: `content`, `cost_breakdown`, `agent_results`, `partial_results`, `budget_report`
-- `SwarmBudgetReport` — per-agent budget summaries, `total_spent`, `was_within_p95`
-- `cancel_agent(name)` — cancel a specific agent mid-run without aborting the swarm
-- A2A (Agent-to-Agent) messaging — `A2ARouter` with direct, topic broadcast, and audit log; `MemoryBus` backend protocol
 
-#### Budget Intelligence
-- Pre-flight budget estimation — `Budget.estimate(agent, input)` before committing to a run
-- `EstimationPolicy` — `FAIL_IF_OVER`, `WARN_IF_OVER`, `ALWAYS_PROCEED`
-- Custom `CostEstimator` protocol — plug in your own token-counting or pricing logic
-- Budget forecasting — `Budget.forecast(history_key=...)` predicts future cost from historical runs
-- `FileBudgetStore` — persistent cross-run budget history in JSON
-- Four budget guardrails: hard stop, soft warning, per-agent cap, dynamic reallocation (`allow_reallocation=True`)
-- Anomaly detection — `Budget(anomaly_detection=True)` flags calls that exceed p95 of recent history
-- Shared budget pool — `Budget(shared=True, max_cost=N)` with `BudgetPool` for fair allocation across agents
+**Budget Intelligence**
+- Pre-flight estimation: `Budget.estimate()` with `EstimationPolicy`
+- Budget forecasting from run history with `Hook.BUDGET_FORECAST`
+- Anomaly detection: `Budget(anomaly_detection=True)` triggers `Hook.BUDGET_ANOMALY` on p95 breach
+- Cross-run daily/weekly limits with `Hook.DAILY_LIMIT_APPROACHING`
+- `FileBudgetStore` for persistent cross-run history
 
-#### Workflow Visualization
-- `Workflow.visualize()` — Rich ASCII tree showing step types (sequential, parallel, branch, dynamic)
-- `Workflow.to_mermaid(direction="TD"|"LR")` — Mermaid `graph TD` string for docs and GitHub READMEs
-- `Workflow.to_dict()` — `{"nodes": [...], "edges": [...]}` for custom rendering
-- `Workflow.run(show_graph=True)` — live Rich table that refreshes per step with status, cost, elapsed time
-- Branch and dynamic steps are represented in Mermaid output
+**Workflow & Swarm Visualization**
+- `Workflow.visualize()` — Rich ASCII tree
+- `Workflow.to_mermaid()` — Mermaid `graph TD` for GitHub/docs
+- `Workflow.run(show_graph=True)` — live Rich overlay with per-step status and cost
+- `GET /graph` HTTP endpoint on `Swarm.serve()` and `Workflow.serve()`
 
-#### AgentRegistry
-- `AgentRegistry` — central registry for discovering and instantiating agents by name or capability tag
-- `@registry.register(tags=["finance", "analysis"])` decorator
-- `registry.get(name)`, `registry.find(tag=...)`, `registry.all()` — typed lookups
-- Supports per-registry and global singleton patterns
+**AgentRegistry**
+- `AgentRegistry` with `@registry.register(tags=[...])` — discover and control agents by name or capability tag
 
-#### Security Hardening
-- `PIIGuardrail` — scan inputs and outputs for PII (email, phone, SSN, credit card via Luhn)
-- `ToolOutputValidator` — validate tool output against a Pydantic schema before the agent sees it
-- `AgentIdentity` — cryptographic identity for agents (signing + verification)
-- Decision provenance — every LLM decision can carry a `ProvenanceRecord` with model, timestamp, and hash
-- `@structured` decorator — `@dataclass` applied internally; `A2ARouter.send()` accepts both Pydantic models and `@structured` dataclasses
+**Security Hardening**
+- `PIIGuardrail` — detect and redact PII (email, phone, SSN, credit card) in inputs, outputs, and memory writes
+- `ToolOutputValidator` — schema validation on tool results before the LLM sees them
+- `AgentIdentity` — Ed25519 cryptographic identity; every A2A message signed and verified
+- Decision provenance: `DECISION_MADE` hook with `DecisionRecord` (model, timestamp, hash) for audit trails
 
-#### Multi-Agent Pry Debugger (TUI)
-- `SwarmPryTUI` — Rich Live compositor for debugging multiple simultaneously-paused agents
-- `GraphPanel` — per-agent status (PENDING / RUNNING / COMPLETE / FAILED / SKIPPED / PAUSED) with cost
-- `BudgetPanel` — recursive budget tree: pool → per-agent allocated/spent
-- `MessagePanel` — chronological A2A / MemoryBus timeline with bounded history
-- `SwarmNav` — keyboard navigation across paused agents (`n` next, `p` prev, `s` step focused)
-- `preview_dynamic()` — evaluate a `.dynamic()` lambda without spawning agents
+**Remote Config Control Plane**
+- `RemoteConfig` — live push of any agent field without restart; schema export for dashboard rendering
+- Config versioning and `rollback()`, per-field `allow`/`deny` lists, `RemoteConfigValidator`
+- Remote lifecycle commands: `PAUSE`, `RESUME`, `KILL` over the wire
 
----
+**Multi-Agent Pry Debugger (TUI)**
+- `SwarmPryTUI` — Rich Live compositor: `GraphPanel` (per-agent status + cost), `BudgetPanel` (pool tree), `MessagePanel` (A2A/MemoryBus timeline), `SwarmNav` (keyboard navigation)
 
 ### Changed
 
-- `rich>=13.0` promoted to core dependency (was optional; required for `visualize()` and Pry TUI)
-- `requests>=2.33.0` minimum enforced (CVE-2026-25645 fix via tiktoken transitive dep)
-- `Swarm` constructor: `reflection_config` and `consensus_config` are top-level params, not nested in `SwarmConfig`
-
----
+- `rich>=13.0` promoted to core dependency
+- `requests>=2.33.0` minimum enforced (CVE-2026-25645)
+- `ExceedPolicy` is now the canonical budget policy enum; `on_exceeded=` callback pattern deprecated
+- `MockResponseMode` enum replaces raw strings `"lorem"/"custom"` in `Model.mock()`
+- Class-based agent definition is now the canonical pattern in all docs and examples
 
 ### Fixed
 
-- `@structured` decorator now applies `@dataclass` internally — classes are instantiable without manual decoration
-- Pre-existing bug in `_has_default()` helper: used `dataclasses.MISSING` check instead of broken `is not type(None)` comparison
-- `_AgentMeta` metaclass blocks `object.__setattr__` on agent instances — swarm context injection now falls back to plain `setattr`
+- `@structured` decorator now applies `@dataclass` internally — no manual decoration needed
+- `_has_default()` helper: fixed broken `is not type(None)` comparison
+- Swarm context injection: `_AgentMeta` metaclass compatibility fixed via plain `setattr` fallback
+- `@tool` without a description now emits `UserWarning` at decoration time
 
----
+### Removed
 
-### DX & API Consistency (post-release patch)
-
-#### `ExceedPolicy` is now the canonical budget API
-- `Budget(exceed_policy=ExceedPolicy.STOP|WARN|IGNORE|SWITCH)` replaces the raw callback pattern
-- `Budget(on_exceeded=raise_on_exceeded|warn_on_exceeded|stop_on_exceeded)` now emits a `DeprecationWarning` — still works, will be removed in a future major version
-- `TokenLimits(exceed_policy=...)` follows the same pattern
-- All docs, examples, and tests migrated to `ExceedPolicy`
-
-#### `MockResponseMode` enum
-- `Model.mock()` and `Model.Almock()` now accept `response_mode=MockResponseMode.LOREM|CUSTOM` instead of raw strings `"lorem"/"custom"`
-- `MockPricing` type widened to `MockPricing | str | None` for backward compatibility
-
-#### `@tool` footgun warnings
-- `@tool` without a description now emits a `UserWarning` at decoration time — the LLM silently ignores undescribed tools
-- `depends_on=["tool_name"]` (raw strings) now emits a `DeprecationWarning`; pass the `ToolSpec` object directly to catch renames at import time
-
-#### `Response` structured output shortcuts
-- `response.is_valid` — `True` if no structured output, or if structured output passed validation
-- `response.validation_attempts` — number of retry attempts made during structured output parsing
-- `response.parsed` — alias for `response.output` (structured output result)
-
-#### Tool result truncation visibility
-- Tool result truncation is now logged at `WARNING` level (was `INFO`) with the tool name, original length, and truncated length
-- If no `max_tool_result_length` is set and the safety cap fires, a `WARNING` is emitted with instructions to set the limit explicitly
-
-#### Class-based agent as canonical pattern
-- All docs and examples now present class-based agent definition as the recommended pattern
-- Constructor/keyword pattern documented as "quick one-off scripts" only
-
----
-
-### Documentation
-
-- Full Budget Intelligence guide (`docs/budget/`)
-- Multi-agent concepts and topology guides (`docs/multi-agent/`)
-- Workflow visualization guide
-- Multi-agent Pry debugger guide (`docs/debugging/pry-multi-agent.md`)
-- AgentRegistry guide (`docs/agent-registry.md`)
-- Security decision provenance guide (`docs/security/decision-provenance.md`)
-- Remote config guide (`docs/remote-config.md`)
-- Migration guide: v0.10 → v0.11 (`docs/migration/v0.10-to-v0.11.md`)
-- Updated API reference with all v0.11.0 additions
-
-### Examples (all in `examples/` subdirectories)
-
-- `examples/07_multi_agent/` — 18 examples: all 5 swarm topologies, workflow variants, visualization, agent router, budget delegation, A2A broadcast, hierarchical swarm, monitor loop
-- `examples/03_budget/` — budget estimation, guardrails, forecasting, anomaly detection
-- `examples/12_remote_config/` — remote config with SSE overrides
-- `examples/21_debug_multiagent/` — Pry debugger for workflows and swarms
-- `examples/23_agent_registry/` — AgentRegistry patterns
+- `DynamicPipeline` — removed; use `AgentRouter`. Importing raises `ImportError` with migration message.
+- `AgentTeam` — removed; use `Swarm(topology=SwarmTopology.ORCHESTRATOR)`. Importing raises `ImportError`.
 
 ---
 

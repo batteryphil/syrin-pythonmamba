@@ -23,20 +23,6 @@ def _normalize_enum_value(path: str, value: str, field: FieldSchema | None) -> s
     def normalized(s: str) -> str:
         return s.strip().lower().replace(" ", "_")
 
-    if path == "agent.loop_strategy":
-        from syrin.enums import LoopStrategy
-
-        if value in (m.value for m in LoopStrategy):
-            return value
-        try:
-            return LoopStrategy[value].value
-        except KeyError:
-            pass
-        # Try display format: "plan execute", "single shot"
-        norm = normalized(value)
-        if norm in (m.value for m in LoopStrategy):
-            return norm
-        return None
     if path.startswith("memory.decay.") and field and field.name == "strategy":
         from syrin.enums import DecayStrategy
 
@@ -87,10 +73,6 @@ def _coerce_enum(value: object, field: FieldSchema | None) -> object:
     if value not in field.enum_values:
         return value  # Caller will validate
     path = field.path
-    if path == "agent.loop_strategy":
-        from syrin.enums import LoopStrategy
-
-        return LoopStrategy(value)
     if path.startswith("memory.decay.") and field.name == "strategy":
         from syrin.enums import DecayStrategy
 
@@ -250,9 +232,6 @@ def apply_agent_section_overrides(
     _section_schema: ConfigSchema,
 ) -> None:
     """Apply agent-section (agent.*) overrides to the agent."""
-    from syrin.enums import LoopStrategy
-    from syrin.loop import LoopStrategyMapping
-
     for path, value in pairs:
         if not path.startswith("agent."):
             continue
@@ -275,14 +254,3 @@ def apply_agent_section_overrides(
                 "_human_approval_timeout",
                 int(cast(int | float | str, value)) if value is not None else 300,
             )
-        elif key == "loop_strategy":
-            strategy: LoopStrategy | str
-            if isinstance(value, LoopStrategy):
-                strategy = value
-            elif isinstance(value, str):
-                strategy = LoopStrategy(value)
-            else:
-                continue
-            max_iter = getattr(agent, "_max_tool_iterations", 10)
-            new_loop = LoopStrategyMapping.create_loop(strategy, max_iterations=max_iter)
-            object.__setattr__(agent, "_loop", new_loop)

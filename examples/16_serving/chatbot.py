@@ -10,6 +10,7 @@ Visit: http://localhost:8000/playground
 from __future__ import annotations
 
 import os
+from datetime import UTC
 from pathlib import Path
 
 from syrin import (
@@ -37,7 +38,7 @@ memory = Memory(
     backend=MemoryBackend.SQLITE,
     path=str(MEMORY_DB),
     write_mode=WriteMode.SYNC,
-    types=[MemoryType.CORE, MemoryType.EPISODIC, MemoryType.SEMANTIC, MemoryType.PROCEDURAL],
+    types=[MemoryType.FACTS, MemoryType.HISTORY, MemoryType.KNOWLEDGE, MemoryType.INSTRUCTIONS],
     top_k=10,
     auto_store=True,
     decay=Decay(
@@ -73,7 +74,7 @@ def remember_fact(content: str, memory_type: str = "episodic") -> str:
     mt = (
         MemoryType(memory_type.lower())
         if memory_type and memory_type.lower() in ("core", "episodic", "semantic", "procedural")
-        else MemoryType.EPISODIC
+        else MemoryType.HISTORY
     )
     ok = memory.remember(content, memory_type=mt)
     return f"Stored: {content[:80]}..." if ok else "Failed to store"
@@ -82,9 +83,9 @@ def remember_fact(content: str, memory_type: str = "episodic") -> str:
 @tool
 def get_current_time() -> str:
     """Return current date/time. Use when user asks what time or date it is."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 @tool

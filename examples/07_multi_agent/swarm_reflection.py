@@ -11,7 +11,7 @@ Use this topology when:
   - You want self-improving outputs without manual iteration.
 
 Key concepts:
-  - ReflectionConfig(producer, critic, max_rounds, score_threshold)
+  - ReflectionConfig(producer, critic, max_rounds, stop_when=lambda ro: ro.score >= 0.8)
   - SwarmConfig(topology=SwarmTopology.REFLECTION)
   - ReflectionConfig.producer and .critic reference agent *classes*, not strings.
 
@@ -26,17 +26,17 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from syrin import Agent, Budget, Model
 from syrin.enums import SwarmTopology
 from syrin.swarm import ReflectionConfig, Swarm, SwarmConfig
 
-if not os.environ.get("OPENAI_API_KEY"):
-    print("Error: OPENAI_API_KEY is not set. This example requires a real API key.")
-    sys.exit(1)
-
-_MODEL = Model.OpenAI("gpt-4o-mini")
+_MODEL = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # ── Agent definitions ─────────────────────────────────────────────────────────
@@ -85,15 +85,15 @@ async def example_technical_explanation() -> None:
     swarm = Swarm(
         agents=[TechWriterAgent(), TechnicalEditorAgent()],
         goal="Explain how vector embeddings enable semantic search in RAG systems",
-        config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-        reflection_config=ReflectionConfig(
-            producer=TechWriterAgent,
-            critic=TechnicalEditorAgent,
-            max_rounds=3,
-            score_threshold=0.80,
-        ),
-        budget=Budget(
-            max_cost=0.20,
+        budget=Budget(max_cost=0.20),
+        config=SwarmConfig(
+            topology=SwarmTopology.REFLECTION,
+            reflection=ReflectionConfig(
+                producer=TechWriterAgent,
+                critic=TechnicalEditorAgent,
+                max_rounds=3,
+                stop_when=lambda ro: ro.score >= 0.80,
+            ),
         ),
     )
     result = await swarm.run()
@@ -105,7 +105,7 @@ async def example_technical_explanation() -> None:
 
 # ── Example 2: Aggressive quality bar — higher threshold, more rounds ─────────
 #
-# Raise score_threshold to demand near-perfect output. The loop continues until
+# Raise the stop_when threshold to demand near-perfect output. The loop continues until
 # the critic is satisfied or max_rounds is reached. Useful for compliance-critical
 # or customer-facing content where quality is non-negotiable.
 
@@ -116,15 +116,15 @@ async def example_high_quality_bar() -> None:
     swarm = Swarm(
         agents=[TechWriterAgent(), TechnicalEditorAgent()],
         goal="Explain the CAP theorem and its practical implications for distributed databases",
-        config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-        reflection_config=ReflectionConfig(
-            producer=TechWriterAgent,
-            critic=TechnicalEditorAgent,
-            max_rounds=4,
-            score_threshold=0.90,
-        ),
-        budget=Budget(
-            max_cost=0.30,
+        budget=Budget(max_cost=0.30),
+        config=SwarmConfig(
+            topology=SwarmTopology.REFLECTION,
+            reflection=ReflectionConfig(
+                producer=TechWriterAgent,
+                critic=TechnicalEditorAgent,
+                max_rounds=4,
+                stop_when=lambda ro: ro.score >= 0.90,
+            ),
         ),
     )
     result = await swarm.run()
@@ -174,15 +174,15 @@ async def example_financial_analysis() -> None:
     swarm = Swarm(
         agents=[FinancialAnalystAgent(), RiskReviewAgent()],
         goal="Nvidia: infrastructure play in the sovereign AI buildout cycle",
-        config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-        reflection_config=ReflectionConfig(
-            producer=FinancialAnalystAgent,
-            critic=RiskReviewAgent,
-            max_rounds=3,
-            score_threshold=0.82,
-        ),
-        budget=Budget(
-            max_cost=0.20,
+        budget=Budget(max_cost=0.20),
+        config=SwarmConfig(
+            topology=SwarmTopology.REFLECTION,
+            reflection=ReflectionConfig(
+                producer=FinancialAnalystAgent,
+                critic=RiskReviewAgent,
+                max_rounds=3,
+                stop_when=lambda ro: ro.score >= 0.82,
+            ),
         ),
     )
     result = await swarm.run()

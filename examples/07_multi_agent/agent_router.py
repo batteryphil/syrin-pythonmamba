@@ -20,18 +20,18 @@ Run:
 
 from __future__ import annotations
 
-import asyncio
 import os
-import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 from syrin import Agent, Budget, Model
 from syrin.agent.agent_router import AgentRouter
 from syrin.enums import Hook
 
-if not os.environ.get("OPENAI_API_KEY"):
-    sys.exit("OPENAI_API_KEY is required. Set it and re-run.")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-_MODEL = Model.OpenAI("gpt-4o-mini")
+_MODEL = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
 
 # ── Agent definitions ─────────────────────────────────────────────────────────
 #
@@ -79,7 +79,7 @@ class InvestmentWriterAgent(Agent):
 # In parallel mode, all spawned agents run simultaneously.
 
 
-async def example_parallel_routing() -> None:
+def example_parallel_routing() -> None:
     print("\n── Example 1: Parallel routing (LLM decides which agents) ──────")
 
     router = AgentRouter(
@@ -120,7 +120,7 @@ async def example_parallel_routing() -> None:
 # This builds a pipeline where each step enriches the next.
 
 
-async def example_sequential_routing() -> None:
+def example_sequential_routing() -> None:
     print("\n── Example 2: Sequential routing (each agent sees prior output) ─")
 
     router = AgentRouter(
@@ -145,7 +145,7 @@ async def example_sequential_routing() -> None:
 # ── Example 3: Router with budget cap ─────────────────────────────────────────
 
 
-async def example_router_with_budget() -> None:
+def example_router_with_budget() -> None:
     print("\n── Example 3: Router with budget cap ────────────────────────────")
 
     router = AgentRouter(
@@ -165,7 +165,7 @@ async def example_router_with_budget() -> None:
 # ── Example 4: Lifecycle hooks for observability ─────────────────────────────
 
 
-async def example_hooks() -> None:
+def example_hooks() -> None:
     print("\n── Example 4: Lifecycle hooks for observability ─────────────────")
 
     router = AgentRouter(
@@ -198,7 +198,7 @@ async def example_hooks() -> None:
 # ── Example 5: visualize() — print agent pool ─────────────────────────────────
 
 
-async def example_visualize() -> None:
+def example_visualize() -> None:
     print("\n── Example 5: router.visualize() ───────────────────────────────")
 
     router = AgentRouter(
@@ -212,14 +212,14 @@ async def example_visualize() -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 
-async def main() -> None:
-    await example_parallel_routing()
-    await example_sequential_routing()
-    await example_router_with_budget()
-    await example_hooks()
-    await example_visualize()
+def main() -> None:
+    example_parallel_routing()
+    example_sequential_routing()
+    example_router_with_budget()
+    example_hooks()
+    example_visualize()
     print("\nAll AgentRouter examples completed.")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

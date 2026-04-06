@@ -130,7 +130,7 @@ class Context:
     ctx.compact() from a ContextThreshold action (e.g. at 75% to compact).
 
     **Cost vs tokens:** ``Budget`` = cost limits (USD). ``token_limits`` (TokenLimits) =
-    context's token caps (run and/or per period). Same field names (run, per, on_exceeded) for consistency.
+    context's token caps (run and/or per period). Use ``exceed_policy=ExceedPolicy.*`` on both for consistency.
 
     Example:
         >>> from syrin import Agent, Model, Context
@@ -153,7 +153,7 @@ class Context:
     thresholds: list[ContextThreshold] = field(default_factory=list)
     """When utilization hits these percentages, actions run (e.g. compact at 75%)."""
     token_limits: TokenLimits | None = None
-    """Token caps for this context (run and/or per period). Same names as Budget: run, per, on_exceeded."""
+    """Token caps for this context (run and/or per period). Use ``exceed_policy=ExceedPolicy.*`` to control behaviour."""
     encoding: str = "cl100k_base"
     """Tokenizer encoding for counting (e.g. cl100k_base for GPT-4). Override only if using a different tokenizer."""
     compactor: ContextCompactorProtocol | None = None

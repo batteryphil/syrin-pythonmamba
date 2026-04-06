@@ -1,4 +1,8 @@
-# AgentIdentity
+---
+title: Agent Identity
+description: Ed25519 cryptographic identity and message signing for agents
+weight: 52
+---
 
 `AgentIdentity` provides Ed25519 cryptographic identity for agents. Each identity has a unique keypair — private key material is **never** serialized, logged, or included in `repr()`.
 

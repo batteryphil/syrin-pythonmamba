@@ -18,7 +18,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock
 from syrin import Agent, Model
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -58,7 +57,7 @@ result = agent.run("Hello with fallback!")
 class MyAgent(Agent):
     name = "custom-model"
     description = "Agent with custom Model subclass"
-    model = almock
+    model = Model.mock()
     system_prompt = "You are a specialized assistant."
 
 

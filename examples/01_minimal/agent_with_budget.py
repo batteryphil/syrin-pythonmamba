@@ -7,12 +7,12 @@ Run:
 """
 
 from syrin import Agent, Budget, Model
+from syrin.enums import ExceedPolicy
 from syrin.exceptions import BudgetExceededError
 
 model = Model.mock()
 
-# --- Example 1: Budget with warning ---
-# warn_on_exceeded: logs a warning but keeps running
+# --- Example 1: Budget with WARN policy ---
 agent = Agent(
     model=model,
     system_prompt="Be concise.",
@@ -25,8 +25,7 @@ print(f"Cost:   ${response.cost:.6f}")
 print(f"Budget: {agent.budget_state}")
 print()
 
-# --- Example 2: Budget with hard stop ---
-# raise_on_exceeded: raises BudgetExceededError when limit hit
+# --- Example 2: Budget with STOP policy ---
 agent2 = Agent(
     model=model,
     system_prompt="Be concise.",

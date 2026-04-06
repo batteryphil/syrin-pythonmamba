@@ -20,14 +20,13 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from examples.models.models import almock  # noqa: E402
-from syrin import Agent, Budget, BudgetThreshold  # noqa: E402
+from syrin import Agent, Budget, BudgetThreshold, Model  # noqa: E402
 from syrin.enums import Hook  # noqa: E402
 
 # Two models: expensive (powerful) and cheap (fast)
 # In a real app: Model.OpenAI("gpt-4o") and Model.OpenAI("gpt-4o-mini")
-powerful_model = almock
-cheap_model = almock  # For demo, both are almock — in prod use different models
+powerful_model = Model.mock()
+cheap_model = Model.mock()  # For demo, both are Model.mock() — in prod use different models
 
 
 class AdaptiveAgent(Agent):

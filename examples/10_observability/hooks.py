@@ -14,8 +14,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock
-from syrin import Agent
+from syrin import Agent, Model
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -30,7 +29,7 @@ def track_cost(ctx):
 class HooksDemoAgent(Agent):
     name = "hooks-demo"
     description = "Agent with lifecycle event hooks"
-    model = almock
+    model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
     system_prompt = "You are helpful."
 
 

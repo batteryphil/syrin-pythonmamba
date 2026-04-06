@@ -1,5 +1,5 @@
 """
-E2E: Multi-agent orchestration — spawn, pipeline, router, dynamic pipeline.
+E2E: Multi-agent orchestration — spawn, sequential/parallel helpers, AgentRouter.
 
 No internal mocks. Uses Almock provider for real call stack execution.
 """
@@ -17,7 +17,7 @@ from syrin import (
     Model,
     Response,
 )
-from syrin.agent.multi_agent import Pipeline  # internal; removed from public API in v0.11.0
+from syrin.agent.pipeline import parallel, sequential
 
 
 def _almock(**kwargs) -> Model:
@@ -112,14 +112,14 @@ class TestSpawn:
 
 
 # =============================================================================
-# 2. PIPELINE
+# 2. SEQUENTIAL / PARALLEL HELPERS
 # =============================================================================
 
 
-class TestPipeline:
-    """Sequential and parallel pipeline execution."""
+class TestSequentialParallel:
+    """sequential() and parallel() helper functions."""
 
-    def test_sequential_pipeline(self) -> None:
+    def test_sequential_two_agents(self) -> None:
         class Researcher(Agent):
             model = _almock()
             system_prompt = "You are a researcher."
@@ -128,70 +128,50 @@ class TestPipeline:
             model = _almock()
             system_prompt = "You are a writer."
 
-        pipeline = Pipeline()
-        result = pipeline.run(
+        result = sequential(
             [
-                (Researcher, "Research AI trends"),
-                (Writer, "Write a summary"),
+                (Researcher(_almock()), "Research AI trends"),
+                (Writer(_almock()), "Write a summary"),
             ]
-        ).sequential()
+        )
 
         assert isinstance(result, Response)
         assert result.content is not None
         assert result.cost >= 0
 
-    def test_parallel_pipeline(self) -> None:
+    def test_parallel_two_agents(self) -> None:
+        import asyncio
+
         class Worker1(Agent):
             model = _almock()
 
         class Worker2(Agent):
             model = _almock()
 
-        pipeline = Pipeline()
-        results = pipeline.run(
-            [
-                (Worker1, "Task A"),
-                (Worker2, "Task B"),
-            ]
-        ).parallel()
+        results = asyncio.run(
+            parallel(
+                [
+                    (Worker1(_almock()), "Task A"),
+                    (Worker2(_almock()), "Task B"),
+                ]
+            )
+        )
 
         assert isinstance(results, list)
         assert len(results) == 2
         assert all(r.content is not None for r in results)
 
-    def test_pipeline_with_budget(self) -> None:
-        class Step1(Agent):
-            model = _almock()
+    def test_empty_sequential_returns_empty_response(self) -> None:
+        """Empty sequential handles gracefully."""
+        result = sequential([])
+        assert result is not None
+        assert result.content == ""
 
-        class Step2(Agent):
-            model = _almock()
-
-        pipeline = Pipeline(budget=Budget(max_cost=10.0))
-        result = pipeline.run(
-            [
-                (Step1, "Step 1"),
-                (Step2, "Step 2"),
-            ]
-        ).sequential()
-        assert result.content is not None
-
-    def test_empty_pipeline_returns_empty_response(self) -> None:
-        """Empty pipeline handles gracefully (no crash)."""
-        pipeline = Pipeline()
-        # Empty list may return an empty response or raise - both valid
-        try:
-            result = pipeline.run([]).sequential()
-            # If it succeeds, response should still be valid
-            assert result is not None
-        except (ValueError, IndexError, RuntimeError):
-            pass  # Raising on empty is also valid
-
-    def test_single_agent_pipeline(self) -> None:
+    def test_single_agent_sequential(self) -> None:
         class Solo(Agent):
             model = _almock()
 
-        pipeline = Pipeline()
-        result = pipeline.run([(Solo, "Solo task")]).sequential()
+        result = sequential([(Solo(_almock()), "Solo task")])
         assert result.content is not None
 
 
@@ -242,7 +222,7 @@ class TestMultiAgentFullFeatures:
             memory = Memory()
 
         parent = Agent(model=_almock(), memory=Memory())
-        parent.remember("Parent secret", memory_type=MemoryType.CORE)
+        parent.remember("Parent secret", memory_type=MemoryType.FACTS)
 
         child = parent.spawn(Child)
         assert isinstance(child, Agent)
@@ -255,21 +235,21 @@ class TestMultiAgentFullFeatures:
             # Child's memory should be independent
             assert not any("Parent secret" in m.content for m in child_memories)
 
-    def test_pipeline_budget_tracking(self) -> None:
-        """Pipeline tracks total cost across all agents."""
+    def test_sequential_cost_tracking(self) -> None:
+        """sequential() helper accumulates cost across agents."""
 
         class Step1(Agent):
             model = _almock()
+            budget = Budget(max_cost=10.0)
 
         class Step2(Agent):
             model = _almock()
 
-        pipeline = Pipeline(budget=Budget(max_cost=10.0))
-        result = pipeline.run(
+        result = sequential(
             [
-                (Step1, "Step 1"),
-                (Step2, "Step 2"),
+                (Step1(_almock()), "Step 1"),
+                (Step2(_almock()), "Step 2"),
             ]
-        ).sequential()
+        )
 
         assert result.cost >= 0

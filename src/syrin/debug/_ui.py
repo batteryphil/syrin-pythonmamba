@@ -794,7 +794,7 @@ class Pry:
                 if mem is not None:
                     backend = getattr(mem, "backend", "—")
                     top_k = getattr(mem, "top_k", "—")
-                    restrict = getattr(mem, "restrict_to", None)
+                    restrict = getattr(mem, "types", None)
                     auto_store = getattr(mem, "auto_store", False)
                     scope = getattr(mem, "scope", "—")
                     types_str = ", ".join(str(t) for t in restrict) if restrict else "all"

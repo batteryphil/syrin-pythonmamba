@@ -58,7 +58,7 @@ class TestBudgetEdgeCases:
     def test_budget_reserve_equals_run(self) -> None:
         """When reserve == run, effective limit falls back to run value.
         (reserve >= run → effective = run, not 0)."""
-        budget = Budget(max_cost=1.0, reserve=1.0)
+        budget = Budget(max_cost=1.0, safety_margin=1.0)
         # Effective run = run (since run > reserve is False, it uses run as-is)
         assert budget.remaining == 0.0  # remaining = run - reserve - spent = 0
         agent = Agent(model=_almock(), budget=budget)
@@ -70,7 +70,7 @@ class TestBudgetEdgeCases:
 
     def test_budget_reserve_greater_than_run(self) -> None:
         """Reserve > run means remaining is 0 but effective limit is run value."""
-        budget = Budget(max_cost=1.0, reserve=2.0)
+        budget = Budget(max_cost=1.0, safety_margin=2.0)
         assert budget.remaining == 0.0  # max(0, run - reserve - spent)
         agent = Agent(model=_almock(), budget=budget)
         r = agent.run("Hello")
@@ -210,13 +210,13 @@ class TestMemoryEdgeCases:
 
     def test_persistent_memory_unicode_content(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
-        _ = agent.remember("你好世界 🌍 مرحبا", memory_type=MemoryType.SEMANTIC)
+        _ = agent.remember("你好世界 🌍 مرحبا", memory_type=MemoryType.KNOWLEDGE)
         entries = agent.recall()
         assert any("你好" in e.content for e in entries)
 
     def test_persistent_memory_empty_content(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
-        agent.remember("", memory_type=MemoryType.EPISODIC)
+        agent.remember("", memory_type=MemoryType.HISTORY)
         entries = agent.recall()
         assert len(entries) == 1
         assert isinstance(entries[0].id, str)
@@ -224,7 +224,7 @@ class TestMemoryEdgeCases:
     def test_persistent_memory_very_long_content(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
         long_content = "x" * 100000
-        _ = agent.remember(long_content, memory_type=MemoryType.SEMANTIC)
+        _ = agent.remember(long_content, memory_type=MemoryType.KNOWLEDGE)
         entries = agent.recall()
         assert len(entries) == 1
         assert len(entries[0].content) == 100000
@@ -232,7 +232,7 @@ class TestMemoryEdgeCases:
     def test_persistent_memory_many_entries(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
         for i in range(100):
-            agent.remember(f"Memory entry {i}", memory_type=MemoryType.EPISODIC)
+            agent.remember(f"Memory entry {i}", memory_type=MemoryType.HISTORY)
         all_entries = agent.recall(limit=200)
         assert len(all_entries) == 100
 
@@ -252,7 +252,7 @@ class TestMemoryEdgeCases:
         entry = ME(
             id="test",
             content="old",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=1.0,
             created_at=__import__("datetime").datetime.now()
             - __import__("datetime").timedelta(days=30),
@@ -442,8 +442,8 @@ class TestConcurrentUsage:
         agent1 = Agent(model=_almock(), budget=Budget(max_cost=10.0), memory=Memory())
         agent2 = Agent(model=_almock(), budget=Budget(max_cost=10.0), memory=Memory())
 
-        agent1.remember("Agent 1 memory", memory_type=MemoryType.CORE)
-        agent2.remember("Agent 2 memory", memory_type=MemoryType.CORE)
+        agent1.remember("Agent 1 memory", memory_type=MemoryType.FACTS)
+        agent2.remember("Agent 2 memory", memory_type=MemoryType.FACTS)
 
         agent1.run("Hello from 1")
         agent2.run("Hello from 2")
@@ -588,7 +588,7 @@ class TestAgentInheritance:
             memory = Memory()
 
         agent = MemoryAgent()
-        mid = agent.remember("Test memory", memory_type=MemoryType.CORE)
+        mid = agent.remember("Test memory", memory_type=MemoryType.FACTS)
         assert isinstance(mid, str)
 
     def test_deep_inheritance_chain(self) -> None:

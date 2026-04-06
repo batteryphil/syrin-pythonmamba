@@ -10,8 +10,7 @@ Requires: uv pip install syrin[serve]
 """
 
 import syrin
-from syrin import Agent, AgentConfig, AuditLog, Model
-from syrin.agent.multi_agent import DynamicPipeline, Pipeline  # internal
+from syrin import Agent, AgentRouter, AuditLog, Model
 
 
 def main() -> None:
@@ -20,31 +19,29 @@ def main() -> None:
     agent = Agent(
         model=Model.mock(),
         system_prompt="You are helpful.",
-        config=AgentConfig(audit=audit),
+        audit=audit,
     )
     agent.run("What is 2+2?")
     print("Agent audit written to ./audit_agent.jsonl")
 
-    # Pipeline with audit
-    pipeline_audit = AuditLog(path="./audit_pipeline.jsonl")
+    # AgentRouter with audit - writes to ./audit_router.jsonl
+    router_audit = AuditLog(path="./audit_router.jsonl")
 
     class Writer(Agent):
         model = Model.mock()
         system_prompt = "Write concisely."
 
-    pipeline = Pipeline(audit=pipeline_audit)
-    pipeline.run([(Writer, "Say hello in one word")])
-    print("Pipeline audit written to ./audit_pipeline.jsonl")
+    class Analyst(Agent):
+        model = Model.mock()
+        system_prompt = "Analyse data concisely."
 
-    # DynamicPipeline with audit
-    dyn_audit = AuditLog(path="./audit_dynamic.jsonl")
-    dyn = DynamicPipeline(
-        agents=[Writer],
+    router = AgentRouter(
+        agents=[Writer, Analyst],
         model=Model.mock(),
-        audit=dyn_audit,
+        audit=router_audit,
     )
-    dyn.run("Greet the user")
-    print("DynamicPipeline audit written to ./audit_dynamic.jsonl")
+    router.run("Greet the user")
+    print("AgentRouter audit written to ./audit_router.jsonl")
 
     # Query entries (built-in JSONL backend)
     backend = audit.get_backend()
@@ -64,6 +61,6 @@ class AuditDemoAgent(syrin.Agent):
 if __name__ == "__main__":
     main()
     audit = syrin.AuditLog(path="./audit_serve.jsonl")
-    agent = AuditDemoAgent(config=AgentConfig(audit=audit))
+    agent = AuditDemoAgent(audit=audit)
     print("Serving at http://localhost:8000/playground")
     agent.serve(port=8000, enable_playground=True, debug=True)

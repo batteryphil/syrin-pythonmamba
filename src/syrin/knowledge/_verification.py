@@ -110,7 +110,7 @@ async def _call_model(
 
     try:
         return await asyncio.wait_for(_do_complete(), timeout=timeout)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return ""
 
 

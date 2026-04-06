@@ -1,6 +1,8 @@
-# MonitorLoop
-
-**Phase 5 — v0.11.0**
+---
+title: MonitorLoop
+description: Real-time monitoring and bounded intervention for swarm agents
+weight: 110
+---
 
 `MonitorLoop` is an async context manager that continuously monitors agents in a swarm, yielding structured events and allowing bounded interventions.
 
@@ -10,7 +12,8 @@
 from syrin.swarm import MonitorLoop
 from syrin.enums import MonitorEventType, InterventionAction
 
-async with MonitorLoop(targets=["worker-1", "worker-2"], poll_interval=1.0) as monitor:
+# Pass agent instances — IDs are resolved automatically
+async with MonitorLoop(targets=[worker_1, worker_2], poll_interval=1.0) as monitor:
     async for event in monitor:
         print(f"[{event.event_type}] {event.agent_id}: {event.data}")
 
@@ -21,7 +24,7 @@ async with MonitorLoop(targets=["worker-1", "worker-2"], poll_interval=1.0) as m
 
 ## Event types
 
-Four event types are emitted. `HEARTBEAT` fires periodically at `poll_interval` seconds. `OUTPUT_READY` fires when `notify_agent_output()` is called externally. `STATE_CHANGE` fires when an agent's status changes (future). `COST_SPIKE` fires when per-step cost exceeds a threshold (future).
+Two event types are emitted. `HEARTBEAT` fires periodically at `poll_interval` seconds. `OUTPUT_READY` fires when `notify_agent_output()` is called externally.
 
 ## MonitorEvent
 
@@ -37,13 +40,13 @@ class MonitorEvent:
 
 ```python
 async with MonitorLoop(
-    targets=["w1"],
+    targets=[worker],           # agent instance
     poll_interval=1.0,
-    max_interventions=3,   # raises MaxInterventionsExceeded on 4th
+    max_interventions=3,        # raises MaxInterventionsExceeded on 4th
 ) as monitor:
     async for event in monitor:
         await monitor.intervene(
-            "w1",
+            worker,             # agent instance
             InterventionAction.CHANGE_CONTEXT_AND_RERUN,
             context="Be more concise",
         )
@@ -54,12 +57,12 @@ When `max_interventions` is exceeded, `MaxInterventionsExceeded` is raised and `
 
 ### Intervention actions
 
-Five intervention actions are available. `PAUSE_AND_WAIT` pauses the agent and waits for input. `CHANGE_CONTEXT_AND_RERUN` injects new context and re-runs the agent. `SKIP` skips this agent's contribution entirely. `KILL` terminates the agent immediately. `ESCALATE` escalates the situation to a supervisor agent.
+Two intervention actions are available. `PAUSE_AND_WAIT` pauses the agent and waits for input. `CHANGE_CONTEXT_AND_RERUN` injects new context and re-runs the agent.
 
 ## Releasing agents
 
 ```python
-monitor.release("worker-1")  # stop heartbeats for worker-1
+monitor.release(worker_1)  # stop heartbeats for worker_1
 ```
 
 ## Injecting output events externally
@@ -67,7 +70,7 @@ monitor.release("worker-1")  # stop heartbeats for worker-1
 When a swarm executor detects that an agent has produced output, call:
 
 ```python
-monitor.notify_agent_output("worker-1", output_text)
+monitor.notify_agent_output(worker_1, output_text)
 ```
 
 This enqueues an `OUTPUT_READY` event immediately.
@@ -76,7 +79,7 @@ This enqueues an `OUTPUT_READY` event immediately.
 
 ```python
 MonitorLoop(
-    targets: list[str],
+    targets: list[Agent | str],      # agent instances (recommended) or string IDs
     poll_interval: float = 1.0,      # seconds between heartbeats
     max_interventions: int = 0,       # 0 = unlimited
     fire_event_fn: Callable | None = None,

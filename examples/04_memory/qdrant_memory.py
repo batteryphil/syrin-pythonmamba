@@ -15,8 +15,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from examples.models.models import almock
-from syrin import Agent, Memory, MemoryType
+from syrin import Agent, Memory, MemoryType, Model
 from syrin.enums import MemoryBackend
 from syrin.memory import QdrantConfig
 
@@ -36,13 +35,13 @@ def main() -> None:
         )
 
         agent = Agent(
-            model=almock,
+            model=Model.mock(),
             system_prompt="You are a helpful assistant with memory.",
             memory=memory,
         )
 
-        agent.remember("User prefers Python over JavaScript", memory_type=MemoryType.CORE)
-        agent.remember("Last discussed async/await patterns", memory_type=MemoryType.EPISODIC)
+        agent.remember("User prefers Python over JavaScript", memory_type=MemoryType.FACTS)
+        agent.remember("Last discussed async/await patterns", memory_type=MemoryType.HISTORY)
 
         # Semantic recall - vector search (MD5 pseudo-embeddings by default;
         # use EmbeddingConfig for real semantic similarity)

@@ -182,7 +182,7 @@ def test_agent_arun_none_rejects() -> None:
 
 
 # -----------------------------------------------------------------------------
-# memory=None or MemoryPreset.DISABLED disables persistent memory
+# memory=None disables persistent memory
 # -----------------------------------------------------------------------------
 
 
@@ -218,7 +218,7 @@ def test_agent_report_resets_between_calls() -> None:
     from syrin.response import GuardrailReport
 
     agent = Agent(model=_almock(), memory=Memory())
-    agent.remember("test data", memory_type=MemoryType.CORE)
+    agent.remember("test data", memory_type=MemoryType.FACTS)
     agent.run("first")
     # Report should have memory stores from remember()
     _ = agent.report

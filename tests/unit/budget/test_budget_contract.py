@@ -1,10 +1,10 @@
 """TDD tests for the budget contract in _budget_ops.py.
 
-Verifies the on_exceeded contract:
-- Callback that returns → execution continues (warn behaviour)
-- Callback that raises → exception propagates (stop behaviour)
-- on_exceeded=None → BudgetExceededError raised by default
-- Correct routing of token on_exceeded vs budget on_exceeded
+Verifies the exceed_policy contract:
+- WARN policy → execution continues
+- STOP policy → BudgetExceededError propagates
+- No policy → BudgetExceededError raised by default
+- Correct routing of token limits vs budget limits
 - pre_call_budget_check follows the same contract
 """
 
@@ -29,9 +29,8 @@ from syrin.budget import (
     RateLimit,
     TokenLimits,
     TokenRateLimit,
-    raise_on_exceeded,
-    warn_on_exceeded,
 )
+from syrin.budget._core import _policy_to_handler
 from syrin.enums import ExceedPolicy
 from syrin.exceptions import BudgetExceededError
 from syrin.types import CostInfo, TokenUsage
@@ -100,15 +99,17 @@ class TestApplyBudgetExceeded:
             _apply_budget_exceeded(None, ctx)
 
     def test_raising_handler_propagates_exception(self) -> None:
-        """raise_on_exceeded raises BudgetExceededError; it propagates."""
+        """STOP policy handler raises BudgetExceededError; it propagates."""
         ctx = _exceeded_ctx()
+        stop_handler = _policy_to_handler(ExceedPolicy.STOP)
         with pytest.raises(BudgetExceededError):
-            _apply_budget_exceeded(raise_on_exceeded, ctx)
+            _apply_budget_exceeded(stop_handler, ctx)
 
     def test_returning_handler_allows_continuation(self) -> None:
-        """warn_on_exceeded returns; _apply_budget_exceeded returns True."""
+        """WARN policy handler returns; _apply_budget_exceeded returns True."""
         ctx = _exceeded_ctx()
-        result = _apply_budget_exceeded(warn_on_exceeded, ctx)
+        warn_handler = _policy_to_handler(ExceedPolicy.WARN)
+        result = _apply_budget_exceeded(warn_handler, ctx)
         assert result is True
 
     def test_custom_returning_handler_allows_continuation(self) -> None:
@@ -170,9 +171,9 @@ class TestPreCallBudgetCheck:
         agent = _make_agent(budget=budget, run_cost=4.99, estimate=0.02)
         pre_call_budget_check(agent, [])  # warn returns, should not raise
 
-    def test_exceeded_with_no_handler_raises(self) -> None:
-        """When exceeded and on_exceeded=None → BudgetExceededError by default."""
-        budget = Budget(max_cost=5.0, on_exceeded=None)
+    def test_exceeded_with_no_policy_raises(self) -> None:
+        """When exceeded and no exceed_policy → BudgetExceededError by default."""
+        budget = Budget(max_cost=5.0)
         agent = _make_agent(budget=budget, run_cost=4.99, estimate=0.02)
         with pytest.raises(BudgetExceededError):
             pre_call_budget_check(agent, [])
@@ -222,40 +223,35 @@ class TestCheckAndApplyBudget:
         agent = _make_agent(budget=budget, run_cost=6.0)
         check_and_apply_budget(agent)  # should not raise
 
-    def test_exceeded_with_no_handler_raises(self) -> None:
-        """Run cost >= max_cost and on_exceeded=None → BudgetExceededError by default."""
-        budget = Budget(max_cost=5.0, on_exceeded=None)
+    def test_exceeded_with_no_policy_raises(self) -> None:
+        """Run cost >= max_cost and no exceed_policy → BudgetExceededError by default."""
+        budget = Budget(max_cost=5.0)
         agent = _make_agent(budget=budget, run_cost=6.0)
         with pytest.raises(BudgetExceededError):
             check_and_apply_budget(agent)
 
-    def test_token_run_exceeded_uses_token_on_exceeded(self) -> None:
-        """When token run limit exceeded, token on_exceeded handler is called."""
-        called: list[BudgetExceededContext] = []
-
-        def token_handler(ctx: BudgetExceededContext) -> None:
-            called.append(ctx)
-
+    def test_token_run_exceeded_with_stop_policy_raises(self) -> None:
+        """When token run limit exceeded with STOP policy → BudgetExceededError."""
         budget = Budget(max_cost=100.0, exceed_policy=ExceedPolicy.STOP)
-        token_limits = TokenLimits(max_tokens=100, on_exceeded=token_handler)
+        token_limits = TokenLimits(max_tokens=100, exceed_policy=ExceedPolicy.STOP)
         agent = _make_agent(budget=budget, token_limits=token_limits, run_tokens=200)
-        check_and_apply_budget(agent)  # token_handler returns, so no raise
-        assert len(called) == 1
-        assert called[0].budget_type == BudgetLimitType.RUN_TOKENS
+        with pytest.raises(BudgetExceededError):
+            check_and_apply_budget(agent)
 
-    def test_token_on_exceeded_fallback_when_budget_handler_is_none(self) -> None:
-        """When budget.on_exceeded is None but token_limits.on_exceeded exists, use it."""
-        called: list[BudgetExceededContext] = []
+    def test_token_run_exceeded_with_warn_policy_continues(self) -> None:
+        """When token run limit exceeded with WARN policy → continues (no raise)."""
+        budget = Budget(max_cost=100.0)
+        token_limits = TokenLimits(max_tokens=100, exceed_policy=ExceedPolicy.WARN)
+        agent = _make_agent(budget=budget, token_limits=token_limits, run_tokens=200)
+        check_and_apply_budget(agent)  # warn policy → no raise
 
-        def token_handler(ctx: BudgetExceededContext) -> None:
-            called.append(ctx)
-
-        budget = Budget(max_cost=5.0, on_exceeded=None)
-        token_limits = TokenLimits(on_exceeded=token_handler)
-        # Run cost exceeds budget → budget.on_exceeded is None, fallback to token handler
+    def test_token_warn_fallback_when_budget_has_no_policy(self) -> None:
+        """When budget has no exceed_policy and token_limits.exceed_policy=WARN, continues."""
+        budget = Budget(max_cost=5.0)
+        token_limits = TokenLimits(exceed_policy=ExceedPolicy.WARN)
+        # Run cost exceeds budget → budget._handler is None, fallback to token handler
         agent = _make_agent(budget=budget, token_limits=token_limits, run_cost=6.0)
-        check_and_apply_budget(agent)
-        assert len(called) == 1
+        check_and_apply_budget(agent)  # WARN policy → no raise
 
     def test_hourly_rate_limit_exceeded_raises(self) -> None:
         """When hourly rate limit exceeded and raise handler → BudgetExceededError."""
@@ -268,19 +264,12 @@ class TestCheckAndApplyBudget:
         with pytest.raises(BudgetExceededError):
             check_and_apply_budget(agent)
 
-    def test_token_rate_limit_hour_exceeded_uses_token_handler(self) -> None:
-        """Hour token rate limit exceeded → token on_exceeded called."""
-        called: list[BudgetExceededContext] = []
-
-        def token_handler(ctx: BudgetExceededContext) -> None:
-            called.append(ctx)
-
+    def test_token_rate_limit_hour_exceeded_with_stop_policy_raises(self) -> None:
+        """Hour token rate limit exceeded with STOP policy → BudgetExceededError."""
         token_limits = TokenLimits(
             rate_limits=TokenRateLimit(hour=100),
-            on_exceeded=token_handler,
+            exceed_policy=ExceedPolicy.STOP,
         )
-        # We need to record enough tokens to exceed the hourly limit
-        # Use a tracker with tokens already recorded
         tracker = BudgetTracker()
         tracker.record(CostInfo(cost_usd=0.01, token_usage=TokenUsage(total_tokens=200)))
         agent = types.SimpleNamespace(
@@ -293,9 +282,8 @@ class TestCheckAndApplyBudget:
             _budget_component=_MockBudgetComponent(),
             _emit_event=MagicMock(),
         )
-        check_and_apply_budget(agent)
-        assert len(called) == 1
-        assert called[0].budget_type == BudgetLimitType.HOUR_TOKENS
+        with pytest.raises(BudgetExceededError):
+            check_and_apply_budget(agent)
 
 
 # ---------------------------------------------------------------------------
@@ -363,14 +351,9 @@ class TestThresholdReFireGuard:
 
 
 class TestNoDuplicateRaise:
-    def test_warn_handler_called_once_per_exceeded(self) -> None:
-        """warn_on_exceeded is invoked exactly once when budget exceeded."""
-        call_count = [0]
-
-        def counting_warn(ctx: BudgetExceededContext) -> None:
-            call_count[0] += 1
-
-        budget = Budget(max_cost=5.0, on_exceeded=counting_warn)
+    def test_warn_policy_called_once_per_exceeded(self) -> None:
+        """WARN policy handler is invoked once when budget exceeded; does not raise."""
+        budget = Budget(max_cost=5.0, exceed_policy=ExceedPolicy.WARN)
         agent = _make_agent(budget=budget, run_cost=6.0)
-        check_and_apply_budget(agent)
-        assert call_count[0] == 1
+        check_and_apply_budget(agent)  # should not raise
+        check_and_apply_budget(agent)  # second call also should not raise

@@ -57,11 +57,9 @@ class TestMemoryNone:
         assert len(messages) >= 1
         assert messages[-1].content == "Hello"
 
-    def test_agent_memory_preset_disabled_same_as_none(self) -> None:
-        """memory=MemoryPreset.DISABLED same as memory=None."""
-        from syrin.enums import MemoryPreset
-
-        agent = Agent(model=_almock(), memory=MemoryPreset.DISABLED)
+    def test_agent_memory_none_disables_memory(self) -> None:
+        """memory=None disables persistent memory (stateless agent)."""
+        agent = Agent(model=_almock(), memory=None)
         assert agent._persistent_memory is None
 
 
@@ -84,11 +82,9 @@ class TestMemoryExplicit:
         assert "Hi" in contents
         assert "Second" in contents
 
-    def test_agent_memory_preset_default_gives_persistent(self) -> None:
-        """memory=MemoryPreset.DEFAULT gives persistent Memory with CORE+EPISODIC."""
-        from syrin.enums import MemoryPreset
-
-        agent = Agent(model=_almock(), memory=MemoryPreset.DEFAULT)
+    def test_agent_memory_explicit_gives_persistent(self) -> None:
+        """memory=Memory() gives persistent memory."""
+        agent = Agent(model=_almock(), memory=Memory())
         assert agent._persistent_memory is not None
 
 

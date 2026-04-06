@@ -102,7 +102,7 @@ async def example_async_with_timeout() -> None:
     try:
         result = await asyncio.wait_for(agent.arun("Hello!"), timeout=10.0)
         print(f"  Result: {result.content[:60]}...")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         print("  Timed out!")
 
 

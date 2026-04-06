@@ -1,7 +1,7 @@
 """Servable base class — shared serve() logic for HTTP and CLI protocols.
 
-Agent, Pipeline, and DynamicPipeline inherit from Servable to get unified
-serve() behavior that respects protocol (HTTP or CLI).
+Agent and AgentRouter inherit from Servable to get unified serve() behavior
+that respects protocol (HTTP or CLI).
 """
 
 from __future__ import annotations
@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING, Union, cast
 
 if TYPE_CHECKING:
     from syrin.agent import Agent
-    from syrin.agent.multi_agent import DynamicPipeline, Pipeline
+    from syrin.agent.agent_router import AgentRouter
     from syrin.serve.config import ServeConfig
 
-_ServableUnion = Union["Agent", "Pipeline", "DynamicPipeline"]
+_ServableUnion = Union["Agent", "AgentRouter"]
 
 
 class Servable:
@@ -24,7 +24,7 @@ class Servable:
         - CLI: Interactive REPL (prompt, run, show cost per turn).
         - STDIO: JSON lines over stdin/stdout for programmatic use.
 
-    Agent, Pipeline, and DynamicPipeline inherit from Servable.
+    Agent and AgentRouter inherit from Servable.
 
     Note:
         HTTP mode uses workers=1 to keep in-memory state (memory, budget) shared

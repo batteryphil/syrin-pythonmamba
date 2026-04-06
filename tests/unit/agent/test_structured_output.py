@@ -51,12 +51,12 @@ class TestOutputValidationError:
 
 
 class TestResponseOutputProperty:
-    def test_output_property_exists_on_response(self) -> None:
+    def test_output_returns_content_for_plain_response(self) -> None:
+        """For plain text agents, output returns the content string."""
         from syrin.response import Response
 
         r: Response[str] = Response(content="hello")
-        # output should be None when no structured output configured
-        assert r.output is None
+        assert r.output == "hello"
 
     def test_output_returns_parsed_when_structured_set(self) -> None:
         from pydantic import BaseModel
@@ -71,13 +71,15 @@ class TestResponseOutputProperty:
         r: Response[str] = Response(content='{"value": 42}', structured=so)
         assert r.output is instance
 
-    def test_output_is_none_when_structured_is_none(self) -> None:
+    def test_output_returns_content_when_no_structured(self) -> None:
+        """No structured output → output falls back to content string."""
         from syrin.response import Response
 
         r: Response[str] = Response(content="hello")
-        assert r.output is None
+        assert r.output == r.content
 
     def test_output_is_none_when_parsed_is_none(self) -> None:
+        """Structured configured but validation failed → output is None (parsed=None)."""
         from syrin.response import Response, StructuredOutput
 
         so = StructuredOutput(raw="bad json", parsed=None)

@@ -15,12 +15,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock, gpt4_mini
-from syrin import Agent, AgentConfig, Context
+from examples.models.models import gpt4_mini
+from syrin import Agent, Context, Model
 from syrin.context import InjectPlacement, PrepareInput
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-_model = gpt4_mini if os.environ.get("USE_REAL_MODEL") == "1" else almock
+_model = gpt4_mini if os.environ.get("USE_REAL_MODEL") == "1" else Model.mock()
 
 
 def _main() -> None:
@@ -39,13 +39,11 @@ def _main() -> None:
     agent = Agent(
         model=_model,
         system_prompt="You are helpful. Use the [RAG] block when relevant.",
-        config=AgentConfig(
-            context=Context(
-                max_tokens=8000,
-                runtime_inject=rag_injector,
-                inject_placement=InjectPlacement.BEFORE_CURRENT_TURN,
-                inject_source_detail="rag",
-            )
+        context=Context(
+            max_tokens=8000,
+            runtime_inject=rag_injector,
+            inject_placement=InjectPlacement.BEFORE_CURRENT_TURN,
+            inject_source_detail="rag",
         ),
     )
 
@@ -71,9 +69,7 @@ def _main() -> None:
 
     print("\n=== Per-call inject (overrides runtime_inject) ===\n")
     agent_no_runtime = Agent(
-        model=_model,
-        system_prompt="You are helpful.",
-        config=AgentConfig(context=Context(max_tokens=8000)),
+        model=_model, system_prompt="You are helpful.", context=Context(max_tokens=8000)
     )
 
     agent_no_runtime.run(

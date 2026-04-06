@@ -201,7 +201,22 @@ def _prepare_context(
         elif config.required and strict:
             raise ValueError(f"Required slot {name!r} is missing")
         else:
+            if config.required:
+                _log.warning(
+                    "Template slot %r is required but was not provided — rendering as empty. "
+                    "Pass it via template.render(%s=...) or set strict=True to raise instead.",
+                    name,
+                    name,
+                )
             ctx[name] = None
+    unknown = set(data) - set(slots)
+    if unknown:
+        _log.warning(
+            "Template render() received unknown keys %s — these will be ignored. "
+            "Declared slots: %s",
+            sorted(unknown),
+            sorted(slots),
+        )
     return ctx
 
 

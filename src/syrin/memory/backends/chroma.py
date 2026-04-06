@@ -144,7 +144,7 @@ class ChromaBackend:
     def _metadata_to_entry(self, metadata: dict[str, object], content: str) -> MemoryEntry:
         """Convert Chroma metadata to MemoryEntry."""
         raw_id = metadata.get("id", "")
-        raw_type = metadata.get("type", "core")
+        raw_type = metadata.get("type", "facts")
         raw_importance = metadata.get("importance", 1.0)
         raw_scope = metadata.get("scope", "user")
         raw_source = metadata.get("source")

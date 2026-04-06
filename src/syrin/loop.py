@@ -30,7 +30,7 @@ from typing import Any, cast
 from syrin.agent._run_context import AgentRunContext
 
 _log = logging.getLogger(__name__)
-from syrin.enums import Hook, LoopStrategy, MessageRole, StopReason
+from syrin.enums import Hook, MessageRole, StopReason
 
 
 def _get_tracer(ctx: object) -> object:
@@ -56,7 +56,7 @@ def _llm_span_context(ctx: object, iteration: int, model_id: str) -> object:
 
 
 # Max chars for tool results when displayed in traces/playground/terminal (observability only).
-# Full result is sent to the LLM unless max_tool_result_length > 0 on the agent.
+# Full result is sent to the LLM unless max_tool_result_length is not None on the agent.
 MAX_TOOL_RESULT_DISPLAY_LENGTH = 2000
 
 # Safety cap when no truncation: avoid sending unbounded text and blowing context.
@@ -121,14 +121,14 @@ def _extract_media_url_from_tool_result(result: str) -> tuple[str | None, str | 
 
 def _truncate_tool_result_for_context(
     result: str,
-    max_len: int = 0,
+    max_len: int | None = None,
     tool_name: str | None = None,
 ) -> str:
     """Prepare tool result for LLM context.
 
     - Image/video data URLs: always replaced with a short message (base64 omitted).
-    - When max_len is 0: full text is sent, capped at MAX_TOOL_RESULT_SAFETY_CAP for safety.
-    - When max_len > 0: text is truncated at max_len chars (legacy/custom limit).
+    - When max_len is None: full text is sent, capped at MAX_TOOL_RESULT_SAFETY_CAP for safety.
+    - When max_len is set: text is truncated at max_len chars.
     """
     if not result:
         return result
@@ -140,13 +140,11 @@ def _truncate_tool_result_for_context(
             f"{prefix}; [base64 data omitted, ~{size_kb}KB - exceeds context limit. "
             "The generation succeeded. Inform the user the image/video was created.]"
         )
-    effective_max = (
-        max_len if isinstance(max_len, int) and max_len > 0 else MAX_TOOL_RESULT_SAFETY_CAP
-    )
+    effective_max = max_len if max_len is not None else MAX_TOOL_RESULT_SAFETY_CAP
     if len(result) <= effective_max:
         return result
     label = f"Tool {tool_name!r} " if tool_name else "Tool "
-    if max_len > 0:
+    if max_len is not None:
         _log.warning(
             "%sresult truncated by max_tool_result_length: %d → %d chars",
             label,
@@ -252,7 +250,7 @@ class SingleShotLoop(Loop):
     """One-shot execution - single LLM call, no tools iteration.
 
     Use for simple questions or one-step tasks. No tool loop; single completion.
-    Default for loop_strategy=SINGLE_SHOT.
+    Use loop=SingleShotLoop() to select this loop.
     """
 
     name = "single_shot"
@@ -352,7 +350,7 @@ class SingleShotLoop(Loop):
 
 
 class ReactLoop(Loop):
-    """Think → Act → Observe loop. Default for Agent (loop_strategy=REACT).
+    """Think → Act → Observe loop. Default for Agent .  Default loop when loop= is not specified..
 
     Iterates: LLM call → tool execution → LLM call until end_turn or max_iterations.
     Use for multi-step tasks requiring tools.
@@ -534,7 +532,9 @@ class ReactLoop(Loop):
                                 str(result)[:MAX_TOOL_RESULT_DISPLAY_LENGTH],
                             )
                     result_str = str(result)
-                    max_len = getattr(ctx, "max_tool_result_length", 0)
+                    max_len = getattr(ctx, "max_tool_result_length", None)
+                    if not isinstance(max_len, int):
+                        max_len = None
                     content_for_llm = _truncate_tool_result_for_context(
                         result_str, max_len=max_len, tool_name=tool_name
                     )
@@ -720,7 +720,7 @@ class HumanInTheLoop(Loop):
                         ),
                         timeout=self._timeout,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     approved = False
 
                 ctx.emit_event(
@@ -765,7 +765,9 @@ class HumanInTheLoop(Loop):
                 try:
                     result = await _execute_tool_with_retry(ctx, tool_name, tool_args)
                     result_str = str(result)
-                    max_len = getattr(ctx, "max_tool_result_length", 0)
+                    max_len = getattr(ctx, "max_tool_result_length", None)
+                    if not isinstance(max_len, int):
+                        max_len = None
                     content_for_llm = _truncate_tool_result_for_context(
                         result_str, max_len=max_len, tool_name=tool_name
                     )
@@ -873,19 +875,18 @@ class PlanExecuteLoop(Loop):
         from syrin.events import EventContext
         from syrin.types import Message, TokenUsage
 
-        plan_prompt: str | list[dict[str, object]] = (
-            user_input
-            + "\n\nPlease provide a detailed plan with numbered steps to accomplish this task."
-            if isinstance(user_input, str)
-            else user_input
-            + [
-                {
-                    "role": "user",
-                    "content": "Please provide a detailed plan with numbered steps to accomplish this task.",
-                }
-            ]
+        messages = ctx.build_messages(user_input)
+        # Append the planning instruction as a separate message — never concatenate
+        # planning instructions with user input (prompt injection risk).
+        from syrin.enums import MessageRole  # noqa: PLC0415
+        from syrin.types import Message as _Msg  # noqa: PLC0415
+
+        messages.append(
+            _Msg(
+                role=MessageRole.USER,
+                content="Please provide a detailed plan with numbered steps to accomplish this task.",
+            )
         )
-        messages = ctx.build_messages(plan_prompt)
         tools = ctx.tools
         generated_media: list[dict[str, object]] = []
         run_start = time.perf_counter()
@@ -933,7 +934,9 @@ class PlanExecuteLoop(Loop):
                     )
                     tool_result = await _execute_tool_with_retry(ctx, tc.name, tc.arguments or {})
                     result_str = str(tool_result)
-                    max_len = getattr(ctx, "max_tool_result_length", 0)
+                    max_len = getattr(ctx, "max_tool_result_length", None)
+                    if not isinstance(max_len, int):
+                        max_len = None
                     content_for_llm = _truncate_tool_result_for_context(
                         result_str, max_len=max_len, tool_name=tc.name
                     )
@@ -1018,7 +1021,9 @@ class PlanExecuteLoop(Loop):
             for tc in response.tool_calls:
                 tool_result = await _execute_tool_with_retry(ctx, tc.name, tc.arguments or {})
                 result_str = str(tool_result)
-                max_len = getattr(ctx, "max_tool_result_length", 0)
+                max_len = getattr(ctx, "max_tool_result_length", None)
+                if not isinstance(max_len, int):
+                    max_len = None
                 content_for_llm = _truncate_tool_result_for_context(
                     result_str, max_len=max_len, tool_name=tc.name
                 )
@@ -1101,10 +1106,47 @@ class PlanExecuteLoop(Loop):
 class CodeActionLoop(Loop):
     """Generate code → Execute → Interpret results loop.
 
-    Uses the LLM to generate Python code to solve the problem,
-    executes it, and interprets the results.
+    The LLM generates Python code to solve the problem; the code runs
+    in the **current Python process** using ``exec()``; the output is
+    fed back to the LLM for interpretation.
 
-    Use for: Mathematical computations, data processing, code generation tasks
+    .. warning:: **In-Process Execution — No Sandbox**
+
+        Code generated by the LLM runs directly inside the calling Python
+        process with the same permissions, file-system access, and memory
+        as your application.  There is **no isolation, no container, and no
+        resource limit** beyond the ``timeout_seconds`` parameter.
+
+        Do NOT use ``CodeActionLoop`` with untrusted user-provided inputs in
+        a production environment.  A full sandboxed execution backend is
+        planned for a future release.  Until then, use this loop only for:
+
+        - Internal tooling where you control the input.
+        - Trusted, developer-written tasks (data analysis, computations).
+        - Offline notebooks and experimentation.
+
+    Use for:
+        - Mathematical computations and numerical analysis.
+        - Data processing and transformation tasks.
+        - Internal automation where the input is fully trusted.
+
+    Attributes:
+        max_iterations: Maximum LLM → execute → interpret cycles (default 10).
+        timeout_seconds: Wall-clock seconds allowed per code execution block.
+            Applies to the ``exec()`` call; does not limit the total loop
+            duration.  Defaults to 60.
+
+    Example::
+
+        from syrin import Agent, Model, CodeActionLoop
+
+        class MathAgent(Agent):
+            model = Model.OpenAI("gpt-4o-mini")
+            loop = CodeActionLoop(max_iterations=5, timeout_seconds=30)
+
+        agent = MathAgent()
+        result = agent.run("Calculate the first 10 prime numbers and their sum")
+        print(result.content)
     """
 
     name = "code_action"
@@ -1113,7 +1155,15 @@ class CodeActionLoop(Loop):
         self,
         max_iterations: int = 10,
         timeout_seconds: int = 60,
-    ):
+    ) -> None:
+        """Initialise CodeActionLoop.
+
+        Args:
+            max_iterations: Maximum LLM → execute → interpret cycles before
+                stopping.  Defaults to 10.
+            timeout_seconds: Maximum seconds to allow a single ``exec()``
+                block to run.  Defaults to 60.
+        """
         self.max_iterations = max_iterations
         self.timeout_seconds = timeout_seconds
 
@@ -1353,30 +1403,6 @@ class CodeActionLoop(Loop):
         )
 
 
-class LoopStrategyMapping:
-    """Maps LoopStrategy enum to loop implementations."""
-
-    _MAPPING = {
-        LoopStrategy.REACT: ReactLoop,
-        LoopStrategy.SINGLE_SHOT: SingleShotLoop,
-    }
-
-    @classmethod
-    def get_loop(cls, strategy: LoopStrategy) -> type[Loop]:
-        """Get loop class for strategy."""
-        return cls._MAPPING.get(strategy, ReactLoop)
-
-    @classmethod
-    def create_loop(cls, strategy: LoopStrategy | str, max_iterations: int = 10) -> Loop:
-        """Create loop instance from strategy."""
-        if isinstance(strategy, str):
-            strategy = LoopStrategy(strategy)
-        loop_class = cls.get_loop(strategy)
-        if loop_class is ReactLoop:
-            return ReactLoop(max_iterations=max_iterations)
-        return loop_class()
-
-
 __all__ = [
     "Loop",
     "LoopResult",
@@ -1385,7 +1411,6 @@ __all__ = [
     "HumanInTheLoop",
     "PlanExecuteLoop",
     "CodeActionLoop",
-    "LoopStrategyMapping",
     "ToolApprovalFn",
     "MAX_TOOL_RESULT_DISPLAY_LENGTH",
     "MAX_TOOL_RESULT_SAFETY_CAP",

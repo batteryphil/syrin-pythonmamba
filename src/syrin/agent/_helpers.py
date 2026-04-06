@@ -9,7 +9,7 @@ from syrin._sentinel import NOT_PROVIDED
 from syrin.budget import Budget
 from syrin.context import Context, DefaultContextManager
 from syrin.context.snapshot import ContextSnapshot
-from syrin.enums import Hook, Media, MemoryBackend, MemoryPreset, MemoryType
+from syrin.enums import Hook, Media
 from syrin.events import EventContext
 from syrin.exceptions import ModalityNotSupportedError
 from syrin.knowledge._grounding import GroundedFact
@@ -672,29 +672,15 @@ def _validate_budget(budget: object) -> Budget | None:
 
 
 def _resolve_memory(
-    memory: Memory | MemoryPreset | None,
+    memory: Memory | None,
 ) -> tuple[Memory | None, InMemoryBackend | None]:
     """Normalize memory argument to (persistent_memory, backend)."""
-    disabled = memory is None or memory is MemoryPreset.DISABLED
-    default = memory is MemoryPreset.DEFAULT
-    if (
-        memory is not None
-        and memory is not MemoryPreset.DISABLED
-        and memory is not MemoryPreset.DEFAULT
-        and not isinstance(memory, Memory)
-    ):
-        raise TypeError(
-            f"memory must be Memory, MemoryPreset.DEFAULT, MemoryPreset.DISABLED, or None, "
-            f"got {type(memory).__name__}. Use Memory(...), MemoryPreset.DEFAULT, or None."
-        )
-    if disabled:
+    if memory is None:
         return (None, None)
-    if default:
-        return (
-            Memory(restrict_to=[MemoryType.CORE, MemoryType.EPISODIC], top_k=10),
-            get_backend(MemoryBackend.MEMORY),
+    if not isinstance(memory, Memory):
+        raise TypeError(
+            f"memory must be Memory or None, got {type(memory).__name__}. Use Memory(...) or None."
         )
-    assert isinstance(memory, Memory)
     return (memory, get_backend(memory.backend, **memory._backend_kwargs()))
 
 

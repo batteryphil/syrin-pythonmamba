@@ -69,7 +69,6 @@ __all__ = _public_exports
 
 _MODULE_BY_NAME: dict[str, str] = {
     "Agent": "syrin.agent",
-    "AgentConfig": "syrin.agent.config",
     "AgentRouter": "syrin.agent.agent_router",
     "MockPricing": "syrin.enums",
     "MockResponseMode": "syrin.enums",
@@ -134,7 +133,6 @@ _MODULE_BY_NAME: dict[str, str] = {
     "LiteLLM": "syrin.model",
     "Loop": "syrin.loop",
     "LoopResult": "syrin.loop",
-    "LoopStrategy": "syrin.enums",
     "MCP": "syrin.mcp",
     "MCPClient": "syrin.mcp",
     "Media": "syrin.enums",
@@ -143,7 +141,6 @@ _MODULE_BY_NAME: dict[str, str] = {
     "model": "syrin.model",
     "MemoryBackend": "syrin.enums",
     "MemoryEntry": "syrin.memory",
-    "MemoryPreset": "syrin.enums",
     "MemoryScope": "syrin.enums",
     "MemoryType": "syrin.enums",
     "MessageRole": "syrin.enums",
@@ -217,7 +214,7 @@ _MODULE_BY_NAME: dict[str, str] = {
     "get_observability_tracer": "syrin.observability",
     "normalize_input": "syrin.guardrails.injection",
     "output": "syrin.model",
-    "parallel": "syrin.agent.multi_agent",
+    "parallel": "syrin.agent.pipeline",
     # Multi-agent: Swarm
     "Swarm": "syrin.swarm",
     "SwarmConfig": "syrin.swarm",
@@ -248,24 +245,21 @@ _MODULE_BY_NAME: dict[str, str] = {
     "WorkflowStatus": "syrin.enums",
     "PauseMode": "syrin.enums",
     "prompt": "syrin.prompt",
-    "raise_on_exceeded": "syrin.budget",
     "replay_trace": "syrin._replay",
     "run": "syrin._package_run",
     "save_as": "syrin.output_format",
     "save_as_docx": "syrin.output_format",
     "save_as_pdf": "syrin.output_format",
-    "sequential": "syrin.agent.multi_agent",
+    "sequential": "syrin.agent.pipeline",
     "session": "syrin.observability",
     "set_debug": "syrin.observability",
     "span": "syrin.observability",
     "spotlight_wrap": "syrin.guardrails.injection",
-    "stop_on_exceeded": "syrin.budget",
     "structured": "syrin.model",
     "system_prompt": "syrin.prompt",
     "tool": "syrin.tool",
     "trace": "syrin.observability",
     "validated": "syrin.prompt",
-    "warn_on_exceeded": "syrin.budget",
 }
 
 
@@ -286,25 +280,6 @@ def _import_public(name: str) -> object:
 
 
 _REMOVED_IN_V0_11: dict[str, str] = {
-    "DynamicPipeline": (
-        "'DynamicPipeline' was removed in v0.11.0. Use 'AgentRouter' instead:\n"
-        "    from syrin import AgentRouter"
-    ),
-    "Pipeline": (
-        "'Pipeline' was removed in v0.11.0. Use 'Workflow' for sequential multi-agent runs:\n"
-        "    from syrin import Workflow\n"
-        "    wf = Workflow('name').step(AgentA).step(AgentB)\n"
-        "    result = await wf.run('input')"
-    ),
-    "AgentTeam": (
-        "'AgentTeam' was removed in v0.11.0. Use 'Swarm' for multi-agent coordination:\n"
-        "    from syrin import Swarm, SwarmConfig\n"
-        "    swarm = Swarm(agents=[...], goal='...', config=SwarmConfig())"
-    ),
-    "PipelineRun": (
-        "'PipelineRun' was removed in v0.11.0. Use 'Workflow' instead:\n"
-        "    from syrin import Workflow"
-    ),
     "task": (
         "'@task' was removed in v0.11.0. Define agent entry points as plain methods:\n"
         "    class MyAgent(Agent):\n"
@@ -322,6 +297,21 @@ _REMOVED_IN_V0_11: dict[str, str] = {
     "HITL": (
         "'HITL' alias was removed in v0.11.0. Use 'HumanInTheLoop' directly:\n"
         "    from syrin import HumanInTheLoop"
+    ),
+    "AgentConfig": (
+        "'AgentConfig' was removed. Pass its fields directly to Agent():\n"
+        "    Agent(context=..., rate_limit=..., checkpoint=..., tracer=...,\n"
+        "          event_bus=..., audit=..., dependencies=...,\n"
+        "          spotlight_tool_outputs=..., normalize_inputs=..., tool_error_mode=...)"
+    ),
+    "raise_on_exceeded": (
+        "'raise_on_exceeded' was removed. Use Budget(exceed_policy=ExceedPolicy.STOP) instead."
+    ),
+    "warn_on_exceeded": (
+        "'warn_on_exceeded' was removed. Use Budget(exceed_policy=ExceedPolicy.WARN) instead."
+    ),
+    "stop_on_exceeded": (
+        "'stop_on_exceeded' was removed. Use Budget(exceed_policy=ExceedPolicy.STOP) instead."
     ),
 }
 

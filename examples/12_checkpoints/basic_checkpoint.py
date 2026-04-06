@@ -10,7 +10,7 @@ Run:
     python examples/12_checkpoints/basic_checkpoint.py
 """
 
-from syrin import Agent, AgentConfig, CheckpointConfig, CheckpointTrigger, Model
+from syrin import Agent, CheckpointConfig, CheckpointTrigger, Model
 
 model = Model.mock()
 
@@ -40,9 +40,7 @@ for trigger in [
 ]:
     Agent(
         model=model,
-        config=AgentConfig(
-            checkpoint=CheckpointConfig(storage="memory", trigger=trigger),
-        ),
+        checkpoint=CheckpointConfig(storage="memory", trigger=trigger),
     )
     print(f"  Created agent with trigger={trigger.value}")
 
@@ -59,7 +57,7 @@ config = CheckpointConfig(
     max_checkpoints=5,
     compress=False,
 )
-agent = Agent(model=model, config=AgentConfig(checkpoint=config))
+agent = Agent(model=model, checkpoint=config)
 print("  Storage: sqlite, trigger: STEP, max: 5")
 
 # ---------------------------------------------------------------------------

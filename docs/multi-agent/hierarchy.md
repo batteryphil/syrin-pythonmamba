@@ -188,6 +188,200 @@ CEO (ORCHESTRATOR)
 
 A supervisor can act on direct reports.  Skip-level control requires delegation or an `ADMIN` role.  Unknown actors are treated as `WORKER` (minimal permissions).
 
+## Reporting Results Upward
+
+When a child agent finishes, its output travels back to the parent through `SpawnResult.content`.  Whatever the child returns as `Response.content` is the report the parent reads — no polling, no subscriptions.
+
+```python
+import asyncio
+import json
+from syrin import Agent, Model
+from syrin.response import Response
+from syrin.swarm._spawn import SpawnResult, SpawnSpec
+
+class SoftwareEngineer(Agent):
+    model = Model.mock()
+    system_prompt = "You implement backend services and APIs."
+
+class Designer(Agent):
+    model = Model.mock()
+    system_prompt = "You design interfaces and user flows."
+
+class CTOAgent(Agent):
+    model = Model.mock()
+    system_prompt = "You decide workforce composition and technical direction."
+
+    async def arun(self, input_text: str) -> Response[str]:
+        # Spawn the workforce and collect their outputs
+        results: list[SpawnResult] = await self.spawn_many([
+            SpawnSpec(agent=SoftwareEngineer, task=input_text, budget=1.00),
+            SpawnSpec(agent=Designer,          task=input_text, budget=0.50),
+        ])
+
+        # Package a structured report for the CEO
+        report = json.dumps({
+            "headcount": {"engineers": 1, "designers": 1},
+            "total_spent": sum(r.cost for r in results),
+            "engineer_output": results[0].content[:200],
+            "designer_output": results[1].content[:200],
+        })
+        return Response(content=report, cost=sum(r.cost for r in results))
+
+
+class CEOAgent(Agent):
+    model = Model.mock()
+    system_prompt = "You set company direction and synthesise all reports."
+
+    async def arun(self, input_text: str) -> Response[str]:
+        # Allocate budget to the CTO and wait for the workforce report
+        cto_result: SpawnResult = await self.spawn(
+            CTOAgent, task=input_text, budget=2.00
+        )
+
+        # Deserialise and act on the structured report
+        report = json.loads(cto_result.content)
+        summary = (
+            f"Workforce: {report['headcount']}\n"
+            f"Spent: ${report['total_spent']:.4f} / $2.00 allocated\n"
+            f"Engineer: {report['engineer_output'][:80]}\n"
+            f"Designer: {report['designer_output'][:80]}"
+        )
+        return Response(content=summary, cost=cto_result.cost)
+
+
+async def main() -> None:
+    ceo = CEOAgent()
+    result = await ceo.arun("Launch a new product dashboard feature")
+    print(result.content)
+
+asyncio.run(main())
+```
+
+**Key rule:** the child's `Response.content` becomes `SpawnResult.content` on the parent side.  If you need machine-readable data (headcount, costs, statuses), return JSON from the child and `json.loads()` it in the parent.
+
+For unsolicited mid-run signals — e.g. a worker escalating a blocker without being awaited — use [A2A messaging](/multi-agent/a2a) instead.
+
+## The Virtual Office Pattern
+
+A full three-level hierarchy: CEO sets budgets, CTO decides the workforce, workers execute.
+
+```python
+import asyncio
+import json
+from syrin import Agent, Budget, Model
+from syrin.response import Response
+from syrin.enums import AgentRole
+from syrin.swarm import Swarm, SwarmConfig
+from syrin.swarm._spawn import SpawnResult, SpawnSpec
+from syrin.enums import SwarmTopology
+
+class SoftwareEngineer(Agent):
+    model = Model.mock()
+    system_prompt = "You implement features and write code."
+
+class MarketingManager(Agent):
+    model = Model.mock()
+    system_prompt = "You run growth campaigns and track KPIs."
+
+class CTOAgent(Agent):
+    role = AgentRole.SUPERVISOR
+    model = Model.mock()
+    system_prompt = (
+        "You decide how many engineers to hire and what to build. "
+        "Spawn engineers via spawn_many(), collect their outputs, "
+        "and return a JSON report: {headcount, outputs, total_spent}."
+    )
+
+    async def arun(self, input_text: str) -> Response[str]:
+        results: list[SpawnResult] = await self.spawn_many([
+            SpawnSpec(agent=SoftwareEngineer, task=f"Build: {input_text}", budget=0.80),
+            SpawnSpec(agent=SoftwareEngineer, task=f"Test: {input_text}",  budget=0.40),
+        ])
+        report = json.dumps({
+            "department": "Engineering",
+            "headcount": 2,
+            "total_spent": sum(r.cost for r in results),
+            "outputs": [r.content[:150] for r in results],
+        })
+        return Response(content=report, cost=sum(r.cost for r in results))
+
+
+class CMOAgent(Agent):
+    role = AgentRole.SUPERVISOR
+    model = Model.mock()
+    system_prompt = (
+        "You run marketing for company growth goals. "
+        "Spawn marketing workers and return a JSON report."
+    )
+
+    async def arun(self, input_text: str) -> Response[str]:
+        result: SpawnResult = await self.spawn(
+            MarketingManager,
+            task=f"Growth campaign: {input_text}",
+            budget=0.50,
+        )
+        report = json.dumps({
+            "department": "Marketing",
+            "headcount": 1,
+            "total_spent": result.cost,
+            "outputs": [result.content[:150]],
+        })
+        return Response(content=report, cost=result.cost)
+
+
+class CEOAgent(Agent):
+    role = AgentRole.ORCHESTRATOR
+    model = Model.mock()
+    system_prompt = (
+        "You allocate budget to CTO and CMO, wait for their reports, "
+        "and synthesise a company-wide executive summary."
+    )
+
+    async def arun(self, input_text: str) -> Response[str]:
+        # CEO decides each department's budget and delegates concurrently
+        dept_results: list[SpawnResult] = await self.spawn_many([
+            SpawnSpec(agent=CTOAgent, task=input_text, budget=2.00),
+            SpawnSpec(agent=CMOAgent, task=input_text, budget=1.00),
+        ])
+
+        # Collect structured reports from both departments
+        reports = [json.loads(r.content) for r in dept_results]
+        total_headcount = sum(d["headcount"] for d in reports)
+        total_spent = sum(r.cost for r in dept_results)
+
+        summary = (
+            f"Company Goal: {input_text}\n\n"
+            + "\n".join(
+                f"[{d['department']}] {d['headcount']} staff  "
+                f"${d['total_spent']:.4f} spent"
+                for d in reports
+            )
+            + f"\n\nTotal headcount: {total_headcount}  "
+            f"Total spent: ${total_spent:.4f}"
+        )
+        return Response(content=summary, cost=total_spent)
+
+
+async def main() -> None:
+    swarm = Swarm(
+        agents=[CEOAgent()],   # Swarm entry point is the CEO instance
+        goal="Drive growth by shipping our Q3 product roadmap",
+        budget=Budget(max_cost=5.00),
+        config=SwarmConfig(topology=SwarmTopology.ORCHESTRATOR),
+    )
+    result = await swarm.run()
+    print(result.content)
+
+asyncio.run(main())
+```
+
+What this demonstrates:
+
+- **CEO controls all budgets** — `SpawnSpec(budget=2.00)` for CTO, `budget=1.00` for CMO.  Neither can overspend their allocation.
+- **CTO decides the workforce** — spawns 2 engineers dynamically; CEO never touches engineer agents directly.
+- **Reports flow upward through `SpawnResult`** — CTO returns JSON, CMO returns JSON, CEO reads both and synthesises the executive summary.
+- **Three levels of hierarchy** — CEO → CTO/CMO → workers.  The pattern extends to any depth.
+
 ## Team Expansion Details
 
 `Swarm._expand_team_agents()` processes the queue iteratively (breadth-first) to handle arbitrary nesting depth.  It sets `_supervisor_id` using `object.__setattr__` to work with frozen dataclasses or agents without arbitrary `__setattr__`.
@@ -196,6 +390,8 @@ Duplicate agent IDs are detected via `processed_ids` to prevent infinite loops i
 
 ## See Also
 
-- [Authority](/multi-agent/authority)
-- [Swarm](/multi-agent/swarm)
-- [Budget delegation](/multi-agent/budget-delegation)
+- [Budget Delegation](/multi-agent/budget-delegation) — `spawn()`, `spawn_many()`, `SpawnResult`, budget pools
+- [Authority](/multi-agent/authority) — permission model, roles, delegation
+- [Swarm](/multi-agent/swarm) — topologies, shared budget, `SwarmResult`
+- [A2A Messaging](/multi-agent/a2a) — unsolicited mid-run signals between agents
+- [MemoryBus](/multi-agent/memory-bus) — shared knowledge board for cross-agent findings

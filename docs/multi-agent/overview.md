@@ -22,9 +22,7 @@ Syrin gives you five multi-agent patterns. Each is right for a specific situatio
 
 **Orchestrator Swarm** — One lead agent decides which specialists to call and in what order. The lead agent reads the goal, reasons about it, and delegates. Best when the strategy should be dynamic — different goals require different specialists.
 
-**Pipeline** — Agents run in sequence. Each agent's output becomes the next agent's input. Best for multi-step workflows where step 3 genuinely needs step 2's output.
-
-**Workflow** — A pipeline with conditional branching and parallel sections. Best for complex business logic: "if the sentiment is negative, route to the complaints specialist; otherwise route to the upsell specialist."
+**Workflow** — Agents run in a deterministic sequence with optional conditional branching and parallel sections. Each step's output becomes the next step's input. Best for multi-step workflows and business logic: "if the sentiment is negative, route to the complaints specialist; otherwise route to the upsell specialist."
 
 **Consensus** — Multiple agents independently analyze the same question and their answers are synthesized into one. Best for high-stakes decisions where you want multiple viewpoints before committing.
 
@@ -36,7 +34,7 @@ If you have **independent tasks** (research, translation, summarization can all 
 
 If you have a **dynamic goal** where you do not know in advance which agents will be needed, use **Orchestrator Swarm**.
 
-If you have a **linear workflow** (research → draft → edit), use **Pipeline**.
+If you have a **linear workflow** (research → draft → edit), use **Workflow** or the `sequential()` helper for lightweight one-off chains.
 
 If you have **conditional logic** (route to specialist A or B based on content), use **Workflow**.
 
@@ -60,7 +58,7 @@ shared_budget = Budget(
 )
 ```
 
-This budget is passed to the `Swarm`, `Pipeline`, or `Workflow`. All agents draw from the same pool. The hard `max_cost` cap ensures total spend never exceeds the limit, regardless of how many agents are running.
+This budget is passed to the `Swarm`, `AgentRouter`, or `Workflow`. All agents draw from the same pool. The hard `max_cost` cap ensures total spend never exceeds the limit, regardless of how many agents are running.
 
 ## Memory Across Agents
 
@@ -92,7 +90,7 @@ This is enterprise-grade security for multi-agent systems that were, until recen
 Choose your pattern and dive in:
 
 - [Swarm](/agent-kit/multi-agent/swarm) — All topologies (PARALLEL, ORCHESTRATOR, CONSENSUS, REFLECTION) with full examples
-- [Pipeline](/agent-kit/multi-agent/pipeline) — Sequential agent chains with shared context
+- [Sequential & Parallel Helpers](/agent-kit/multi-agent/pipeline) — Lightweight one-off `sequential()` and `parallel()` chains
 - [Workflow](/agent-kit/multi-agent/workflow) — Conditional and parallel workflow execution
 - [A2A Communication](/agent-kit/multi-agent/a2a) — Typed agent-to-agent messaging
 - [MemoryBus](/agent-kit/multi-agent/memory-bus) — Shared memory across agents

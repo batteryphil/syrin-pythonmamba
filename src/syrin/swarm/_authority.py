@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import contextlib
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from syrin.enums import AgentPermission, AgentRole, DelegationScope, Hook
+from syrin.enums import AgentPermission, AgentRole, ControlAction, DelegationScope, Hook
 from syrin.swarm._agent_ref import AgentRef, _aid
 
 # ---------------------------------------------------------------------------
@@ -60,13 +61,13 @@ class AuditEntry:
     Attributes:
         actor_id: ID of the agent that performed the action.
         target_id: ID of the agent the action was performed on.
-        action: Name of the action performed.
+        action: :class:`~syrin.enums.ControlAction` describing what was done.
         timestamp: UTC timestamp when the action was recorded.
     """
 
     actor_id: str
     target_id: str
-    action: str
+    action: ControlAction
     timestamp: datetime
 
 
@@ -288,7 +289,7 @@ class SwarmAuthorityGuard:
                 reason=reason,
             )
 
-    def record_action(self, actor_id: str, target_id: str, action: str) -> None:
+    def record_action(self, actor_id: str, target_id: str, action: ControlAction | str) -> None:
         """Record a successful action to the audit log and fire AGENT_CONTROL_ACTION.
 
         This is an internal method used by :class:`SwarmController`; callers
@@ -297,12 +298,15 @@ class SwarmAuthorityGuard:
         Args:
             actor_id: ID of the agent that performed the action.
             target_id: ID of the target agent.
-            action: Name/description of the action performed.
+            action: :class:`~syrin.enums.ControlAction` describing what was done.
         """
+        # Normalise to ControlAction if a plain string was passed
+        with contextlib.suppress(ValueError):
+            action = ControlAction(action)
         entry = AuditEntry(
             actor_id=actor_id,
             target_id=target_id,
-            action=action,
+            action=action,  # type: ignore[arg-type]
             timestamp=datetime.utcnow(),
         )
         self._audit.append(entry)
@@ -311,7 +315,7 @@ class SwarmAuthorityGuard:
             {
                 "actor_id": actor_id,
                 "target_id": target_id,
-                "action": action,
+                "action": str(action),
             },
         )
 
@@ -401,3 +405,76 @@ class SwarmAuthorityGuard:
             for r in self._delegations
             if not (r.delegator_id == delegator_id and r.delegate_id == delegate_id)
         ]
+
+
+# ---------------------------------------------------------------------------
+# Factory helper
+# ---------------------------------------------------------------------------
+
+
+def build_guard_from_agents(
+    agents: Sequence[AgentRef],
+    fire_event_fn: Callable[[Hook, dict[str, object]], None] | None = None,
+) -> SwarmAuthorityGuard:
+    """Build a :class:`SwarmAuthorityGuard` automatically from agent class attributes.
+
+    Reads the ``role`` and ``team`` :data:`~typing.ClassVar` attributes declared on
+    each agent class to construct the ``roles`` and ``teams`` mappings without any
+    free strings.
+
+    Args:
+        agents: List of agent instances.  Each agent's class should declare
+            a ``role`` ClassVar (:class:`~syrin.enums.AgentRole`) and optionally
+            a ``team`` ClassVar (list of sub-agent classes it supervises).
+        fire_event_fn: Optional event hook callback.
+
+    Returns:
+        A :class:`SwarmAuthorityGuard` wired from the agents' class metadata.
+
+    Example::
+
+        class Supervisor(Agent):
+            role = AgentRole.SUPERVISOR
+            team = [WorkerAgent]
+
+        class WorkerAgent(Agent):
+            role = AgentRole.WORKER
+
+        supervisor = Supervisor()
+        worker = WorkerAgent()
+        guard = build_guard_from_agents([supervisor, worker])
+    """
+    roles: dict[AgentRef, AgentRole] = {}
+    teams: dict[AgentRef, list[AgentRef]] = {}
+
+    # Index agents by their class for team membership lookup
+    class_to_agents: dict[type, list[AgentRef]] = {}
+    for agent in agents:
+        cls = type(agent)
+        class_to_agents.setdefault(cls, []).append(agent)
+        agent_role: AgentRole = getattr(cls, "role", AgentRole.WORKER)
+        if not isinstance(agent_role, AgentRole):
+            agent_role = AgentRole.WORKER
+        roles[agent] = agent_role
+
+    for agent in agents:
+        cls = type(agent)
+        # Use `team` ClassVar (existing pattern in syrin Agent)
+        managed_classes: list[type] | None = getattr(cls, "team", None)
+        if not managed_classes:
+            continue
+        managed_agents: list[AgentRef] = []
+        for managed_cls in managed_classes:
+            managed_agents.extend(class_to_agents.get(managed_cls, []))
+        if managed_agents:
+            teams[agent] = managed_agents
+
+    return SwarmAuthorityGuard(roles=roles, teams=teams, fire_event_fn=fire_event_fn)
+
+
+__all__ = [
+    "AgentPermissionError",
+    "AuditEntry",
+    "SwarmAuthorityGuard",
+    "build_guard_from_agents",
+]

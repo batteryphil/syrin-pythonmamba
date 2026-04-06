@@ -1,4 +1,4 @@
-"""Multi-agent HTTP routing — AgentRouter for multiple agents/pipelines on one server."""
+"""Multi-agent HTTP routing — AgentRouter for multiple agents on one server."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from syrin.serve.servable import Servable
 
 if TYPE_CHECKING:
     from syrin.agent import Agent
-    from syrin.agent.multi_agent import DynamicPipeline, Pipeline
+    from syrin.agent.agent_router import AgentRouter as DynamicAgentRouter
     from syrin.serve.config import ServeConfig
 
 
@@ -37,15 +37,15 @@ class AgentRouter(Servable):
 
     def __init__(
         self,
-        agents: list[Agent | Pipeline | DynamicPipeline],
+        agents: list[Agent | DynamicAgentRouter],
         *,
         config: ServeConfig | None = None,
         agent_prefix: str = "/agent",
     ) -> None:
-        """Create a router for multiple agents and/or pipelines.
+        """Create a router for multiple agents.
 
         Args:
-            agents: List of Agent, Pipeline, or DynamicPipeline instances to serve.
+            agents: List of Agent or AgentRouter instances to serve.
             config: Optional ServeConfig. Defaults used if None.
             agent_prefix: URL prefix for agent routes, e.g. "/agent" yields /agent/{name}/chat.
         """

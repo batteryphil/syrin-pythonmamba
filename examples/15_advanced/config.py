@@ -82,13 +82,12 @@ for t in threads:
 configure(trace=False)
 
 if __name__ == "__main__":
-    from examples.models.models import almock
-    from syrin import Agent
+    from syrin import Agent, Model
 
     class ConfigDemoAgent(Agent):
         name = "config-demo"
         description = "Agent with global config demo"
-        model = almock
+        model = Model.mock()
         system_prompt = "You are helpful."
 
     agent = ConfigDemoAgent()

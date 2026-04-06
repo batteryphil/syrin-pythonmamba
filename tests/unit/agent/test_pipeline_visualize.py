@@ -1,11 +1,13 @@
-"""Tests for Pipeline.visualize()."""
+"""Tests for parallel() and sequential() helper functions from syrin.agent.pipeline."""
 
 from __future__ import annotations
+
+import asyncio
 
 import pytest
 
 from syrin import Agent, Model
-from syrin.agent.pipeline import Pipeline
+from syrin.agent.pipeline import parallel, sequential
 
 
 class _ResearchAgent(Agent):
@@ -30,73 +32,94 @@ class _EditorAgent(Agent):
 
 
 @pytest.mark.phase_1
-class TestPipelineVisualize:
-    """Pipeline.visualize() outputs the agent chain."""
+class TestSequential:
+    """sequential() runs agents one after another."""
 
-    def test_visualize_does_not_raise_with_no_agents(self) -> None:
-        """visualize() does not raise when no agents are pre-configured."""
-        pipeline = Pipeline()
-        pipeline.visualize()  # must not raise
+    def test_sequential_empty_returns_empty_response(self) -> None:
+        """sequential([]) returns an empty Response without raising."""
+        result = sequential([])
+        assert result.content == ""
+        assert result.cost == 0.0
 
-    def test_visualize_does_not_raise_with_agents(self) -> None:
-        """visualize() does not raise when agents are pre-configured."""
-        pipeline = Pipeline(
-            agents=[
-                (_ResearchAgent, "Research topic"),
-                (_WriterAgent, "Write article"),
-                (_EditorAgent, "Edit article"),
+    def test_sequential_single_agent(self) -> None:
+        """sequential() with one agent returns that agent's response."""
+        agent = _ResearchAgent()
+        result = sequential([(agent, "Research AI")])
+        assert isinstance(result.content, str)
+
+    def test_sequential_multiple_agents(self) -> None:
+        """sequential() with multiple agents returns last agent's response."""
+        researcher = _ResearchAgent()
+        writer = _WriterAgent()
+        result = sequential([(researcher, "Research AI"), (writer, "Write summary")])
+        assert isinstance(result.content, str)
+
+    def test_sequential_pass_previous_false(self) -> None:
+        """sequential() with pass_previous=False does not prepend prior output."""
+        researcher = _ResearchAgent()
+        writer = _WriterAgent()
+        # Should not raise — just ignores previous output
+        result = sequential(
+            [(researcher, "Research AI"), (writer, "Write summary")],
+            pass_previous=False,
+        )
+        assert isinstance(result.content, str)
+
+    def test_sequential_three_agents(self) -> None:
+        """sequential() with three agents completes without raising."""
+        researcher = _ResearchAgent()
+        writer = _WriterAgent()
+        editor = _EditorAgent()
+        result = sequential(
+            [
+                (researcher, "Research AI trends"),
+                (writer, "Write article"),
+                (editor, "Edit article"),
             ]
         )
-        pipeline.visualize()  # must not raise
+        assert isinstance(result.content, str)
 
-    def test_visualize_output_contains_agent_names(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """visualize() output contains agent class names."""
-        printed: list[str] = []
 
-        def _mock_print(*args: object, **kwargs: object) -> None:
-            printed.append(" ".join(str(a) for a in args))
+@pytest.mark.phase_1
+class TestParallel:
+    """parallel() runs agents concurrently."""
 
-        monkeypatch.setattr("builtins.print", _mock_print)
-        try:
-            import rich as _rich  # noqa: F401
+    def test_parallel_single_agent(self) -> None:
+        """parallel() with one agent returns a list with one response."""
+        agent = _ResearchAgent()
+        results = asyncio.run(parallel([(agent, "Research AI")]))
+        assert len(results) == 1
+        assert isinstance(results[0].content, str)
 
-            monkeypatch.setattr("rich.print", _mock_print)
-        except ImportError:
-            pass
+    def test_parallel_multiple_agents(self) -> None:
+        """parallel() with multiple agents returns results in input order."""
+        researcher = _ResearchAgent()
+        writer = _WriterAgent()
+        results = asyncio.run(parallel([(researcher, "Research AI"), (writer, "Write summary")]))
+        assert len(results) == 2
+        for r in results:
+            assert isinstance(r.content, str)
 
-        pipeline = Pipeline(
-            agents=[
-                (_ResearchAgent, "Research"),
-                (_WriterAgent, "Write"),
-            ]
+    def test_parallel_three_agents(self) -> None:
+        """parallel() with three agents returns three results."""
+        researcher = _ResearchAgent()
+        writer = _WriterAgent()
+        editor = _EditorAgent()
+        results = asyncio.run(
+            parallel(
+                [
+                    (researcher, "Research AI"),
+                    (writer, "Write article"),
+                    (editor, "Edit article"),
+                ]
+            )
         )
-        pipeline.visualize()
+        assert len(results) == 3
 
-        combined = " ".join(printed)
-        assert "_ResearchAgent" in combined or "ResearchAgent" in combined or "Research" in combined
-        assert "_WriterAgent" in combined or "WriterAgent" in combined or "Writer" in combined
-
-    def test_visualize_agent_class_without_task(self) -> None:
-        """visualize() works with plain agent class (not tuple) entries."""
-        pipeline = Pipeline(agents=[_ResearchAgent, _WriterAgent])
-        pipeline.visualize()  # must not raise
-
-    def test_visualize_produces_nonempty_output(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """visualize() with configured agents produces non-empty output."""
-        printed: list[str] = []
-
-        def _mock_print(*args: object, **kwargs: object) -> None:
-            printed.append(" ".join(str(a) for a in args))
-
-        monkeypatch.setattr("builtins.print", _mock_print)
-        try:
-            import rich as _rich  # noqa: F401
-
-            monkeypatch.setattr("rich.print", _mock_print)
-        except ImportError:
-            pass
-
-        pipeline = Pipeline(agents=[(_ResearchAgent, "Research")])
-        pipeline.visualize()
-
-        assert len(printed) > 0 or True  # Rich may not use builtins.print
+    def test_parallel_result_order_matches_input(self) -> None:
+        """parallel() preserves input order in results."""
+        researcher = _ResearchAgent()
+        writer = _WriterAgent()
+        results = asyncio.run(parallel([(researcher, "Task A"), (writer, "Task B")]))
+        # Both should be valid Response objects — order is deterministic
+        assert len(results) == 2

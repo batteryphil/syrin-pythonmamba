@@ -8,8 +8,8 @@ Then run this script:
   python -m examples.16_serving.stress_test_remote_config
 
 Tests:
-- GET /config: schema has enum_values for agent.loop_strategy (dropdown in UI)
-- PATCH loop_strategy (react <-> single_shot)
+- GET /config: schema has agent.max_tool_iterations field
+- PATCH agent.max_tool_iterations
 - PATCH tools.<name>.enabled (toggle tool off/on)
 - PATCH budget.max_cost
 - Revert (value: null)
@@ -17,6 +17,7 @@ Tests:
 
 Note: budget.on_exceeded (raise/warn/stop) is a callable in code and is not exposed
 as an enum in remote config; only run, reserve, per, etc. are configurable.
+loop_strategy has been removed; use loop= directly on Agent(...).
 """
 
 from __future__ import annotations
@@ -81,7 +82,7 @@ def main() -> int:
     print("Remote config stress test (expect server at", BASE, ")")
     print()
 
-    # 1) GET config, assert schema has enum_values for loop_strategy (for UI dropdown)
+    # 1) GET config, assert schema has agent.max_tool_iterations
     status, data = get_config()
     if status != 200:
         print("FAIL: GET /config returned", status, data)
@@ -95,39 +96,32 @@ def main() -> int:
     sections = data.get("sections", {})
     agent_section = sections.get("agent", {})
     fields = agent_section.get("fields") or []
+    iter_field = next((f for f in fields if f.get("path") == "agent.max_tool_iterations"), None)
+    if not iter_field:
+        print("FAIL: sections.agent has no field agent.max_tool_iterations")
+        return 1
+    # loop_strategy must NOT be present (removed)
     loop_field = next((f for f in fields if f.get("path") == "agent.loop_strategy"), None)
-    if not loop_field:
-        print("FAIL: sections.agent has no field agent.loop_strategy")
+    if loop_field:
+        print("FAIL: agent.loop_strategy must not be present (removed from remote config)")
         return 1
-    enum_vals = loop_field.get("enum_values")
-    if not enum_vals or "react" not in enum_vals or "single_shot" not in enum_vals:
-        print(
-            "FAIL: agent.loop_strategy must have enum_values (e.g. react, single_shot) for dropdown. Got:",
-            enum_vals,
-        )
-        return 1
-    print("OK: agent.loop_strategy has enum_values:", enum_vals, "(dropdown in UI)")
+    print("OK: agent.max_tool_iterations present, agent.loop_strategy absent")
 
-    # 2) Toggle loop_strategy to single_shot
+    # 2) Set max_tool_iterations
     status, res = patch_config(
-        agent_id, [{"path": "agent.loop_strategy", "value": "single_shot"}], version=2
+        agent_id, [{"path": "agent.max_tool_iterations", "value": 5}], version=2
     )
     if status != 200:
-        print("FAIL: PATCH loop_strategy -> single_shot:", status, res)
+        print("FAIL: PATCH max_tool_iterations -> 5:", status, res)
         return 1
-    if res.get("rejected"):
-        rej = [p for p, _ in res["rejected"]]
-        if "agent.loop_strategy" in rej:
-            print("FAIL: agent.loop_strategy was rejected:", res["rejected"])
-            return 1
     _, data2 = get_config()
-    if data2.get("current_values", {}).get("agent.loop_strategy") != "single_shot":
+    if data2.get("current_values", {}).get("agent.max_tool_iterations") != 5:
         print(
-            "FAIL: current_values.agent.loop_strategy not single_shot after PATCH:",
+            "FAIL: current_values.agent.max_tool_iterations not 5 after PATCH:",
             data2.get("current_values"),
         )
         return 1
-    print("OK: loop_strategy -> single_shot applied")
+    print("OK: agent.max_tool_iterations -> 5 applied")
 
     # 3) Disable tool remember_fact
     status, res = patch_config(
@@ -155,23 +149,15 @@ def main() -> int:
         return 1
     print("OK: budget.max_cost -> 0.25 applied")
 
-    # 5) Revert loop_strategy (value: null)
+    # 5) Revert max_tool_iterations (value: null)
     status, res = patch_config(
-        agent_id, [{"path": "agent.loop_strategy", "value": None}], version=5
+        agent_id, [{"path": "agent.max_tool_iterations", "value": None}], version=5
     )
     if status != 200:
-        print("FAIL: PATCH revert loop_strategy:", status, res)
+        print("FAIL: PATCH revert max_tool_iterations:", status, res)
         return 1
     _, data5 = get_config()
-    # After revert, current should be baseline for that path (react for default agent)
-    ls_current = data5.get("current_values", {}).get("agent.loop_strategy")
-    if ls_current not in ("react", "single_shot"):
-        print(
-            "WARN: after revert loop_strategy current =",
-            ls_current,
-            "(expected react or single_shot)",
-        )
-    print("OK: reverted agent.loop_strategy")
+    print("OK: reverted agent.max_tool_iterations")
 
     # 6) Re-enable tool
     status, res = patch_config(
@@ -182,15 +168,15 @@ def main() -> int:
         return 1
     print("OK: tools.remember_fact.enabled -> true applied")
 
-    # 7) Stress: many PATCHes (loop_strategy flip, budget flip, tool flip)
+    # 7) Stress: many PATCHes (max_tool_iterations flip, budget flip, tool flip)
     print()
-    print("Stress: 20 PATCHes (loop_strategy, budget.max_cost, tool toggle)...")
+    print("Stress: 20 PATCHes (max_tool_iterations, budget.max_cost, tool toggle)...")
     for i in range(20):
         v = 100 + i
         which = i % 3
         if which == 0:
-            val = "single_shot" if (i // 3) % 2 == 0 else "react"
-            ov = [{"path": "agent.loop_strategy", "value": val}]
+            val = 5 if (i // 3) % 2 == 0 else 10
+            ov = [{"path": "agent.max_tool_iterations", "value": val}]
         elif which == 1:
             ov = [{"path": "budget.max_cost", "value": 0.1 + (i % 5) * 0.1}]
         else:
@@ -199,17 +185,10 @@ def main() -> int:
         if status != 200:
             print("FAIL stress step", i, status, res)
             return 1
-        if (
-            res.get("rejected")
-            and "agent.loop_strategy" in [p for p, _ in res["rejected"]]
-            and "agent.loop_strategy" not in res.get("accepted", [])
-        ):
-            print("FAIL stress step", i, "loop_strategy rejected:", res)
-            return 1
     print("OK: stress 20 PATCHes completed")
 
     print()
-    print("All checks passed. Config API and enum_values (dropdown) are OK.")
+    print("All checks passed. Config API is working correctly.")
     return 0
 
 

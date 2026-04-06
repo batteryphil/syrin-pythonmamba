@@ -1,6 +1,6 @@
 """Tests for Human-in-the-Loop: ApprovalGate, requires_approval, ReactLoop integration."""
 
-from syrin import Agent, AgentConfig, ApprovalGate, Model
+from syrin import Agent, ApprovalGate, Model
 from syrin.tool import tool
 
 
@@ -62,7 +62,7 @@ class TestReactLoopRequiresApproval:
             model=_almock(),
             system_prompt="Use dangerous_op when asked.",
             tools=[dangerous_op],
-            config=AgentConfig(approval_gate=gate),
+            approval_gate=gate,
         )
         r = agent.run("Run dangerous_op with x=test")
         assert r.content is not None
@@ -84,7 +84,7 @@ class TestReactLoopRequiresApproval:
             model=_almock(),
             system_prompt="Use risky when needed.",
             tools=[risky],
-            config=AgentConfig(approval_gate=gate),
+            approval_gate=gate,
         )
         r = agent.run("Do risky thing")
         assert r.content is not None

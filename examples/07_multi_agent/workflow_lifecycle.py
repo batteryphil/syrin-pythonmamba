@@ -23,7 +23,9 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 from syrin import Agent, Model
 from syrin.checkpoint._core import MemoryCheckpointBackend, SQLiteCheckpointBackend
@@ -31,10 +33,9 @@ from syrin.enums import PauseMode, WorkflowStatus
 from syrin.workflow import Workflow
 from syrin.workflow.exceptions import WorkflowCancelledError
 
-if not os.environ.get("OPENAI_API_KEY"):
-    sys.exit("OPENAI_API_KEY is required. Set it and re-run.")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-_MODEL = Model.OpenAI("gpt-4o-mini")
+_MODEL = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
 
 # ── Agent definitions ─────────────────────────────────────────────────────────
 

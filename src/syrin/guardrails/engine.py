@@ -116,7 +116,7 @@ class ParallelEvaluationEngine:
                     timeout=self.timeout,
                 )
                 decisions = results
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Timeout occurred
             if self.fail_on_timeout:
                 elapsed = (time.time() - start_time) * 1000

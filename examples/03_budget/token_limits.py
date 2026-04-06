@@ -17,9 +17,9 @@ from __future__ import annotations
 
 from syrin import (
     Agent,
-    AgentConfig,
     Budget,
     Context,
+    ExceedPolicy,
     Model,
     TokenLimits,
     TokenRateLimit,
@@ -37,11 +37,7 @@ print("=" * 60)
 
 agent = Agent(
     model=model,
-    config=AgentConfig(
-        context=Context(
-            token_limits=TokenLimits(max_tokens=15_000, exceed_policy=ExceedPolicy.WARN)
-        )
-    ),
+    context=Context(token_limits=TokenLimits(max_tokens=15_000, exceed_policy=ExceedPolicy.WARN)),
 )
 result = agent.run("What is machine learning?")
 print(f"   Tokens used: {result.tokens.total_tokens}")
@@ -55,13 +51,11 @@ print("=" * 60)
 
 agent = Agent(
     model=model,
-    config=AgentConfig(
-        context=Context(
-            token_limits=TokenLimits(
-                max_tokens=15_000,
-                rate_limits=TokenRateLimit(hour=50_000, day=200_000),
-                exceed_policy=ExceedPolicy.WARN,
-            )
+    context=Context(
+        token_limits=TokenLimits(
+            max_tokens=15_000,
+            rate_limits=TokenRateLimit(hour=50_000, day=200_000),
+            exceed_policy=ExceedPolicy.WARN,
         )
     ),
 )
@@ -79,13 +73,11 @@ agent = Agent(
     model=model,
     system_prompt="You are concise.",
     budget=Budget(max_cost=0.05, exceed_policy=ExceedPolicy.WARN),
-    config=AgentConfig(
-        context=Context(
-            token_limits=TokenLimits(
-                max_tokens=15_000,
-                rate_limits=TokenRateLimit(hour=50_000, day=200_000),
-                exceed_policy=ExceedPolicy.WARN,
-            )
+    context=Context(
+        token_limits=TokenLimits(
+            max_tokens=15_000,
+            rate_limits=TokenRateLimit(hour=50_000, day=200_000),
+            exceed_policy=ExceedPolicy.WARN,
         )
     ),
 )

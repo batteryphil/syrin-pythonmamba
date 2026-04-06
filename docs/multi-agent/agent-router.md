@@ -12,7 +12,7 @@ With a `Workflow`, you decide upfront which agents run and in what order. That's
 
 This is the right tool when you don't know at design time what agents a task will need — the task could be "write a market report" (needs research + writing) or "analyze sentiment" (just one agent) or "build a pipeline" (needs five different specialists). The LLM decides.
 
-> **v0.11.0:** `AgentRouter` replaces the old `DynamicPipeline`. If you used `DynamicPipeline`, switch to `AgentRouter` — the API is identical.
+> **v0.11.0:** `AgentRouter` replaces the old `DynamicPipeline`. `DynamicPipeline` has been removed. If you used it, switch to `AgentRouter` — the API is identical.
 
 ## Basic Usage
 
@@ -120,7 +120,7 @@ Use **AgentRouter** when the task structure is unknown at design time and you wa
 If you're on v0.10.x:
 
 ```python
-# Before (v0.10.x) — deprecated
+# Before (v0.10.x)
 from syrin import DynamicPipeline
 pipeline = DynamicPipeline(agents=[ResearchAgent, WriterAgent], model=model)
 result = pipeline.run("task")
@@ -131,7 +131,7 @@ router = AgentRouter(agents=[ResearchAgent, WriterAgent], model=model)
 result = router.run("task")
 ```
 
-The API is identical. `DynamicPipeline` emits a `DeprecationWarning` and will be removed in v0.12.0.
+The constructor parameters and `run()` signature are identical. Only the class name changed.
 
 ## What's Next
 

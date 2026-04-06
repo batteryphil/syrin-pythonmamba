@@ -33,7 +33,7 @@ class TestBug01MemoryBusValidation:
         from syrin.swarm._memory_bus import MemoryBus
 
         bus = MemoryBus()
-        entry = MemoryEntry(id="test-1", content="test content", type=MemoryType.EPISODIC)
+        entry = MemoryEntry(id="test-1", content="test content", type=MemoryType.HISTORY)
         # Publishing to a bus with no subscribers should not raise
         asyncio.run(bus.publish(entry, "agent-1"))
 

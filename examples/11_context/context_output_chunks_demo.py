@@ -10,7 +10,7 @@ Run:
 
 from __future__ import annotations
 
-from syrin import Agent, AgentConfig, Context
+from syrin import Agent, Context
 from syrin.memory import Memory
 from syrin.model import Model
 
@@ -27,13 +27,11 @@ def _main() -> None:
             "Keep each paragraph focused."
         ),
         memory=Memory(),
-        config=AgentConfig(
-            context=Context(
-                max_tokens=8000,
-                store_output_chunks=True,
-                output_chunk_top_k=5,
-                output_chunk_threshold=0.0,
-            )
+        context=Context(
+            max_tokens=8000,
+            store_output_chunks=True,
+            output_chunk_top_k=5,
+            output_chunk_threshold=0.0,
         ),
     )
 

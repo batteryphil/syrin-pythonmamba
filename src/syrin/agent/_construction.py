@@ -36,19 +36,18 @@ from syrin.agent._helpers import (
     _validate_agent_media,
     _validate_budget,
 )
-from syrin.agent.config import AgentConfig
 from syrin.audit import AuditHookHandler, AuditLog
 from syrin.budget import Budget
 from syrin.budget_store import BudgetStore
-from syrin.checkpoint import Checkpointer
+from syrin.checkpoint import CheckpointConfig, Checkpointer
 from syrin.circuit import CircuitBreaker
 from syrin.context import Context, DefaultContextManager
 from syrin.context.config import _ContextConfig
-from syrin.enums import LoopStrategy, Media, MemoryPreset
+from syrin.enums import Media, ToolErrorMode
 from syrin.events import Events
 from syrin.generation import get_default_image_generator, get_default_video_generator
 from syrin.guardrails import Guardrail, GuardrailChain
-from syrin.loop import Loop, LoopStrategyMapping, ReactLoop
+from syrin.loop import Loop, ReactLoop
 from syrin.memory import Memory
 from syrin.model import Model
 from syrin.observability import ConsoleExporter, Tracer, get_tracer
@@ -62,6 +61,10 @@ from syrin.types import ModelConfig
 
 if TYPE_CHECKING:
     from syrin.agent import Agent
+    from syrin.domain_events import EventBus
+    from syrin.hitl import ApprovalGate
+    from syrin.observability import Tracer
+    from syrin.ratelimit import APIRateLimit, RateLimitManager
 
 _log = logging.getLogger(__name__)
 
@@ -134,15 +137,14 @@ def init_agent(
     system_prompt: str | Callable[[], str] | None,
     tools: list[ToolSpec] | None,
     budget: Budget | None,
-    output: Output | None,
+    output: type | Output | None,
     max_tool_iterations: int,
     budget_store: BudgetStore | None,
-    memory: Memory | MemoryPreset | None,
-    loop_strategy: LoopStrategy,
+    memory: Memory | None,
     loop: Loop | type[Loop] | None,
     guardrails: list[Guardrail] | GuardrailChain | None,
     human_approval_timeout: int,
-    max_tool_result_length: int,
+    max_tool_result_length: int | None,
     retry_on_transient: bool,
     max_retries: int,
     retry_backoff_base: float,
@@ -153,7 +155,18 @@ def init_agent(
     template_variables: dict[str, object] | None,
     inject_template_vars: bool,
     max_child_agents: int | None,
-    config: AgentConfig | None,
+    context: Context | DefaultContextManager | None,
+    rate_limit: APIRateLimit | RateLimitManager | None,
+    checkpoint: CheckpointConfig | Checkpointer | None,
+    circuit_breaker: CircuitBreaker | None,
+    approval_gate: ApprovalGate | None,
+    tracer: Tracer | None,
+    event_bus: EventBus[object] | None,  # type: ignore[type-var]
+    audit: AuditLog | None,
+    dependencies: object | None,
+    spotlight_tool_outputs: bool,
+    normalize_inputs: bool,
+    tool_error_mode: ToolErrorMode,
     model_router: ModelRouter | RoutingConfig | None,
     input_media: set[Media] | None,
     output_media: set[Media] | None,
@@ -222,9 +235,7 @@ def init_agent(
     if memory is NOT_PROVIDED:
         class_mem = getattr(cls, "_syrin_default_memory", NOT_PROVIDED)
         memory = (
-            Memory()
-            if class_mem is NOT_PROVIDED or class_mem is None
-            else cast(Memory | MemoryPreset, class_mem)
+            Memory() if class_mem is NOT_PROVIDED or class_mem is None else cast(Memory, class_mem)
         )
     if name is NOT_PROVIDED:
         name = getattr(cls, "_syrin_default_name", None)
@@ -403,6 +414,15 @@ def init_agent(
     else:
         self._model = None
         self._model_config = cast(ModelConfig, model)
+    # Accept bare type — wrap it in Output() automatically
+    if output is not None and not isinstance(output, Output):
+        if isinstance(output, type):
+            output = Output(output)
+        else:
+            raise TypeError(
+                f"output must be a Pydantic model class or Output instance, got {type(output).__name__}. "
+                "Example: output=MyModel or output=Output(MyModel, validation_retries=3)"
+            )
     if output is None:
         class_output = getattr(cls, "_syrin_default_output", None)
         if isinstance(class_output, Output):
@@ -528,16 +548,10 @@ def init_agent(
     self._max_tool_iterations = max_tool_iterations
     self._parent_agent = None
 
-    self._config = config
-    ctx = config.context if config else None
-    rate_limit = config.rate_limit if config else None
-    checkpoint = config.checkpoint if config else None
-    circuit_breaker = config.circuit_breaker if config else None
-    approval_gate = config.approval_gate if config else None
-    tracer = config.tracer if config else None
-    event_bus = config.event_bus if config else None
-    audit = config.audit if config else None
-    dependencies = config.dependencies if config else None
+    self._spotlight_tool_outputs = spotlight_tool_outputs
+    self._normalize_inputs = normalize_inputs
+    self._tool_error_mode = tool_error_mode
+    ctx = context
     if ctx is None:
         context_manager = DefaultContextManager(Context())
     elif isinstance(ctx, _ContextConfig):
@@ -588,9 +602,7 @@ def init_agent(
         else:
             loop_instance = ReactLoop(max_iterations=max_tool_iterations)
     else:
-        loop_instance = LoopStrategyMapping.create_loop(
-            loop_strategy, max_iterations=max_tool_iterations
-        )
+        loop_instance = ReactLoop(max_iterations=max_tool_iterations)
     self._loop = loop_instance
     self._last_iteration = 0
     self._conversation_id = None

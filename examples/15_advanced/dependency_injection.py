@@ -1,7 +1,7 @@
 """Dependency Injection Example.
 
 Demonstrates:
-- Agent(config=AgentConfig(dependencies=...)) for runtime dependencies
+- Agent(dependencies=...) for runtime dependencies
 - Tools receive ctx: RunContext[MyDeps] with ctx.deps
 - Testing with mock dependencies (inject MockDeps)
 
@@ -15,8 +15,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock
-from syrin import Agent, AgentConfig, RunContext, tool
+from syrin import Agent, Model, RunContext, tool
 
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
@@ -70,7 +69,7 @@ class SearchAgent(Agent):
 
     name = "search-agent"
     description = "Agent with dependency injection"
-    model = almock
+    model = Model.mock()
     system_prompt = "Use search and get_user_preference. Be concise."
     tools = [search, get_user_preference]
 
@@ -84,7 +83,7 @@ if __name__ == "__main__":
         search_client=RealSearchClient(),
         user_id="alice",
     )
-    agent = SearchAgent(config=AgentConfig(dependencies=real_deps))
+    agent = SearchAgent(dependencies=real_deps)
     result = agent.run("Search for AI trends")
     print(f"Result: {result.content[:150]}...")
     print(f"Cost: ${result.cost:.6f}")
@@ -96,7 +95,7 @@ if __name__ == "__main__":
         search_client=MockSearchClient(),
         user_id="test-user",
     )
-    test_agent = SearchAgent(config=AgentConfig(dependencies=mock_deps))
+    test_agent = SearchAgent(dependencies=mock_deps)
     test_result = test_agent.run("Search for testing")
     print(f"\nWith mock: {test_result.content[:100]}...")
     print("Serving at http://localhost:8000/playground")

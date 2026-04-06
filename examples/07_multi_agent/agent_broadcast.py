@@ -64,7 +64,7 @@ async def example_basic_pubsub() -> None:
         "confidence": "high",
     }
     subscriber_count = await bus.broadcast(
-        sender_id="research-agent",
+        sender="research-agent",
         topic="research.complete",
         payload=findings,
     )

@@ -17,8 +17,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock, gpt4_mini
-from syrin import Agent, AgentConfig
+from examples.models.models import gpt4_mini
+from syrin import Agent
 from syrin.context import Context
 from syrin.model import Model
 from syrin.threshold import ContextThreshold
@@ -26,7 +26,7 @@ from syrin.threshold import ContextThreshold
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # Use real gpt-4o-mini when USE_REAL_MODEL=1
-_model: Model = gpt4_mini if os.environ.get("USE_REAL_MODEL") == "1" else almock
+_model: Model = gpt4_mini if os.environ.get("USE_REAL_MODEL") == "1" else Model.mock()
 
 
 def main() -> None:
@@ -43,14 +43,12 @@ def main() -> None:
     agent = Agent(
         model=_model,
         system_prompt="You are a helpful assistant. Be very brief.",
-        config=AgentConfig(
-            context=Context(
-                max_tokens=120,
-                reserve=20,
-                thresholds=[
-                    ContextThreshold(at=50, action=lambda evt: evt.compact()),  # compact at 50%
-                ],
-            )
+        context=Context(
+            max_tokens=120,
+            reserve=20,
+            thresholds=[
+                ContextThreshold(at=50, action=lambda evt: evt.compact()),  # compact at 50%
+            ],
         ),
     )
 

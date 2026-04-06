@@ -140,6 +140,127 @@ agent.events.on(Hook.SPAWN_END, lambda ctx: print(
 
 `Hook.SPAWN_END` context includes `source_agent`, `child_agent`, `child_task`, `cost`, and `duration`.
 
+## Runtime Budget Reallocation
+
+After agents are spawned and running, a supervisor can adjust their allocations without stopping or restarting them.  Two operations are available on `SwarmController`:
+
+| Method | What it does |
+|--------|-------------|
+| `topup_budget(agent, amount)` | Adds `amount` on top of the agent's current allocation |
+| `reallocate_budget(agent, new_amount)` | Replaces the agent's allocation with `new_amount` entirely |
+
+Both are atomic (backed by `asyncio.Lock`), require `CONTROL` permission, and are recorded in the audit log as `ControlAction.TOPUP_BUDGET` / `ControlAction.REALLOCATE_BUDGET`.
+
+### Wiring it up
+
+Pass a `BudgetPool` to `SwarmController` at construction time.  The same pool must be shared with the agents whose allocations you want to adjust.
+
+```python
+import asyncio
+from syrin.budget._pool import BudgetPool
+from syrin.enums import AgentRole
+from syrin.swarm._authority import SwarmAuthorityGuard
+from syrin.swarm._control import AgentStateSnapshot, AgentStatus, SwarmController
+
+async def main() -> None:
+    pool = BudgetPool(total=10.00)
+    await pool.allocate("cto", 2.00)
+    await pool.allocate("marketing", 3.00)
+
+    guard = SwarmAuthorityGuard(
+        roles={
+            "ceo": AgentRole.ORCHESTRATOR,
+            "cto": AgentRole.WORKER,
+            "marketing": AgentRole.WORKER,
+        },
+        teams={"ceo": ["cto", "marketing"]},
+    )
+
+    ctrl = SwarmController(
+        actor_id="ceo",
+        guard=guard,
+        state_registry={...},   # your AgentStateSnapshot dict
+        task_registry={},
+        budget_pool=pool,        # ← wire the pool here
+    )
+
+    # CTO is performing well — give it $1 more
+    await ctrl.topup_budget("cto", 1.00)
+    # Marketing underspent — trim its cap, return funds to pool
+    await ctrl.reallocate_budget("marketing", 1.50)
+
+asyncio.run(main())
+```
+
+### `topup_budget(target, additional)`
+
+Draws `additional` from the pool's free balance and adds it to the agent's allocation.  The agent keeps running — no restart required.
+
+```python
+# CTO started with $2; add $1.50 mid-run
+await ctrl.topup_budget("cto", 1.50)
+# pool.snapshot()["cto"]["allocated"] → 3.50
+# pool.remaining reduced by 1.50
+```
+
+Raises `BudgetAllocationError` if:
+- The agent has no active allocation (not yet spawned or already finished)
+- The pool has insufficient remaining balance
+- The new total would exceed `per_agent_max`
+
+### `reallocate_budget(target, new_amount)`
+
+Replaces the agent's allocation with `new_amount`.
+
+- **Increasing** (`new_amount > current`): draws the difference from the pool
+- **Decreasing** (`new_amount < current`): returns the difference to the pool
+
+```python
+# Raise CTO's cap from $2 → $5 (draws $3 from pool)
+await ctrl.reallocate_budget("cto", 5.00)
+
+# Trim marketing from $3 → $1.50 (returns $1.50 to pool)
+await ctrl.reallocate_budget("marketing", 1.50)
+```
+
+Raises `BudgetAllocationError` if:
+- The agent has no active allocation
+- `new_amount` is less than what the agent has already spent
+- Pool has insufficient balance (when increasing)
+- `new_amount` would exceed `per_agent_max`
+
+### CEO rebalancing departments mid-run
+
+The pattern works naturally for the Virtual Office use case: CEO watches
+mid-run cost snapshots and rebalances across departments without pausing anyone.
+
+```python
+snap = pool.snapshot()
+
+# Engineering is close to its limit — top it up
+if snap["engineering"]["spent"] / snap["engineering"]["allocated"] > 0.80:
+    await ctrl.topup_budget("engineering", 2.00)
+
+# Marketing underspent — reclaim unused allocation
+if snap["marketing"]["spent"] < snap["marketing"]["allocated"] * 0.30:
+    await ctrl.reallocate_budget(
+        "marketing",
+        max(snap["marketing"]["spent"], snap["marketing"]["allocated"] * 0.50),
+    )
+```
+
+### Audit trail
+
+Every `topup_budget` and `reallocate_budget` call is recorded in the authority guard's audit log:
+
+```python
+for entry in ctrl._guard.audit_log():
+    print(f"{entry.action:<24} {entry.actor_id} → {entry.target_id}")
+
+# reallocate_budget        ceo → marketing
+# topup_budget             ceo → engineering
+```
+
 ## Cross-Swarm Budget
 
 Budget delegation is scoped to the owning swarm's `BudgetPool`. Agents from different swarms don't share pools. If you need cross-swarm budgeting, create a single swarm with a shared budget and structure your agents as a hierarchy within it.
@@ -147,5 +268,5 @@ Budget delegation is scoped to the owning swarm's `BudgetPool`. Agents from diff
 ## See Also
 
 - [Swarm](/multi-agent/swarm) — Swarm topologies
-- [Hierarchy](/multi-agent/hierarchy) — Multi-level agent hierarchies
+- [Hierarchy](/multi-agent/hierarchy) — Multi-level agent hierarchies, Virtual Office pattern
 - [Budget](/core/budget) — Budget configuration

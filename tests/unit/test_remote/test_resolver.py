@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from syrin import Agent, AgentConfig, Budget, Model
+from syrin import Agent, Budget, Model
 from syrin.budget import RateLimit
 from syrin.enums import DecayStrategy
 from syrin.memory import Memory
@@ -25,8 +25,7 @@ def _make_agent(
         model=Model.Almock(),
         name=name,
         budget=budget,
-        memory=memory
-        or Memory(restrict_to=[], top_k=5, decay=Decay(strategy=DecayStrategy.EXPONENTIAL)),
+        memory=memory or Memory(types=[], top_k=5, decay=Decay(strategy=DecayStrategy.EXPONENTIAL)),
     )
 
 
@@ -136,8 +135,8 @@ class TestValidOverrides:
         assert agent._max_tool_iterations == 5
         reg.unregister(agent_id)
 
-    def test_apply_agent_loop_strategy(self) -> None:
-        """Apply agent.loop_strategy='single_shot' -> _loop is SingleShotLoop."""
+    def test_apply_loop_strategy_rejected_since_removed(self) -> None:
+        """loop_strategy is removed; applying it should not be accepted."""
         agent = _make_agent()
         reg = get_registry()
         reg.register(agent)
@@ -146,8 +145,7 @@ class TestValidOverrides:
         assert schema is not None
         payload = _payload(agent_id, ("agent.loop_strategy", "single_shot"))
         result = ConfigResolver().apply_overrides(agent, payload, schema=schema)
-        assert "agent.loop_strategy" in result.accepted
-        assert type(agent._loop).__name__ == "SingleShotLoop"
+        assert "agent.loop_strategy" not in result.accepted
         reg.unregister(agent_id)
 
     def test_empty_overrides(self) -> None:
@@ -368,7 +366,7 @@ class TestHotSwapBlocklist:
             model=Model.Almock(),
             name="cp_agent",
             budget=Budget(max_cost=1.0),
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory", path=None)),
+            checkpoint=CheckpointConfig(storage="memory", path=None),
         )
         reg = get_registry()
         reg.register(agent)

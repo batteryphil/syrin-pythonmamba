@@ -5,10 +5,9 @@ from __future__ import annotations
 import logging
 import threading
 import time
-import warnings
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
@@ -26,7 +25,7 @@ from syrin.enums import (
     ThresholdMetric,
     ThresholdWindow,
 )
-from syrin.exceptions import BudgetExceededError, BudgetThresholdError
+from syrin.exceptions import BudgetExceededError
 from syrin.threshold import BudgetThreshold, ThresholdContext
 from syrin.types import CostInfo, TokenUsage
 
@@ -41,7 +40,7 @@ class BudgetState:
     """
 
     limit: float
-    """Effective run limit in USD (run - reserve)."""
+    """Effective run limit in USD (max_cost - safety_margin)."""
     remaining: float
     """Remaining budget in USD (never negative)."""
     spent: float
@@ -76,48 +75,18 @@ __all__ = [
     "RateLimit",
     "TokenLimits",
     "TokenRateLimit",
-    "raise_on_exceeded",
-    "stop_on_exceeded",
     "BudgetThreshold",
-    "warn_on_exceeded",
 ]
 
 
 @dataclass(frozen=True)
 class BudgetExceededContext:
-    """Context passed to on_exceeded when a budget limit is exceeded.
-
-    Raise from the callback to stop the run; return to continue (e.g. warn and continue).
-    """
+    """Context passed to the budget handler when a limit is exceeded."""
 
     current_cost: float
     limit: float
     budget_type: BudgetLimitType
     message: str
-
-
-def raise_on_exceeded(ctx: BudgetExceededContext) -> None:
-    """Built-in on_exceeded handler: raise BudgetExceededError to stop the run."""
-    raise BudgetExceededError(
-        ctx.message,
-        current_cost=ctx.current_cost,
-        limit=ctx.limit,
-        budget_type=ctx.budget_type.value,
-    )
-
-
-def warn_on_exceeded(ctx: BudgetExceededContext) -> None:
-    """Built-in on_exceeded handler: log a warning and continue."""
-    _log.warning("%s", ctx.message)
-
-
-def stop_on_exceeded(ctx: BudgetExceededContext) -> None:
-    """Built-in on_exceeded handler: raise BudgetThresholdError (stop) to stop the run."""
-    raise BudgetThresholdError(
-        ctx.message,
-        threshold_percent=100.0,
-        action_taken="stop",
-    )
 
 
 class BudgetStatus(StrEnum):
@@ -210,12 +179,25 @@ class TokenRateLimit(BaseModel):  # type: ignore[explicit-any]
 def _policy_to_handler(
     policy: ExceedPolicy,
 ) -> Callable[[BudgetExceededContext], None]:
-    """Map an ExceedPolicy enum value to a concrete on_exceeded handler."""
+    """Map an ExceedPolicy enum value to a concrete handler. Internal use only."""
     if policy == ExceedPolicy.STOP:
-        return raise_on_exceeded
+
+        def _raise(ctx: BudgetExceededContext) -> None:
+            raise BudgetExceededError(
+                ctx.message,
+                current_cost=ctx.current_cost,
+                limit=ctx.limit,
+                budget_type=ctx.budget_type.value,
+            )
+
+        return _raise
     if policy == ExceedPolicy.WARN:
-        return warn_on_exceeded
-    # IGNORE and SWITCH both continue; SWITCH requires agent-level fallback_model support.
+
+        def _warn(ctx: BudgetExceededContext) -> None:
+            _log.warning("%s", ctx.message)
+
+        return _warn
+    # IGNORE: silently continue.
     return lambda _ctx: None
 
 
@@ -226,18 +208,19 @@ class TokenLimits(BaseModel):  # type: ignore[explicit-any]
     without mixing with cost (Budget is USD only).
 
     **What:** Optional run cap (max_tokens per request run) and optional per-window
-    caps (TokenRateLimit). When a limit is exceeded, on_exceeded is called; raise
-    to stop the run, return to continue.
+    caps (TokenRateLimit). Use ``exceed_policy`` to control what happens when a limit
+    is exceeded.
 
     **How:** Use as Context.token_limits: Context(token_limits=TokenLimits(max_tokens=50_000, ...)).
     The agent's budget tracker enforces limits after each LLM call.
 
     Example:
         >>> from syrin import Agent, Context, Model
-        >>> from syrin.budget import TokenLimits, TokenRateLimit, raise_on_exceeded
+        >>> from syrin.budget import TokenLimits, TokenRateLimit
+        >>> from syrin.enums import ExceedPolicy
         >>> agent = Agent(
         ...     model=Model("openai/gpt-4o"),
-        ...     context=Context(token_limits=TokenLimits(max_tokens=50_000, on_exceeded=raise_on_exceeded)),
+        ...     context=Context(token_limits=TokenLimits(max_tokens=50_000, exceed_policy=ExceedPolicy.STOP)),
         ... )
     """
 
@@ -252,30 +235,20 @@ class TokenLimits(BaseModel):  # type: ignore[explicit-any]
         default=None,
         description="Token caps per hour/day/week/month rolling windows.",
     )
-    on_exceeded: Callable[[BudgetExceededContext], None] | None = Field(
-        default=None,
-        description="Called when a token limit is exceeded. Raise to stop the run; return to continue (e.g. warn). Same as Budget.on_exceeded.",
-    )
     exceed_policy: ExceedPolicy | None = Field(
         default=None,
         description=(
-            "Declarative policy when token limit is exceeded. Applied only when on_exceeded is None. "
+            "Declarative policy when token limit is exceeded. "
             "STOP raises BudgetExceededError; WARN logs and continues; IGNORE silently continues."
         ),
     )
 
-    @model_validator(mode="after")
-    def _resolve_exceed_policy(self) -> TokenLimits:
-        if self.on_exceeded is not None and self.exceed_policy is None:
-            warnings.warn(
-                "TokenLimits(on_exceeded=...) is deprecated. "
-                "Use TokenLimits(exceed_policy=ExceedPolicy.STOP/WARN/IGNORE) instead.",
-                DeprecationWarning,
-                stacklevel=4,
-            )
-        if self.on_exceeded is None and self.exceed_policy is not None:
-            self.on_exceeded = _policy_to_handler(self.exceed_policy)
-        return self
+    @property
+    def _handler(self) -> Callable[[BudgetExceededContext], None] | None:
+        """Internal: handler derived from exceed_policy."""
+        if self.exceed_policy is not None:
+            return _policy_to_handler(self.exceed_policy)
+        return None
 
     @property
     def per_hour(self) -> int | None:
@@ -313,8 +286,6 @@ class Budget(BaseModel):  # type: ignore[explicit-any]
         ...     ]
         ... )
 
-    Note:
-        ``on_exceeded=`` (callback form) is deprecated. Use ``exceed_policy=`` instead.
     """
 
     model_config = {"str_strip_whitespace": True, "arbitrary_types_allowed": True}
@@ -324,20 +295,22 @@ class Budget(BaseModel):  # type: ignore[explicit-any]
         ge=0,
         description="Max cost per run (USD). Pydantic coerces numeric strings (e.g. '0.50') to float.",
     )
-    reserve: float = Field(
-        default=0, ge=0, description="Amount to reserve; effective run limit is max_cost - reserve."
+    safety_margin: float = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Amount held back from the budget (USD). The effective run limit is "
+            "max_cost - safety_margin, ensuring the agent never spends the full budget. "
+            "Useful to keep a buffer for final replies or post-processing."
+        ),
     )
     rate_limits: RateLimit | None = Field(
         default=None, description="Rate limits per hour/day/week/month."
     )
-    on_exceeded: Callable[[BudgetExceededContext], None] | None = Field(
-        default=None,
-        description="Called when a limit is exceeded. Raise to stop; return to continue.",
-    )
     exceed_policy: ExceedPolicy | None = Field(
         default=None,
         description=(
-            "Declarative policy when budget is exceeded. Applied only when on_exceeded is None. "
+            "Policy when budget is exceeded. "
             "STOP raises BudgetExceededError; WARN logs and continues; IGNORE silently continues."
         ),
     )
@@ -446,36 +419,35 @@ class Budget(BaseModel):  # type: ignore[explicit-any]
                 raise ValueError(
                     f"Budget thresholds only support {valid_metrics}, got {metric_val}"
                 )
-        if self.on_exceeded is not None and self.exceed_policy is None:
-            warnings.warn(
-                "Budget(on_exceeded=...) is deprecated. "
-                "Use Budget(exceed_policy=ExceedPolicy.STOP) to raise on exceeded, "
-                "Budget(exceed_policy=ExceedPolicy.WARN) to log and continue, or "
-                "Budget(exceed_policy=ExceedPolicy.IGNORE) to silently continue. "
-                "on_exceeded= still works but will be removed in a future major version.",
-                DeprecationWarning,
-                stacklevel=4,
-            )
-        if self.on_exceeded is None and self.exceed_policy is not None:
-            self.on_exceeded = _policy_to_handler(self.exceed_policy)
         return self
 
     @property
+    def _handler(self) -> Callable[[BudgetExceededContext], None] | None:
+        """Internal: handler derived from exceed_policy."""
+        if self.exceed_policy is not None:
+            return _policy_to_handler(self.exceed_policy)
+        return None
+
+    @property
     def effective_run_limit(self) -> float | None:
-        """Effective run limit for budget checking: max_cost - reserve when max_cost > reserve, else max_cost.
+        """Effective run limit for budget checking: max_cost - safety_margin when max_cost > safety_margin, else max_cost.
 
         None if max_cost is not set.
         """
         if self.max_cost is None:
             return None
-        return (self.max_cost - self.reserve) if self.max_cost > self.reserve else self.max_cost
+        return (
+            (self.max_cost - self.safety_margin)
+            if self.max_cost > self.safety_margin
+            else self.max_cost
+        )
 
     @property
     def remaining(self) -> float | None:
         """Get remaining budget (never negative). Returns None if max_cost limit not set."""
         if self.max_cost is None:
             return None
-        effective = self.max_cost - self.reserve
+        effective = self.max_cost - self.safety_margin
         return max(0.0, effective - self._spent)
 
     def _set_spent(self, amount: float) -> None:
@@ -627,8 +599,8 @@ _STATE_SCHEMA_VERSION = 1
 
 def _in_calendar_month(ts: float, now_ts: float) -> bool:
     """True if ts is in the same calendar month (and year) as now_ts."""
-    a = datetime.fromtimestamp(ts, tz=timezone.utc)
-    b = datetime.fromtimestamp(now_ts, tz=timezone.utc)
+    a = datetime.fromtimestamp(ts, tz=UTC)
+    b = datetime.fromtimestamp(now_ts, tz=UTC)
     return (a.month, a.year) == (b.month, b.year)
 
 

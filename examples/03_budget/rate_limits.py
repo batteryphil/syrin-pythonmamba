@@ -15,7 +15,7 @@ Run:
 
 from __future__ import annotations
 
-from syrin import Agent, AgentConfig, Budget, Model, RateLimit
+from syrin import Agent, Budget, ExceedPolicy, Model, RateLimit
 from syrin.enums import ThresholdMetric
 from syrin.ratelimit import APIRateLimit
 from syrin.threshold import RateLimitThreshold, ThresholdContext
@@ -73,7 +73,7 @@ print("=" * 60)
 
 agent = Agent(
     model=model,
-    config=AgentConfig(rate_limit=APIRateLimit(rpm=500, tpm=150_000)),
+    rate_limit=APIRateLimit(rpm=500, tpm=150_000),
 )
 print(f"   Rate limit config: {agent.rate_limit}")
 
@@ -91,13 +91,11 @@ def on_warning(ctx: ThresholdContext) -> None:
 
 agent = Agent(
     model=model,
-    config=AgentConfig(
-        rate_limit=APIRateLimit(
-            rpm=100,
-            thresholds=[
-                RateLimitThreshold(at=80, action=on_warning, metric=ThresholdMetric.RPM),
-            ],
-        )
+    rate_limit=APIRateLimit(
+        rpm=100,
+        thresholds=[
+            RateLimitThreshold(at=80, action=on_warning, metric=ThresholdMetric.RPM),
+        ],
     ),
 )
 print("   Agent configured with RPM=100, threshold at 80%")
@@ -111,28 +109,26 @@ print("=" * 60)
 
 agent = Agent(
     model=model,
-    config=AgentConfig(
-        rate_limit=APIRateLimit(
-            rpm=500,
-            tpm=150_000,
-            thresholds=[
-                RateLimitThreshold(
-                    at=50,
-                    action=lambda ctx: print(f"   RPM at {ctx.percentage}%"),
-                    metric=ThresholdMetric.RPM,
-                ),
-                RateLimitThreshold(
-                    at=70,
-                    action=lambda ctx: print(f"   TPM at {ctx.percentage}%"),
-                    metric=ThresholdMetric.TPM,
-                ),
-                RateLimitThreshold(
-                    at=100,
-                    action=lambda _: print("   RPM limit reached!"),
-                    metric=ThresholdMetric.RPM,
-                ),
-            ],
-        ),
+    rate_limit=APIRateLimit(
+        rpm=500,
+        tpm=150_000,
+        thresholds=[
+            RateLimitThreshold(
+                at=50,
+                action=lambda ctx: print(f"   RPM at {ctx.percentage}%"),
+                metric=ThresholdMetric.RPM,
+            ),
+            RateLimitThreshold(
+                at=70,
+                action=lambda ctx: print(f"   TPM at {ctx.percentage}%"),
+                metric=ThresholdMetric.TPM,
+            ),
+            RateLimitThreshold(
+                at=100,
+                action=lambda _: print("   RPM limit reached!"),
+                metric=ThresholdMetric.RPM,
+            ),
+        ],
     ),
 )
 print("   Agent configured with 3 thresholds on RPM/TPM")

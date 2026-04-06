@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import uuid
 from typing import TYPE_CHECKING
 
-from syrin.enums import AgentStatus, Hook, PauseMode, SwarmTopology, WorkflowStatus
+from syrin.enums import AgentRole, AgentStatus, Hook, PauseMode, SwarmTopology, WorkflowStatus
 from syrin.events import EventContext, Events
 from syrin.swarm._config import SwarmConfig
 from syrin.swarm._result import AgentStatusEntry, SwarmResult
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
     from syrin.agent._core import Agent
     from syrin.budget import Budget
     from syrin.response import Response
+    from syrin.swarm._agent_ref import AgentRef
+    from syrin.swarm._control import SwarmController
     from syrin.swarm._memory_bus import MemoryBus
     from syrin.workflow._core import Workflow
 
@@ -73,6 +76,7 @@ class SwarmRunHandle(RunHandle[str]):
             placeholder, run_id, pause_event, resume_event, cancel_event, pause_mode_ref
         )
         self._swarm_task = swarm_task
+        self._swarm_ref: Swarm | None = None
 
     async def wait(self) -> SwarmResult:  # type: ignore[override]
         """Await swarm completion and return the :class:`~syrin.swarm._result.SwarmResult`.
@@ -94,60 +98,134 @@ class SwarmRunHandle(RunHandle[str]):
         self._mark_completed()
         return result
 
+    @property
+    def controller(self) -> SwarmController:
+        """Return a :class:`~syrin.swarm._control.SwarmController` bound to this swarm's live state.
+
+        Use this to pause, resume, or inspect individual agents without
+        constructing a controller manually.
+
+        Returns:
+            :class:`~syrin.swarm._control.SwarmController` acting as the first
+            agent in the swarm (or the first ORCHESTRATOR-role agent).
+
+        Example::
+
+            handle = swarm.play()
+            ctrl = handle.controller
+            await ctrl.pause_agent(worker)
+        """
+        if self._swarm_ref is None:
+            raise RuntimeError(
+                "SwarmRunHandle.controller requires a swarm reference. "
+                "Use swarm.play() to obtain this handle."
+            )
+        return self._swarm_ref._make_controller()
+
+    def controller_for(self, actor: AgentRef | str) -> SwarmController:
+        """Return a :class:`~syrin.swarm._control.SwarmController` acting on behalf of *actor*.
+
+        Args:
+            actor: The agent instance or ID that will be the actor for all
+                control actions issued through the returned controller.
+
+        Returns:
+            :class:`~syrin.swarm._control.SwarmController`.
+        """
+        if self._swarm_ref is None:
+            raise RuntimeError("SwarmRunHandle.controller_for() requires a swarm reference.")
+        return self._swarm_ref._make_controller(actor=actor)
+
 
 class Swarm:
     """Multi-agent Swarm for concurrent AI workloads.
 
     A :class:`Swarm` groups one or more agents under a shared goal and runs
     them according to a :class:`~syrin.swarm._config.SwarmConfig` topology.
-    Currently PARALLEL topology is fully supported; ORCHESTRATOR, WORKFLOW,
-    CONSENSUS, and REFLECTION arrive in later phases.
+    All five topologies are fully supported:
+
+    - **PARALLEL** — agents run concurrently, results merged.
+    - **CONSENSUS** — agents vote; majority (or configured fraction) wins.
+    - **REFLECTION** — iterative producer-critic refinement loop.
+    - **ORCHESTRATOR** — first agent decomposes the goal; workers execute.
+    - **WORKFLOW** — wraps a :class:`~syrin.workflow.Workflow` inside a swarm.
+
+    Topology-specific configuration lives inside
+    :class:`~syrin.swarm._config.SwarmConfig` via the ``consensus`` and
+    ``reflection`` attributes.  This keeps all configuration co-located.
 
     Attributes:
         goal: Shared goal string passed to every agent.
         budget: Optional shared :class:`~syrin.budget.Budget`.
-        config: Swarm configuration.
+        config: Swarm configuration including topology and topology-specific
+            settings.
 
-    Example::
+    Examples::
+
+        # PARALLEL — all agents run concurrently
+        from syrin.swarm import Swarm, SwarmConfig
+        from syrin.enums import SwarmTopology
 
         swarm = Swarm(
             agents=[ResearchAgent(), AnalysisAgent()],
             goal="Summarise AI trends for Q1 2025",
             budget=Budget(max_cost=5.00),
+            config=SwarmConfig(topology=SwarmTopology.PARALLEL),
         )
         result = await swarm.run()
         print(result.content)
+
+        # CONSENSUS — agents vote, ≥67% must agree
+        from syrin.swarm import ConsensusConfig
+        swarm = Swarm(
+            agents=[Agent1(), Agent2(), Agent3()],
+            goal="Is this clause enforceable?",
+            config=SwarmConfig(
+                topology=SwarmTopology.CONSENSUS,
+                consensus=ConsensusConfig(min_agreement=0.67),
+            ),
+        )
+
+        # REFLECTION — writer + critic loop
+        from syrin.swarm import ReflectionConfig
+        swarm = Swarm(
+            agents=[WriterAgent(), EditorAgent()],
+            goal="Write a technical explanation of vector embeddings",
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=EditorAgent,
+                    max_rounds=3,
+                    score_threshold=0.85,
+                ),
+            ),
+        )
     """
 
     def __init__(
         self,
-        agents: list[Agent],
+        agents: list[Agent | type[Agent]],
         goal: str,
         budget: Budget | None = None,
         memory: MemoryBus | None = None,
         config: SwarmConfig | None = None,
         pry: bool = False,
-        consensus_config: object | None = None,
-        reflection_config: object | None = None,
         workflow: Workflow | None = None,
     ) -> None:
         """Initialise a Swarm.
 
         Args:
-            agents: Non-empty list of agent instances.
+            agents: Non-empty list of agent instances or agent classes.  Agent
+                classes are instantiated automatically with no arguments.
             goal: Shared goal for all agents.  Must be non-empty.
             budget: Optional budget.  When ``max_cost`` is set, a shared
                 :class:`~syrin.budget.BudgetPool` is created automatically.
             memory: Optional :class:`~syrin.swarm._memory_bus.MemoryBus`.
-            config: Optional :class:`~syrin.swarm._config.SwarmConfig`; a
-                default config is created if omitted.
+            config: Optional :class:`~syrin.swarm._config.SwarmConfig`.
+                Topology-specific configuration (``consensus``, ``reflection``)
+                lives here.  A default ORCHESTRATOR config is used if omitted.
             pry: Enable Pry multi-agent debugger (future feature).
-            consensus_config: Optional
-                :class:`~syrin.swarm.topologies._consensus.ConsensusConfig`
-                for CONSENSUS topology runs.
-            reflection_config: Optional
-                :class:`~syrin.swarm.topologies._reflection.ReflectionConfig`
-                for REFLECTION topology runs.
             workflow: Optional :class:`~syrin.workflow.Workflow` for
                 :attr:`~syrin.enums.SwarmTopology.WORKFLOW` topology runs.
 
@@ -156,18 +234,23 @@ class Swarm:
         """
         if not agents:
             raise ValueError("Swarm requires at least one agent")
+        # Normalize: instantiate any class references
+        resolved: list[Agent] = []
+        for a in agents:
+            if inspect.isclass(a):
+                resolved.append(a())
+            else:
+                resolved.append(a)  # type: ignore[arg-type]
         goal = goal.strip()
         if not goal:
             raise ValueError("Swarm goal must be a non-empty string")
 
         self.goal: str = goal
-        self._agents: list[Agent] = list(agents)
+        self._agents: list[Agent] = resolved
         self.budget: Budget | None = budget
         self.memory: MemoryBus | None = memory
         self.config: SwarmConfig = config or SwarmConfig()
         self.pry: bool = pry
-        self._consensus_config: object | None = consensus_config
-        self._reflection_config: object | None = reflection_config
         self._workflow: Workflow | None = workflow
 
         # Expand team members from Agent.team ClassVar
@@ -183,7 +266,7 @@ class Swarm:
         self._handle: SwarmRunHandle | None = None
         self._agent_tasks: dict[str, asyncio.Task[object]] = {}
         self._agent_status: dict[str, AgentStatus] = {
-            type(a).__name__: AgentStatus.IDLE for a in self._agents
+            a.agent_id: AgentStatus.IDLE for a in self._agents
         }
         self._run_id: str = str(uuid.uuid4())
 
@@ -315,7 +398,7 @@ class Swarm:
         self._resume_event.set()
         self._cancel_event.clear()
         self._agent_tasks = {}
-        self._agent_status = {type(a).__name__: AgentStatus.IDLE for a in self._agents}
+        self._agent_status = {a.agent_id: AgentStatus.IDLE for a in self._agents}
 
         exec_task: asyncio.Task[SwarmResult] = asyncio.create_task(self._execute())
         handle = SwarmRunHandle(
@@ -326,6 +409,7 @@ class Swarm:
             cancel_event=self._cancel_event,
             pause_mode_ref=[PauseMode.AFTER_CURRENT_STEP],
         )
+        handle._swarm_ref = self
         self._handle = handle
         return handle
 
@@ -334,20 +418,20 @@ class Swarm:
         topology = self.config.topology
 
         if topology == SwarmTopology.CONSENSUS:
-            from syrin.swarm.topologies._consensus import ConsensusConfig, run_consensus
+            from syrin.swarm.topologies._consensus import run_consensus
 
-            cfg: ConsensusConfig | None = None
-            if self._consensus_config is not None:
-                cfg = self._consensus_config  # type: ignore[assignment]
-            return await run_consensus(self, cfg)
+            return await run_consensus(self, self.config.consensus)
 
         if topology == SwarmTopology.REFLECTION:
-            from syrin.swarm.topologies._reflection import ReflectionConfig, run_reflection
+            from syrin.swarm.topologies._reflection import run_reflection
 
-            ref_cfg: ReflectionConfig | None = self._reflection_config  # type: ignore[assignment]
-            if ref_cfg is None:
-                raise ValueError("ReflectionConfig is required for REFLECTION topology")
-            return await run_reflection(self, ref_cfg)
+            if self.config.reflection is None:
+                raise ValueError(
+                    "REFLECTION topology requires ReflectionConfig. "
+                    "Pass it via SwarmConfig(topology=SwarmTopology.REFLECTION, "
+                    "reflection=ReflectionConfig(producer=..., critic=...))"
+                )
+            return await run_reflection(self, self.config.reflection)
 
         if topology == SwarmTopology.ORCHESTRATOR:
             from syrin.swarm.topologies._orchestrator import run_orchestrator
@@ -412,22 +496,25 @@ class Swarm:
         if self._handle is not None:
             self._handle._swarm_task.cancel()
 
-    async def cancel_agent(self, name: str) -> None:
-        """Cancel a single agent by name without stopping the swarm.
+    async def cancel_agent(self, target: AgentRef | str) -> None:
+        """Cancel a single agent without stopping the swarm.
 
         Args:
-            name: Class name of the agent to cancel.
+            target: Agent instance or agent ID string.
 
         Raises:
-            ValueError: If no agent with that name is registered in this swarm.
+            ValueError: If the agent is not registered in this swarm.
         """
-        known_names = {type(a).__name__ for a in self._agents}
-        if name not in known_names:
+        from syrin.swarm._agent_ref import _aid
+
+        target_id = _aid(target)
+        known_ids = {a.agent_id for a in self._agents}
+        if target_id not in known_ids:
             raise ValueError(
-                f"No agent named '{name}' is registered in this swarm. "
-                f"Known agents: {sorted(known_names)}"
+                f"No agent with ID {target_id!r} is registered in this swarm. "
+                f"Known agent IDs: {sorted(known_ids)}"
             )
-        task = self._agent_tasks.get(name)
+        task = self._agent_tasks.get(target_id)
         if task is not None and not task.done():
             task.cancel()
 
@@ -492,16 +579,11 @@ class Swarm:
     # ──────────────────────────────────────────────────────────────────────────
 
     def agent_statuses(self) -> list[AgentStatusEntry]:
-        """Return a status snapshot for every agent registered in the swarm.
-
-        Returns:
-            List of :class:`~syrin.swarm._result.AgentStatusEntry`, one per
-            agent, in the order the agents were provided at construction.
-        """
+        """Return a status snapshot for every agent registered in the swarm."""
         return [
             AgentStatusEntry(
                 agent_name=type(a).__name__,
-                state=self._agent_status.get(type(a).__name__, AgentStatus.IDLE),
+                state=self._agent_status.get(a.agent_id, AgentStatus.IDLE),
             )
             for a in self._agents
         ]
@@ -577,6 +659,58 @@ class Swarm:
         ctx = EventContext(data)
         ctx.scrub()
         self.events._trigger(hook, ctx)
+
+    def _make_controller(self, actor: AgentRef | str | None = None) -> SwarmController:
+        """Build a SwarmController bound to this swarm's live registries.
+
+        Args:
+            actor: Agent instance or ID acting as the controller's authority
+                source. Defaults to the first ORCHESTRATOR or ADMIN role agent,
+                falling back to the first agent.
+
+        Returns:
+            :class:`~syrin.swarm._control.SwarmController`.
+        """
+        from syrin.swarm._authority import build_guard_from_agents
+        from syrin.swarm._control import AgentStateSnapshot, SwarmController
+
+        if actor is None:
+            actor_agent: Agent | None = None
+            for a in self._agents:
+                r: AgentRole = getattr(type(a), "role", AgentRole.WORKER)
+                if r in (AgentRole.ORCHESTRATOR, AgentRole.ADMIN):
+                    actor_agent = a
+                    break
+            if actor_agent is None:
+                actor_agent = self._agents[0]
+            actor = actor_agent
+
+        # Build authority guard from agent class metadata
+        guard = build_guard_from_agents(self._agents)
+
+        # Build state registry from current status
+        state_registry: dict[str, AgentStateSnapshot] = {}
+        for a in self._agents:
+            aid = a.agent_id
+            status = self._agent_status.get(aid, AgentStatus.IDLE)
+            role: AgentRole = getattr(type(a), "role", AgentRole.WORKER)
+            state_registry[aid] = AgentStateSnapshot(
+                agent_id=aid,
+                status=status,
+                role=role,
+                last_output_summary="",
+                cost_spent=0.0,
+                task="",
+                context_override=None,
+                supervisor_id=getattr(a, "_supervisor_id", None),
+            )
+
+        return SwarmController(
+            actor_id=actor,
+            guard=guard,
+            state_registry=state_registry,
+            task_registry=self._agent_tasks,
+        )
 
     def _expand_team_agents(self) -> None:
         """Expand ``Agent.team`` class variables into the swarm's agent pool.

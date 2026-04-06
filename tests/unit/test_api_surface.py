@@ -7,7 +7,6 @@ from __future__ import annotations
 import pytest
 
 from syrin import Agent, CheckpointConfig, Model
-from syrin.agent.config import AgentConfig
 from syrin.budget import RateLimit, TokenLimits, TokenRateLimit
 from syrin.circuit import CircuitBreaker
 from syrin.domain_events import BudgetThresholdReached, EventBus
@@ -129,7 +128,7 @@ class TestAgentCheckpointer:
         """agent.checkpointer returns Checkpointer when checkpoint configured."""
         agent = Agent(
             model=Model(provider="openai", model_id="gpt-4o-mini"),
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory")),
+            checkpoint=CheckpointConfig(storage="memory"),
         )
         assert agent.checkpointer is not None
         assert agent.checkpointer == agent._checkpointer
@@ -143,7 +142,7 @@ class TestAgentCheckpointer:
         """agent.checkpointer.save/load works for manual checkpointing."""
         agent = Agent(
             model=Model(provider="openai", model_id="gpt-4o-mini"),
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory")),
+            checkpoint=CheckpointConfig(storage="memory"),
         )
         cid = agent.checkpointer.save("test_agent", {"iteration": 1})
         assert cid is not None
@@ -153,37 +152,28 @@ class TestAgentCheckpointer:
 
 
 class TestRemovedSymbols:
-    """Symbols removed in v0.11.0 raise ImportError with actionable migration messages."""
+    """Symbols removed in v0.11.0 are not available in the public syrin namespace."""
 
-    def test_import_dynamic_pipeline_raises_import_error(self) -> None:
-        """from syrin import DynamicPipeline raises ImportError."""
+    def test_import_dynamic_pipeline_not_available(self) -> None:
+        """syrin.DynamicPipeline is not in the public namespace (raises AttributeError)."""
         import syrin
 
-        with pytest.raises(ImportError) as exc_info:
+        with pytest.raises(AttributeError):
             _ = syrin.DynamicPipeline  # type: ignore[attr-defined]
 
-        assert "DynamicPipeline" in str(exc_info.value)
-        assert "AgentRouter" in str(exc_info.value)
-
-    def test_import_pipeline_raises_import_error(self) -> None:
-        """from syrin import Pipeline raises ImportError with Workflow guidance."""
+    def test_import_pipeline_not_available(self) -> None:
+        """syrin.Pipeline is not in the public namespace (raises AttributeError)."""
         import syrin
 
-        with pytest.raises(ImportError) as exc_info:
+        with pytest.raises(AttributeError):
             _ = syrin.Pipeline  # type: ignore[attr-defined]
 
-        assert "Pipeline" in str(exc_info.value)
-        assert "Workflow" in str(exc_info.value)
-
-    def test_import_agent_team_raises_import_error(self) -> None:
-        """from syrin import AgentTeam raises ImportError with Swarm guidance."""
+    def test_import_agent_team_not_available(self) -> None:
+        """syrin.AgentTeam is not in the public namespace (raises AttributeError)."""
         import syrin
 
-        with pytest.raises(ImportError) as exc_info:
+        with pytest.raises(AttributeError):
             _ = syrin.AgentTeam  # type: ignore[attr-defined]
-
-        assert "AgentTeam" in str(exc_info.value)
-        assert "Swarm" in str(exc_info.value)
 
     def test_import_task_raises_import_error(self) -> None:
         """'task' is not in the public syrin namespace."""
@@ -203,13 +193,13 @@ class TestRemovedSymbols:
         assert "ReactLoop" in str(exc_info.value)
 
     def test_import_error_message_mentions_v0_11_0(self) -> None:
-        """ImportError messages mention v0.11.0 for non-module removed symbols."""
+        """ImportError messages mention v0.11.0 for tombstoned symbols."""
         import syrin
 
-        # 'task' is excluded: as a subpackage it may be pre-imported by the test
-        # runner, making getattr return the module rather than triggering __getattr__.
-        # Its removal from __all__ is tested by test_import_task_raises_import_error.
-        for removed in ("DynamicPipeline", "Pipeline", "AgentTeam", "REACT"):
+        # Only symbols still in _REMOVED_IN_V0_11 raise ImportError with the v0.11.0 message.
+        # DynamicPipeline, Pipeline, and AgentTeam have had their tombstones removed and
+        # now raise AttributeError (not importable at all from syrin namespace).
+        for removed in ("REACT",):
             with pytest.raises(ImportError) as exc_info:
                 _ = getattr(syrin, removed)
             assert "v0.11.0" in str(exc_info.value), f"Missing v0.11.0 in {removed} error"

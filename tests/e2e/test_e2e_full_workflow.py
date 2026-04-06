@@ -144,7 +144,6 @@ class TestAgentWithTools:
         assert result == "5"
 
     def test_tool_execution_error_is_caught(self) -> None:
-        from syrin.agent.config import AgentConfig
         from syrin.enums import ToolErrorMode
         from syrin.exceptions import ToolExecutionError
 
@@ -155,7 +154,7 @@ class TestAgentWithTools:
         agent = Agent(
             model=_almock(),
             tools=[fail_tool],
-            config=AgentConfig(tool_error_mode=ToolErrorMode.STOP),
+            tool_error_mode=ToolErrorMode.STOP,
         )
         with pytest.raises(ToolExecutionError, match="Intentional failure"):
             agent._execute_tool("fail_tool", {})
@@ -174,7 +173,7 @@ class TestAgentWithTools:
 
 
 class TestAgentWithBudget:
-    """Budget enforcement: run limit, rate limits, thresholds, reserve."""
+    """Budget enforcement: run limit, rate limits, thresholds, safety_margin."""
 
     def test_budget_tracks_cost(self) -> None:
         agent = Agent(model=_almock(), budget=Budget(max_cost=10.0))
@@ -221,7 +220,7 @@ class TestAgentWithBudget:
             agent.run("Hello")
 
     def test_budget_with_reserve(self) -> None:
-        budget = Budget(max_cost=1.0, reserve=0.5)
+        budget = Budget(max_cost=1.0, safety_margin=0.5)
         assert budget.remaining == 0.5  # effective = run - reserve
         agent = Agent(model=_almock(), budget=budget)
         agent.run("Hello")
@@ -274,15 +273,11 @@ class TestAgentWithTokenLimits:
     """Token-based budget limits (separate from USD budget)."""
 
     def test_token_limits_run_exceeded(self) -> None:
-        from syrin.agent.config import AgentConfig
-
         agent = Agent(
             model=_almock(),
             budget=Budget(max_cost=100.0, exceed_policy=ExceedPolicy.STOP),
-            config=AgentConfig(
-                context=Context(
-                    token_limits=TokenLimits(max_tokens=1, exceed_policy=ExceedPolicy.STOP)
-                )
+            context=Context(
+                token_limits=TokenLimits(max_tokens=1, exceed_policy=ExceedPolicy.STOP)
             ),
         )
         with pytest.raises(BudgetExceededError) as exc:
@@ -290,17 +285,13 @@ class TestAgentWithTokenLimits:
         assert exc.value.budget_type == "run_tokens"
 
     def test_token_limits_per_hour(self) -> None:
-        from syrin.agent.config import AgentConfig
-
         agent = Agent(
             model=_almock(),
             budget=Budget(max_cost=100.0, exceed_policy=ExceedPolicy.STOP),
-            config=AgentConfig(
-                context=Context(
-                    token_limits=TokenLimits(
-                        rate_limits=TokenRateLimit(hour=1),
-                        exceed_policy=ExceedPolicy.STOP,
-                    )
+            context=Context(
+                token_limits=TokenLimits(
+                    rate_limits=TokenRateLimit(hour=1),
+                    exceed_policy=ExceedPolicy.STOP,
                 )
             ),
         )
@@ -328,7 +319,7 @@ class TestAgentWithMemory:
 
     def test_persistent_memory_remember_recall_forget(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
-        mid = agent.remember("User name is Alice", memory_type=MemoryType.CORE)
+        mid = agent.remember("User name is Alice", memory_type=MemoryType.FACTS)
         assert isinstance(mid, str) and len(mid) > 0
 
         entries = agent.recall("Alice")
@@ -343,15 +334,15 @@ class TestAgentWithMemory:
 
     def test_persistent_memory_all_four_types(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
-        agent.remember("My name is John", memory_type=MemoryType.CORE)
-        agent.remember("Visited Paris yesterday", memory_type=MemoryType.EPISODIC)
-        agent.remember("Python uses indentation", memory_type=MemoryType.SEMANTIC)
-        agent.remember("To make tea: boil water", memory_type=MemoryType.PROCEDURAL)
+        agent.remember("My name is John", memory_type=MemoryType.FACTS)
+        agent.remember("Visited Paris yesterday", memory_type=MemoryType.HISTORY)
+        agent.remember("Python uses indentation", memory_type=MemoryType.KNOWLEDGE)
+        agent.remember("To make tea: boil water", memory_type=MemoryType.INSTRUCTIONS)
 
         all_mems = agent.recall()
         assert len(all_mems) == 4
 
-        core = agent.recall(memory_type=MemoryType.CORE)
+        core = agent.recall(memory_type=MemoryType.FACTS)
         assert len(core) == 1
         assert "John" in core[0].content
 
@@ -501,17 +492,13 @@ class TestAgentWithContext:
     """Context management and token tracking."""
 
     def test_agent_with_context_config(self) -> None:
-        from syrin.agent.config import AgentConfig
-
         ctx = Context(max_tokens=4000)
-        agent = Agent(model=_almock(), config=AgentConfig(context=ctx))
+        agent = Agent(model=_almock(), context=ctx)
         r = agent.run("Hello")
         assert r.content is not None
 
     def test_context_stats_populated(self) -> None:
-        from syrin.agent.config import AgentConfig
-
-        agent = Agent(model=_almock(), config=AgentConfig(context=Context(max_tokens=4000)))
+        agent = Agent(model=_almock(), context=Context(max_tokens=4000))
         agent.run("Hello")
         stats = agent.context_stats
         assert stats is not None
@@ -556,8 +543,6 @@ class TestAgentWithEverything:
 
         chain = GuardrailChain([ContentFilter(blocked_words=["forbidden"])])
 
-        from syrin.agent.config import AgentConfig
-
         agent = Agent(
             model=_almock(),
             system_prompt="You are a helpful assistant with full capabilities.",
@@ -565,14 +550,14 @@ class TestAgentWithEverything:
             memory=Memory(),
             budget=Budget(max_cost=10.0, rate_limits=RateLimit(hour=100.0)),
             guardrails=chain,
-            config=AgentConfig(context=Context(max_tokens=8000)),
+            context=Context(max_tokens=8000),
         )
         agent.events.on(Hook.AGENT_RUN_START, lambda _: events_log.append("start"))
         agent.events.on(Hook.AGENT_RUN_END, lambda _: events_log.append("end"))
 
         # Store memories
-        agent.remember("User prefers concise answers", memory_type=MemoryType.CORE)
-        agent.remember("Previous session discussed Python", memory_type=MemoryType.EPISODIC)
+        agent.remember("User prefers concise answers", memory_type=MemoryType.FACTS)
+        agent.remember("Previous session discussed Python", memory_type=MemoryType.HISTORY)
 
         # Run
         r = agent.run("Hello, tell me about Python")
@@ -604,7 +589,7 @@ class TestAgentWithEverything:
             budget=Budget(max_cost=10.0),
             guardrails=chain,
         )
-        agent.remember("Some context", memory_type=MemoryType.CORE)
+        agent.remember("Some context", memory_type=MemoryType.FACTS)
         r = agent.run("This is forbidden")
         assert r.report.guardrail.blocked is True
 
@@ -615,7 +600,7 @@ class TestAgentWithEverything:
             memory=Memory(),
             budget=Budget(max_cost=0.0, exceed_policy=ExceedPolicy.STOP),
         )
-        agent.remember("Context", memory_type=MemoryType.CORE)
+        agent.remember("Context", memory_type=MemoryType.FACTS)
         with pytest.raises(BudgetExceededError):
             agent.run("Hello")
 

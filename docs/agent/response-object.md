@@ -144,7 +144,7 @@ for call in response.tool_calls:
 
 When you configure `Output(MyModel)`, the validated Python object is in:
 
-**`response.output`** — the canonical way to get structured output. Contains the validated Python object (e.g. a `UserInfo` instance) when `Output(MyModel)` is configured, `None` otherwise.
+**`response.output`** — the main output of this response. For structured agents (`Output(MyModel)` configured): the validated Python object (e.g. a `UserInfo` instance). For plain text agents: the text string (same as `response.content`).
 
 **`response.structured`** — validation state object with `.is_valid`, `.all_errors`, etc.
 

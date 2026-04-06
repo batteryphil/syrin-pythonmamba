@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from syrin.agent import Agent
-    from syrin.agent.multi_agent import DynamicPipeline, Pipeline
+    from syrin.agent.agent_router import AgentRouter
     from syrin.serve.config import ServeConfig
 
 
@@ -70,13 +70,13 @@ def _ensure_serve_deps() -> None:
 
 
 def build_router(
-    agent: Agent | Pipeline | DynamicPipeline,
+    agent: Agent | AgentRouter,
     config: ServeConfig,
 ) -> object:
-    """Build a FastAPI APIRouter for the given agent, pipeline, or dynamic pipeline.
+    """Build a FastAPI APIRouter for the given agent or router.
 
-    Accepts Agent, Pipeline, or DynamicPipeline. Pipelines are wrapped in an
-    adapter that implements arun, astream, events, budget_state, etc.
+    Accepts Agent or AgentRouter. AgentRouter is wrapped in an adapter that
+    implements arun, astream, events, budget_state, etc.
 
     Routes: POST /chat, POST /stream, GET /health, GET /ready, GET /budget, GET /describe.
     With enable_playground: GET /playground, GET /stream (SSE).
@@ -621,7 +621,7 @@ def build_router(
                     if msg is None:
                         break
                     yield f"event: override\ndata: {json.dumps(msg)}\n\n"
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield f'event: heartbeat\ndata: {{"version": {_config_last_version[0]}}}\n\n'
 
         return StreamingResponse(
@@ -722,16 +722,16 @@ def build_router(
 
 
 def create_http_app(
-    obj: Agent | Pipeline | DynamicPipeline,
+    obj: Agent | AgentRouter,
     config: ServeConfig,
 ) -> object:
-    """Create a FastAPI app for agent, pipeline, or dynamic pipeline.
+    """Create a FastAPI app for an agent or AgentRouter.
 
-    Used internally by agent.serve() / pipeline.serve(). Mounts the router
+    Used internally by agent.serve() / router.serve(). Mounts the router
     and optionally the playground. Use for custom app setup.
 
     Args:
-        obj: Agent, Pipeline, or DynamicPipeline.
+        obj: Agent or AgentRouter.
         config: ServeConfig.
 
     Returns:

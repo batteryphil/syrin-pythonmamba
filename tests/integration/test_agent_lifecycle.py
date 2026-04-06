@@ -6,7 +6,7 @@ import asyncio
 from unittest.mock import AsyncMock, patch
 
 from syrin import Agent
-from syrin.enums import LoopStrategy
+from syrin.loop import SingleShotLoop
 from syrin.model import Model
 from syrin.types import ProviderResponse, TokenUsage
 
@@ -100,7 +100,7 @@ class TestAgentLifecycleSyncAsyncParity:
         agent = Agent(
             model=model,
             system_prompt="Test.",
-            loop_strategy=LoopStrategy.SINGLE_SHOT,
+            loop=SingleShotLoop(),
         )
         mock_resp = _mock_provider_response(content="Done", input_tokens=1, output_tokens=2)
         with patch.object(
@@ -117,7 +117,6 @@ class TestAgentLifecycleSyncAsyncParity:
         agent = Agent(
             model=model,
             system_prompt="Test.",
-            loop_strategy=LoopStrategy.REACT,
             tools=[],
         )
         mock_resp = _mock_provider_response(content="Reply", input_tokens=5, output_tokens=10)

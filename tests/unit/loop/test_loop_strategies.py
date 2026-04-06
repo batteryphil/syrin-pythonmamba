@@ -4,7 +4,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 from syrin.agent._run_context import DefaultAgentRunContext
-from syrin.enums import LoopStrategy, MessageRole
+from syrin.enums import MessageRole
 from syrin.loop import (
     CodeActionLoop,
     PlanExecuteLoop,
@@ -388,21 +388,21 @@ class TestCodeActionLoop:
 
 
 class TestLoopStrategyIntegration:
-    """Test LoopStrategy enum integration."""
+    """Test loop class direct usage (LoopStrategy enum removed)."""
 
-    def test_loop_strategy_single_shot(self):
-        """LoopStrategy.SINGLE_SHOT maps to SingleShotLoop."""
-        from syrin.loop import LoopStrategyMapping, SingleShotLoop
+    def test_single_shot_loop_instantiation(self):
+        """SingleShotLoop can be instantiated directly."""
+        from syrin.loop import SingleShotLoop
 
-        loop_class = LoopStrategyMapping.get_loop(LoopStrategy.SINGLE_SHOT)
-        assert loop_class == SingleShotLoop
+        loop = SingleShotLoop()
+        assert loop is not None
 
-    def test_loop_strategy_react(self):
-        """LoopStrategy.REACT should map to ReactLoop."""
-        from syrin.loop import LoopStrategyMapping, ReactLoop
+    def test_react_loop_instantiation(self):
+        """ReactLoop can be instantiated directly."""
+        from syrin.loop import ReactLoop
 
-        loop_class = LoopStrategyMapping.get_loop(LoopStrategy.REACT)
-        assert loop_class == ReactLoop
+        loop = ReactLoop()
+        assert loop is not None
 
 
 # =============================================================================

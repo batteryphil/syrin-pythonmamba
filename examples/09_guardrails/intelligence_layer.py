@@ -185,14 +185,13 @@ async def _run() -> None:
 
 if __name__ == "__main__":
     asyncio.run(_run())
-    from examples.models.models import almock
-    from syrin import Agent
+    from syrin import Agent, Model
     from syrin.guardrails import ContentFilter
 
     class IntelligenceDemoAgent(Agent):
         name = "intelligence-demo"
         description = "Agent with ContentFilter (intelligence layer demo)"
-        model = almock
+        model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
         system_prompt = "You are a helpful assistant."
         guardrails = [ContentFilter(blocked_words=["password"])]
 

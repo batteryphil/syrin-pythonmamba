@@ -5,7 +5,7 @@ PULL uses agent's Memory for segment storage and retrieval; no separate context_
 
 from __future__ import annotations
 
-from syrin import Agent, AgentConfig, Model
+from syrin import Agent, Model
 from syrin.context import Context
 from syrin.enums import FormationMode
 from syrin.memory import Memory
@@ -44,11 +44,9 @@ class TestFormationModePullAgentFlow:
             model=_almock(),
             system_prompt="Help.",
             memory=Memory(),
-            config=AgentConfig(
-                context=Context(
-                    formation_mode=FormationMode.PULL,
-                    pull_top_k=5,
-                )
+            context=Context(
+                formation_mode=FormationMode.PULL,
+                pull_top_k=5,
             ),
         )
         msgs = agent._build_messages("Hello")
@@ -63,12 +61,10 @@ class TestFormationModePullAgentFlow:
             model=_almock(),
             system_prompt="Help.",
             memory=Memory(),
-            config=AgentConfig(
-                context=Context(
-                    formation_mode=FormationMode.PULL,
-                    pull_top_k=5,
-                    pull_threshold=0.0,
-                )
+            context=Context(
+                formation_mode=FormationMode.PULL,
+                pull_top_k=5,
+                pull_threshold=0.0,
             ),
         )
         agent.run("Tell me about Python")
@@ -88,12 +84,10 @@ class TestFormationModePullAgentFlow:
             model=_almock(),
             system_prompt="Help.",
             memory=memory,
-            config=AgentConfig(
-                context=Context(
-                    formation_mode=FormationMode.PULL,
-                    pull_top_k=5,
-                    pull_threshold=0.0,
-                )
+            context=Context(
+                formation_mode=FormationMode.PULL,
+                pull_top_k=5,
+                pull_threshold=0.0,
             ),
         )
         agent.run("Tell me about Python")

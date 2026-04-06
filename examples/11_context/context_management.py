@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from syrin import Agent, AgentConfig, Context, Model
+from syrin import Agent, Context, Model
 from syrin.context import (
     ContextCompactor,
     ContextManager,
@@ -44,7 +44,7 @@ section("1. Context basics (max_tokens, stats after response)")
 agent = Agent(
     model=model,
     system_prompt="You are a helpful assistant.",
-    config=AgentConfig(context=Context(max_tokens=80_000)),
+    context=Context(max_tokens=80_000),
 )
 agent.run("What is 2+2? Answer in one sentence.")
 
@@ -103,15 +103,13 @@ fired: list[int] = []
 agent2 = Agent(
     model=model,
     system_prompt="You are helpful.",
-    config=AgentConfig(
-        context=Context(
-            max_tokens=5000,
-            thresholds=[
-                ContextThreshold(at=50, action=lambda _: fired.append(50)),
-                ContextThreshold(at=70, action=lambda _: fired.append(70)),
-                ContextThreshold(at=100, action=lambda _: fired.append(100)),
-            ],
-        )
+    context=Context(
+        max_tokens=5000,
+        thresholds=[
+            ContextThreshold(at=50, action=lambda _: fired.append(50)),
+            ContextThreshold(at=70, action=lambda _: fired.append(70)),
+            ContextThreshold(at=100, action=lambda _: fired.append(100)),
+        ],
     ),
 )
 agent2.run("Hello!")
@@ -154,7 +152,7 @@ class PassThroughContextManager(ContextManager):
 
 agent3 = Agent(
     model=model,
-    config=AgentConfig(context=PassThroughContextManager()),
+    context=PassThroughContextManager(),
 )
 agent3.run("Hi, custom manager!")
 print(f"  Pass-through manager: {agent3.context_stats.total_tokens} tokens, no compaction")

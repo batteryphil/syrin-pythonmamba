@@ -21,8 +21,7 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from examples.models.models import almock  # noqa: E402
-from syrin import Agent, Budget, Memory, tool  # noqa: E402
+from syrin import Agent, Budget, Memory, Model, tool  # noqa: E402
 
 
 @tool
@@ -40,7 +39,7 @@ def summarize_document(text: str) -> str:
 class ResearchAgent(Agent):
     name = "research_agent"
     description = "Research agent with tools and memory"
-    model = almock
+    model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
     system_prompt = "You are a research assistant."
     tools = [search_web, summarize_document]
     budget = Budget(max_cost=1.00)

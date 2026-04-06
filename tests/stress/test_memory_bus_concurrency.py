@@ -16,7 +16,7 @@ def _make_entry(i: int) -> MemoryEntry:
     return MemoryEntry(
         id=f"entry-{i}",
         content=f"Entry {i}: synthetic memory content for agent {i}",
-        type=MemoryType.SEMANTIC,
+        type=MemoryType.KNOWLEDGE,
         importance=0.8,
     )
 

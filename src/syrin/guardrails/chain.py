@@ -95,7 +95,7 @@ class GuardrailChain:
                         total_budget_consumed=total_budget,
                     )
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 elapsed = (time.time() - start_time) * 1000
                 timeout_decision = GuardrailDecision(
                     passed=False,

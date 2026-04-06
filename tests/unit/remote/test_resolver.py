@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 
-from syrin import Agent, AgentConfig, Budget, Model
+from syrin import Agent, Budget, Model
 from syrin.budget import RateLimit
 from syrin.enums import DecayStrategy
 from syrin.memory import Memory
@@ -27,8 +27,7 @@ def _make_agent(
         model=Model.Almock(),
         name=name,
         budget=budget,
-        memory=memory
-        or Memory(restrict_to=[], top_k=5, decay=Decay(strategy=DecayStrategy.EXPONENTIAL)),
+        memory=memory or Memory(types=[], top_k=5, decay=Decay(strategy=DecayStrategy.EXPONENTIAL)),
     )
 
 
@@ -184,19 +183,18 @@ class TestValidOverrides:
         assert agent._max_tool_iterations == 5
         reg.unregister(agent_id)
 
-    def test_apply_agent_loop_strategy(self) -> None:
-        """Apply agent.loop_strategy='single_shot' -> _loop is SingleShotLoop."""
+    def test_apply_agent_max_tool_iterations_updates_correctly(self) -> None:
+        """Apply agent.max_tool_iterations=5 updates the agent correctly (loop_strategy removed)."""
         agent = _make_agent()
         reg = get_registry()
         reg.register(agent)
         agent_id = reg.make_agent_id(agent)
         schema = reg.get_schema(agent_id)
         assert schema is not None
-        payload = _payload(agent_id, ("agent.loop_strategy", "single_shot"))
+        payload = _payload(agent_id, ("agent.max_tool_iterations", 5))
         result = ConfigResolver().apply_overrides(agent, payload, schema=schema)
-        assert "agent.loop_strategy" in result.accepted
-
-        assert type(agent._loop).__name__ == "SingleShotLoop"
+        assert "agent.max_tool_iterations" in result.accepted
+        assert agent._max_tool_iterations == 5
         reg.unregister(agent_id)
 
     def test_apply_knowledge_top_k(self) -> None:
@@ -309,19 +307,18 @@ class TestValidOverrides:
         assert agent._model.settings.max_output_tokens == 2048
         reg.unregister(agent_id)
 
-    def test_apply_agent_loop_strategy_accepts_enum_name(self) -> None:
-        """agent.loop_strategy with enum name (e.g. REACT) is normalized and accepted."""
+    def test_apply_unknown_field_is_rejected(self) -> None:
+        """Unknown field path results in rejected override (loop_strategy removed)."""
         agent = _make_agent()
         reg = get_registry()
         reg.register(agent)
         agent_id = reg.make_agent_id(agent)
         schema = reg.get_schema(agent_id)
         assert schema is not None
-        payload = _payload(agent_id, ("agent.loop_strategy", "REACT"))
+        payload = _payload(agent_id, ("agent.loop_strategy", "react"))
         result = ConfigResolver().apply_overrides(agent, payload, schema=schema)
-        assert "agent.loop_strategy" in result.accepted
-
-        assert type(agent._loop).__name__ == "ReactLoop"
+        # loop_strategy is no longer a valid field; it should be rejected or ignored
+        assert "agent.loop_strategy" not in result.accepted
         reg.unregister(agent_id)
 
     def test_empty_overrides(self) -> None:
@@ -471,7 +468,7 @@ class TestHotSwapBlocklist:
             model=Model.Almock(),
             name="cp_agent",
             budget=Budget(max_cost=1.0),
-            config=AgentConfig(checkpoint=CheckpointConfig(storage="memory", path=None)),
+            checkpoint=CheckpointConfig(storage="memory", path=None),
         )
         reg = get_registry()
         reg.register(agent)

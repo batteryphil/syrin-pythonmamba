@@ -1,6 +1,6 @@
 """Memory module — first-class persistent memory for agents.
 
-Supports four memory types (Core, Episodic, Semantic, Procedural),
+Supports four memory types (Facts, History, Knowledge, Instructions),
 pluggable backends, automatic extraction, forgetting curves, budget
 integration, and position-aware context injection.
 """
@@ -24,10 +24,10 @@ from .embedding import EmbeddingConfig
 from .snapshot import MemorySnapshot, MemorySnapshotEntry
 from .store import MemoryStore
 from .types import (
-    CoreMemory,
-    EpisodicMemory,
-    ProceduralMemory,
-    SemanticMemory,
+    FactsMemory,
+    HistoryMemory,
+    InstructionsMemory,
+    KnowledgeMemory,
     create_memory,
 )
 from .vector_configs import ChromaConfig, PostgresConfig, QdrantConfig, RedisConfig
@@ -52,10 +52,10 @@ __all__ = [
     # Storage
     "MemoryStore",
     # Memory types
-    "CoreMemory",
-    "EpisodicMemory",
-    "SemanticMemory",
-    "ProceduralMemory",
+    "FactsMemory",
+    "HistoryMemory",
+    "KnowledgeMemory",
+    "InstructionsMemory",
     "create_memory",
     "PostgresConfig",
     "QdrantConfig",

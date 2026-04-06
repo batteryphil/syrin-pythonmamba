@@ -85,7 +85,7 @@ Each `ConsensusVote` has:
 
 **`ConsensusStrategy.MAJORITY`** — the answer with the most votes wins. If no majority exists, the result is the most common answer.
 
-**`ConsensusStrategy.UNANIMOUS`** — all agents must agree. If they don't, `consensus_reached=False`.
+**`ConsensusStrategy.UNANIMITY`** — all agents must agree. If they don't, `consensus_reached=False`.
 
 **`ConsensusStrategy.WEIGHTED`** — votes are multiplied by their `weight`. Use this when some agents (e.g. a more capable model) should have more influence.
 
@@ -97,7 +97,7 @@ from syrin.enums import ConsensusStrategy
 consensus_config = ConsensusConfig(strategy=ConsensusStrategy.MAJORITY)
 
 # All must agree
-consensus_config = ConsensusConfig(strategy=ConsensusStrategy.UNANIMOUS)
+consensus_config = ConsensusConfig(strategy=ConsensusStrategy.UNANIMITY)
 ```
 
 ## When to Use Consensus

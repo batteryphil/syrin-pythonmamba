@@ -22,18 +22,18 @@ agent = Agent(
 # 1. Store memories (4 types)
 # ============================================================
 # CORE: permanent facts (never decays) — user identity, preferences
-agent.remember("The user's name is Alice.", memory_type=MemoryType.CORE, importance=1.0)
+agent.remember("The user's name is Alice.", memory_type=MemoryType.FACTS, importance=1.0)
 
 # EPISODIC: past events (decays over time) — what happened in conversations
-agent.remember("User asked about machine learning yesterday.", memory_type=MemoryType.EPISODIC)
+agent.remember("User asked about machine learning yesterday.", memory_type=MemoryType.HISTORY)
 
 # SEMANTIC: knowledge and facts — learned information
-agent.remember("Alice prefers Python over JavaScript.", memory_type=MemoryType.SEMANTIC)
+agent.remember("Alice prefers Python over JavaScript.", memory_type=MemoryType.KNOWLEDGE)
 
 # PROCEDURAL: how-to knowledge — processes and workflows
 agent.remember(
     "When Alice asks for code, use type hints and docstrings.",
-    memory_type=MemoryType.PROCEDURAL,
+    memory_type=MemoryType.INSTRUCTIONS,
 )
 
 print("Stored 4 memories (one of each type)")
@@ -49,7 +49,7 @@ for entry in results:
 print()
 
 # Recall by type
-core_memories = agent.recall(memory_type=MemoryType.CORE)
+core_memories = agent.recall(memory_type=MemoryType.FACTS)
 print(f"=== Core memories ({len(core_memories)}) ===")
 for entry in core_memories:
     print(f"  {entry.content}")

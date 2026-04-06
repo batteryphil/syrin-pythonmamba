@@ -62,6 +62,7 @@ for any 2+ agent system::
         await router.ack(agent_id="bob", message_id=envelope.message_id)
 """
 
+from syrin.enums import ControlAction
 from syrin.swarm._a2a import (
     A2AAuditEntry,
     A2ABudgetExceededError,
@@ -76,6 +77,7 @@ from syrin.swarm._authority import (
     AgentPermissionError,
     AuditEntry,
     SwarmAuthorityGuard,
+    build_guard_from_agents,
 )
 from syrin.swarm._broadcast import (
     BroadcastBus,
@@ -131,6 +133,7 @@ __all__ = [
     "ConsensusConfig",
     "ConsensusResult",
     "ConsensusVote",
+    "ControlAction",
     "FallbackStrategy",
     "MaxInterventionsExceeded",
     "MemoryBus",
@@ -149,4 +152,5 @@ __all__ = [
     "SwarmResult",
     "SwarmHandoffContext",
     "SwarmRunHandle",
+    "build_guard_from_agents",
 ]

@@ -14,13 +14,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock, gpt4_mini
-from syrin import Agent, AgentConfig, Context
+from examples.models.models import gpt4_mini
+from syrin import Agent, Context, Model
 from syrin.context import FormationMode
 from syrin.memory import Memory
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-_model = gpt4_mini if os.environ.get("USE_REAL_MODEL") == "1" else almock
+_model = gpt4_mini if os.environ.get("USE_REAL_MODEL") == "1" else Model.mock()
 
 
 def _main() -> None:
@@ -30,13 +30,8 @@ def _main() -> None:
         model=_model,
         system_prompt="You are helpful. Keep answers brief.",
         memory=Memory(),
-        config=AgentConfig(
-            context=Context(
-                max_tokens=8000,
-                formation_mode=FormationMode.PULL,
-                pull_top_k=10,
-                pull_threshold=0.0,
-            )
+        context=Context(
+            max_tokens=8000, formation_mode=FormationMode.PULL, pull_top_k=10, pull_threshold=0.0
         ),
     )
 

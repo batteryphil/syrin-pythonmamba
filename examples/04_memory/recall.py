@@ -30,11 +30,11 @@ def main() -> None:
 
     # Store some memories
     facts = [
-        ("User likes Python programming", MemoryType.CORE),
-        ("User works at a startup", MemoryType.CORE),
-        ("User prefers afternoon meetings", MemoryType.EPISODIC),
-        ("Python was created by Guido van Rossum", MemoryType.SEMANTIC),
-        ("How to deploy: push to main, CI runs, auto-deploy", MemoryType.PROCEDURAL),
+        ("User likes Python programming", MemoryType.FACTS),
+        ("User works at a startup", MemoryType.FACTS),
+        ("User prefers afternoon meetings", MemoryType.HISTORY),
+        ("Python was created by Guido van Rossum", MemoryType.KNOWLEDGE),
+        ("How to deploy: push to main, CI runs, auto-deploy", MemoryType.INSTRUCTIONS),
     ]
 
     print("\nStoring memories:")
@@ -59,7 +59,7 @@ def main() -> None:
 
     # Recall by type — list all core memories
     print("\nAll CORE memories:")
-    core = assistant.recall(memory_type=MemoryType.CORE)
+    core = assistant.recall(memory_type=MemoryType.FACTS)
     for r in core:
         print(f"  - {r.content}")
 

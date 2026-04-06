@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -28,8 +28,8 @@ class AuditEntry(BaseModel):  # type: ignore[explicit-any]
         extra: Hook-specific fields.
     """
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    source: str = Field(description="Agent class name, Pipeline, or DynamicPipeline")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    source: str = Field(description="Agent class name or AgentRouter")
     event: str = Field(description="Audit event type (e.g. llm_call, tool_call)")
     model: str | None = None
     tokens: dict[str, int] | None = Field(default=None, description="input, output, total")
@@ -70,7 +70,7 @@ class AuditFilters(BaseModel):  # type: ignore[explicit-any]
 class AuditLog(BaseModel):  # type: ignore[explicit-any]
     """Audit configuration for Agent, Pipeline, or DynamicPipeline.
 
-    Pass to Agent(config=AgentConfig(audit=AuditLog(...))) or Pipeline(audit=...). Events are
+    Pass to Agent(audit=AuditLog(...)) or Pipeline(audit=...). Events are
     written to the backend (JSONL by default).
 
     Attributes:

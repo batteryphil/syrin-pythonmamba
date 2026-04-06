@@ -163,6 +163,122 @@ class BudgetPool:
             # Ensure we don't go below zero due to floating-point drift
             self._allocated_total = max(0.0, self._allocated_total)
 
+    async def topup(self, agent_id: str, additional: float) -> None:
+        """Atomically add *additional* USD to an agent's existing allocation.
+
+        Draws the extra amount from the pool's free balance, just like a new
+        :meth:`allocate` call would.  The agent must already have an active
+        allocation.
+
+        Args:
+            agent_id: Agent whose allocation to increase.
+            additional: Extra amount in USD to add.  ``0.0`` is a no-op.
+
+        Raises:
+            BudgetAllocationError: If the agent has no active allocation, the
+                pool has insufficient remaining balance, or the new total would
+                exceed :attr:`per_agent_max`.
+
+        Example::
+
+            await pool.allocate("cto", 2.00)
+            await pool.topup("cto", 1.00)   # cto now has 3.00 allocated
+        """
+        if additional == 0.0:
+            return
+        async with self._lock:
+            if agent_id not in self._entries:
+                raise BudgetAllocationError(
+                    f"Agent '{agent_id}' has no active allocation.",
+                    agent_id=agent_id,
+                    amount=additional,
+                    reason="not_allocated",
+                )
+            new_allocated = self._entries[agent_id]["allocated"] + additional
+            if self._per_agent_max is not None and new_allocated > self._per_agent_max:
+                raise BudgetAllocationError(
+                    f"Topup would push agent '{agent_id}' allocated "
+                    f"({new_allocated:.4f}) above per_agent_max "
+                    f"({self._per_agent_max:.4f}).",
+                    agent_id=agent_id,
+                    amount=additional,
+                    reason="per_agent_max",
+                )
+            available = self._total - self._allocated_total
+            if additional > available:
+                raise BudgetAllocationError(
+                    f"Topup {additional:.4f} exceeds pool remaining {available:.4f}.",
+                    agent_id=agent_id,
+                    amount=additional,
+                    reason="insufficient_pool",
+                )
+            self._entries[agent_id]["allocated"] = new_allocated
+            self._allocated_total += additional
+
+    async def reallocate(self, agent_id: str, new_amount: float) -> None:
+        """Atomically replace an agent's allocation with *new_amount* USD.
+
+        If *new_amount* is greater than the current allocation the difference
+        is drawn from the pool's free balance.  If it is smaller, the
+        difference is returned to the pool.  *new_amount* must be at least as
+        large as what the agent has already spent.
+
+        Args:
+            agent_id: Agent whose allocation to replace.
+            new_amount: New total allocation in USD.
+
+        Raises:
+            BudgetAllocationError: If the agent has no active allocation,
+                *new_amount* is less than the agent's already-spent amount,
+                the pool has insufficient remaining balance (when increasing),
+                or *new_amount* would exceed :attr:`per_agent_max`.
+
+        Example::
+
+            await pool.allocate("cto", 2.00)
+            await pool.spend("cto", 0.50)
+            await pool.reallocate("cto", 4.00)   # increase mid-run
+            await pool.reallocate("cto", 1.00)   # shrink, but ≥ spent (0.50)
+        """
+        async with self._lock:
+            if agent_id not in self._entries:
+                raise BudgetAllocationError(
+                    f"Agent '{agent_id}' has no active allocation.",
+                    agent_id=agent_id,
+                    amount=new_amount,
+                    reason="not_allocated",
+                )
+            entry = self._entries[agent_id]
+            spent = entry["spent"]
+            if new_amount < spent:
+                raise BudgetAllocationError(
+                    f"Cannot reallocate agent '{agent_id}' to {new_amount:.4f}; "
+                    f"agent has already spent {spent:.4f}.",
+                    agent_id=agent_id,
+                    amount=new_amount,
+                    reason="below_spent",
+                )
+            if self._per_agent_max is not None and new_amount > self._per_agent_max:
+                raise BudgetAllocationError(
+                    f"New amount {new_amount:.4f} exceeds per_agent_max {self._per_agent_max:.4f}.",
+                    agent_id=agent_id,
+                    amount=new_amount,
+                    reason="per_agent_max",
+                )
+            delta = new_amount - entry["allocated"]
+            if delta > 0:
+                available = self._total - self._allocated_total
+                if delta > available:
+                    raise BudgetAllocationError(
+                        f"Reallocation increase of {delta:.4f} exceeds pool "
+                        f"remaining {available:.4f}.",
+                        agent_id=agent_id,
+                        amount=new_amount,
+                        reason="insufficient_pool",
+                    )
+            self._entries[agent_id]["allocated"] = new_amount
+            self._allocated_total = max(0.0, self._allocated_total + delta)
+
     def snapshot(self) -> dict[str, _AgentEntry]:
         """Return a point-in-time snapshot of all agent allocations.
 

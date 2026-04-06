@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from syrin import Agent, CircuitBreaker, Model
-from syrin.agent.config import AgentConfig
 from syrin.exceptions import CircuitBreakerOpenError, ProviderError
 
 
@@ -25,7 +24,7 @@ class TestCircuitBreakerAgent:
     def test_agent_with_circuit_breaker_success_resets_failures(self) -> None:
         """Successful calls keep circuit closed."""
         cb = CircuitBreaker(failure_threshold=3, recovery_timeout=60)
-        agent = Agent(model=_almock(), system_prompt="Hi", config=AgentConfig(circuit_breaker=cb))
+        agent = Agent(model=_almock(), system_prompt="Hi", circuit_breaker=cb)
         agent.run("Hello")
         agent.run("Hi again")
         assert cb.get_state().state.value == "closed"
@@ -34,7 +33,7 @@ class TestCircuitBreakerAgent:
     def test_agent_circuit_trips_after_failures(self) -> None:
         """Circuit trips after failure_threshold provider errors."""
         cb = CircuitBreaker(failure_threshold=2, recovery_timeout=10)
-        agent = Agent(model=_almock(), system_prompt="Hi", config=AgentConfig(circuit_breaker=cb))
+        agent = Agent(model=_almock(), system_prompt="Hi", circuit_breaker=cb)
         with patch.object(
             agent._provider,
             "complete",
@@ -51,7 +50,7 @@ class TestCircuitBreakerAgent:
     def test_agent_circuit_open_no_fallback_raises(self) -> None:
         """When circuit open and no fallback, raises CircuitBreakerOpenError."""
         cb = CircuitBreaker(failure_threshold=1, recovery_timeout=60)
-        agent = Agent(model=_almock(), system_prompt="Hi", config=AgentConfig(circuit_breaker=cb))
+        agent = Agent(model=_almock(), system_prompt="Hi", circuit_breaker=cb)
         with (
             patch.object(
                 agent._provider,
@@ -76,7 +75,7 @@ class TestCircuitBreakerAgent:
         agent = Agent(
             model=_almock(),
             system_prompt="Hi",
-            config=AgentConfig(circuit_breaker=cb),
+            circuit_breaker=cb,
         )
         with (
             patch.object(
@@ -94,4 +93,4 @@ class TestCircuitBreakerAgent:
     def test_agent_circuit_breaker_invalid_type_rejected(self) -> None:
         """Agent rejects non-CircuitBreaker for circuit_breaker."""
         with pytest.raises(TypeError, match="circuit_breaker must be CircuitBreaker"):
-            Agent(model=_almock(), config=AgentConfig(circuit_breaker="invalid"))  # type: ignore[arg-type]
+            Agent(model=_almock(), circuit_breaker="invalid")  # type: ignore[arg-type]

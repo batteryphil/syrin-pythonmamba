@@ -28,8 +28,8 @@ def main() -> None:
             path=path,
             write_mode=WriteMode.SYNC,
         )
-        memory.remember("User prefers Python", memory_type=MemoryType.CORE)
-        memory.remember("Last session: discussed async patterns", memory_type=MemoryType.EPISODIC)
+        memory.remember("User prefers Python", memory_type=MemoryType.FACTS)
+        memory.remember("Last session: discussed async patterns", memory_type=MemoryType.HISTORY)
 
         # Export to snapshot
         snapshot = memory.export()

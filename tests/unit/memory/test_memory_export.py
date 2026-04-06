@@ -36,8 +36,8 @@ class TestMemoryExport:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("Fact A", memory_type=MemoryType.CORE)
-        mem.remember("Fact B", memory_type=MemoryType.EPISODIC)
+        mem.remember("Fact A", memory_type=MemoryType.FACTS)
+        mem.remember("Fact B", memory_type=MemoryType.HISTORY)
         snap = mem.export()
         assert len(snap.memories) >= 2
         contents = [m.content for m in snap.memories]
@@ -50,7 +50,7 @@ class TestMemoryExport:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("JSON test", memory_type=MemoryType.CORE)
+        mem.remember("JSON test", memory_type=MemoryType.FACTS)
         snap = mem.export()
         js = json.dumps(snap.to_dict())
         loaded = json.loads(js)
@@ -75,7 +75,7 @@ class TestMemoryImport:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("Original", memory_type=MemoryType.CORE)
+        mem.remember("Original", memory_type=MemoryType.FACTS)
         snap = mem.export()
 
         mem2 = Memory(
@@ -94,7 +94,7 @@ class TestMemoryImport:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("A", memory_type=MemoryType.CORE)
+        mem.remember("A", memory_type=MemoryType.FACTS)
         snap = mem.export()
 
         mem2 = Memory(
@@ -102,7 +102,7 @@ class TestMemoryImport:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem2.remember("B", memory_type=MemoryType.CORE)
+        mem2.remember("B", memory_type=MemoryType.FACTS)
         count = mem2.import_from(snap)
         assert count >= 1
         results = mem2.recall(count=10)

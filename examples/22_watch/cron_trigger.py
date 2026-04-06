@@ -23,8 +23,7 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from examples.models.models import almock  # noqa: E402
-from syrin import Agent  # noqa: E402
+from syrin import Agent, Model  # noqa: E402
 from syrin.enums import Hook  # noqa: E402
 from syrin.watch import CronProtocol, TriggerEvent  # noqa: E402
 
@@ -32,7 +31,7 @@ from syrin.watch import CronProtocol, TriggerEvent  # noqa: E402
 class DailyReportAgent(Agent):
     name = "daily_reporter"
     description = "Generates a brief daily status report"
-    model = almock
+    model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
     system_prompt = "You generate concise daily status reports. Keep each report to 2-3 sentences."
 
 

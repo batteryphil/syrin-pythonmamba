@@ -6,36 +6,53 @@ by injecting new context or pausing the agent. After too many interventions
 MaxInterventionsExceeded is raised and Hook.AGENT_ESCALATION fires.
 
 Key concepts:
-  - MonitorLoop(targets=[...], poll_interval=1.0, max_interventions=3)
+  - MonitorLoop(targets=[agent, ...], poll_interval=1.0, max_interventions=3)
   - async with MonitorLoop(...) as monitor: async for event in monitor
   - MonitorEventType.HEARTBEAT, .OUTPUT_READY
-  - monitor.notify_agent_output(agent_id, output) — feed output into monitor
-  - monitor.intervene(agent_id, InterventionAction.CHANGE_CONTEXT_AND_RERUN)
+  - monitor.notify_agent_output(agent, output) — feed output into monitor
+  - monitor.intervene(agent, InterventionAction.CHANGE_CONTEXT_AND_RERUN)
   - MaxInterventionsExceeded — raised when limit exceeded
   - Hook.AGENT_ESCALATION — fired on max intervention breach
 
 Run:
-    uv run python examples/monitor_loop.py
+    uv run python examples/07_multi_agent/monitor_loop.py
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
+from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+from syrin import Agent, Model
 from syrin.enums import Hook, InterventionAction, MonitorEventType
 from syrin.swarm import MaxInterventionsExceeded, MonitorEvent, MonitorLoop
+
+_MODEL = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+
+
+class WriterAgent(Agent):
+    model = _MODEL
+    system_prompt = "You write clear, engaging summaries."
+
 
 # ── Example 1: Basic heartbeat monitoring ────────────────────────────────────
 #
 # MonitorLoop polls targets at poll_interval seconds and emits HEARTBEAT
-# events to show the agent is alive.
+# events to show the agent is alive.  Pass agent instances, not string IDs.
 
 
 async def example_heartbeat() -> None:
     print("\n── Example 1: Basic heartbeat monitoring ────────────────────────")
 
+    writer = WriterAgent()
+
     async with MonitorLoop(
-        targets=["writer-agent"],
+        targets=[writer],  # agent object, not "writer-agent"
         poll_interval=0.05,  # fast poll for the example
     ) as monitor:
         beats = 0
@@ -58,15 +75,16 @@ async def example_heartbeat() -> None:
 async def example_output_ready() -> None:
     print("\n── Example 2: OUTPUT_READY events ───────────────────────────────")
 
+    writer = WriterAgent()
     output_events: list[MonitorEvent] = []
 
     async with MonitorLoop(
-        targets=["writer-agent"],
+        targets=[writer],
         poll_interval=10.0,  # long poll — we will trigger outputs manually
     ) as monitor:
         # Simulate the writer agent producing 2 outputs
-        monitor.notify_agent_output("writer-agent", "Draft 1: The AI landscape is changing.")
-        monitor.notify_agent_output("writer-agent", "Draft 2: Revised with more clarity.")
+        monitor.notify_agent_output(writer, "Draft 1: The AI landscape is changing.")
+        monitor.notify_agent_output(writer, "Draft 2: Revised with more clarity.")
 
         async for event in monitor:
             if event.event_type == MonitorEventType.OUTPUT_READY:
@@ -89,15 +107,16 @@ async def example_output_ready() -> None:
 async def example_intervention() -> None:
     print("\n── Example 3: Intervention on poor quality output ───────────────")
 
+    writer = WriterAgent()
     interventions_done: list[str] = []
 
     async with MonitorLoop(
-        targets=["writer-agent"],
+        targets=[writer],
         poll_interval=10.0,
         max_interventions=3,  # cap at 3 interventions before escalation
     ) as monitor:
         # Simulate poor output
-        monitor.notify_agent_output("writer-agent", "Bad draft: vague, unclear, too short.")
+        monitor.notify_agent_output(writer, "Bad draft: vague, unclear, too short.")
 
         async for event in monitor:
             if event.event_type == MonitorEventType.OUTPUT_READY:
@@ -107,7 +126,7 @@ async def example_intervention() -> None:
                 # QA assessment: bad draft — intervene
                 if "bad" in output.lower() or "vague" in output.lower():
                     await monitor.intervene(
-                        event.agent_id,
+                        writer,
                         InterventionAction.CHANGE_CONTEXT_AND_RERUN,
                         context="Be more specific. Focus on enterprise AI adoption.",
                     )
@@ -130,6 +149,7 @@ async def example_intervention() -> None:
 async def example_max_interventions_exceeded() -> None:
     print("\n── Example 4: MaxInterventionsExceeded and AGENT_ESCALATION ────")
 
+    writer = WriterAgent()
     escalation_events: list[dict[str, object]] = []
 
     def fire_fn(hook: Hook, data: dict[str, object]) -> None:
@@ -137,18 +157,18 @@ async def example_max_interventions_exceeded() -> None:
             escalation_events.append(data)
 
     async with MonitorLoop(
-        targets=["writer-agent"],
+        targets=[writer],
         poll_interval=10.0,
         max_interventions=2,  # only 2 allowed
         fire_event_fn=fire_fn,
     ) as monitor:
         # Use up both intervention slots
-        await monitor.intervene("writer-agent", InterventionAction.PAUSE_AND_WAIT)
-        await monitor.intervene("writer-agent", InterventionAction.PAUSE_AND_WAIT)
+        await monitor.intervene(writer, InterventionAction.PAUSE_AND_WAIT)
+        await monitor.intervene(writer, InterventionAction.PAUSE_AND_WAIT)
 
         # Third intervention exceeds limit
         try:
-            await monitor.intervene("writer-agent", InterventionAction.CHANGE_CONTEXT_AND_RERUN)
+            await monitor.intervene(writer, InterventionAction.CHANGE_CONTEXT_AND_RERUN)
             print("  ERROR: should have raised MaxInterventionsExceeded")
         except MaxInterventionsExceeded as e:
             print(f"  MaxInterventionsExceeded: limit={e.limit}  count={e.count}")
@@ -157,7 +177,7 @@ async def example_max_interventions_exceeded() -> None:
         evt = escalation_events[0]
         print(
             f"  AGENT_ESCALATION hook fired:"
-            f"\n    agent_id:       {evt.get('agent_id')}"
+            f"\n    agent_id:           {evt.get('agent_id')}"
             f"\n    intervention_count: {evt.get('intervention_count')}"
             f"\n    max_interventions:  {evt.get('max_interventions')}"
         )
@@ -169,12 +189,13 @@ async def example_max_interventions_exceeded() -> None:
 async def example_release() -> None:
     print("\n── Example 5: monitor.release() — stop monitoring an agent ─────")
 
+    writer = WriterAgent()
     heartbeats_before: int = 0
     heartbeats_after: int = 0
     released = False
 
     async with MonitorLoop(
-        targets=["writer-agent"],
+        targets=[writer],
         poll_interval=0.05,
     ) as monitor:
         async for event in monitor:
@@ -182,14 +203,12 @@ async def example_release() -> None:
                 if not released:
                     heartbeats_before += 1
                     if heartbeats_before >= 2:
-                        monitor.release("writer-agent")
+                        monitor.release(writer)  # pass agent object
                         released = True
+                        # Drain any already-queued event then stop
+                        break
                 else:
-                    # After release, no new heartbeats should arrive
-                    # (existing queued events may still be drained)
                     heartbeats_after += 1
-                if heartbeats_before + heartbeats_after >= 4:
-                    break
 
     print(f"  Heartbeats before release: {heartbeats_before}")
     print(f"  Heartbeats after release:  {heartbeats_after} (may be 0 or 1 from queue)")

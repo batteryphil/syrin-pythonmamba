@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import asyncio
 
-from syrin import Agent, Budget, Model
+from syrin import Agent, Budget, ExceedPolicy, Model
 from syrin.enums import SwarmTopology
 from syrin.swarm import Swarm, SwarmConfig
 

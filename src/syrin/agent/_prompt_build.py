@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from syrin.agent import Agent
 
+from datetime import UTC
+
 from syrin.agent._context_builder import build_messages as build_messages_for_llm
 from syrin.enums import Hook
 from syrin.events import EventContext
@@ -38,12 +40,12 @@ def effective_template_variables(
 
 def get_prompt_builtins(agent: Agent) -> dict[str, object]:
     """Return built-in vars (date, agent_id, conversation_id)."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     agent_id = getattr(agent, "_agent_name", None) or agent.__class__.__name__
     conversation_id = getattr(agent, "_conversation_id", None)
     return {
-        "date": datetime.now(timezone.utc),
+        "date": datetime.now(UTC),
         "agent_id": agent_id,
         "conversation_id": conversation_id,
     }

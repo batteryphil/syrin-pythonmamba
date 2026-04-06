@@ -24,8 +24,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
-from examples.models.models import almock
-from syrin import Agent, Budget
+from syrin import Agent, Budget, Model
 from syrin.enums import MemoryType
 from syrin.guardrails import ContentFilter
 
@@ -42,7 +41,7 @@ class AnalysisOutput(BaseModel):
 class Assistant(Agent):
     name = "reports-assistant"
     description = "Agent with full report sections"
-    model = almock
+    model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
     system_prompt = "You are a helpful assistant."
 
 
@@ -57,7 +56,7 @@ guardrail = ContentFilter(blocked_words=["hack", "steal", "password"])
 
 
 class GuardedAssistant(Agent):
-    model = almock
+    model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
     guardrails = [guardrail]
 
 
@@ -67,21 +66,21 @@ print("Blocked:", result.report.guardrail.blocked, result.report.guardrail.block
 
 # 3. Memory operations in reports
 agent = Assistant()
-agent.remember("Python is great", memory_type=MemoryType.SEMANTIC)
+agent.remember("Python is great", memory_type=MemoryType.KNOWLEDGE)
 agent.recall("Python")
 print("Memory:", agent.report.memory.stores, agent.report.memory.recalls)
 
 
 # 4. Complete report summary
 class FullAgent(Agent):
-    model = almock
+    model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
     system_prompt = "You are a helpful assistant with memory."
     guardrails = [ContentFilter(blocked_words=["blocked"])]
     budget = Budget(max_cost=5.0)
 
 
 agent = FullAgent()
-agent.remember("User likes Python", memory_type=MemoryType.CORE)
+agent.remember("User likes Python", memory_type=MemoryType.FACTS)
 result = agent.run("Tell me about Python.")
 print(
     "Report:",

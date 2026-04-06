@@ -14,8 +14,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from examples.models.models import almock
-from syrin import Agent, Memory, MemoryType
+from syrin import Agent, Memory, MemoryType, Model
 from syrin.enums import MemoryBackend
 from syrin.memory import ChromaConfig
 
@@ -33,13 +32,13 @@ def main() -> None:
         )
 
         agent = Agent(
-            model=almock,
+            model=Model.mock(),
             system_prompt="You are a helpful assistant with memory.",
             memory=memory,
         )
 
-        agent.remember("User likes functional programming", memory_type=MemoryType.SEMANTIC)
-        agent.remember("Discussed list comprehensions yesterday", memory_type=MemoryType.EPISODIC)
+        agent.remember("User likes functional programming", memory_type=MemoryType.KNOWLEDGE)
+        agent.remember("Discussed list comprehensions yesterday", memory_type=MemoryType.HISTORY)
 
         entries = agent.recall(query="programming", limit=5)
         print(f"Recalled {len(entries)} memories:")

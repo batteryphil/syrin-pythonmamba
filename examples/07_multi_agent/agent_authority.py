@@ -1,225 +1,186 @@
-"""Agent authority — role-based control actions with SwarmAuthorityGuard.
+"""Agent authority — role-based control with agent objects.
 
-Shows how OrchestratorAgent controls WorkerAgents using the authority
-guard (RBAC), and what happens when a WorkerAgent tries to control the
-orchestrator — AgentPermissionError is raised.
+Shows how agents use role class attributes and build_guard_from_agents()
+to set up authority without free strings. Control actions pass agent
+objects — no "orchestrator-1" string IDs anywhere.
 
 Key concepts:
-  - SwarmAuthorityGuard(roles={...}, teams={...})
-  - SwarmController(actor_id=..., guard=..., state_registry=..., task_registry=...)
-  - ctrl.pause_agent(worker_id), ctrl.resume_agent(worker_id)
-  - ctrl.change_context(worker_id, new_context)
-  - ctrl.read_agent_state(worker_id) → AgentStateSnapshot
-  - AgentPermissionError — raised when unauthorised agent attempts control
-  - DelegationScope — grant temporary authority
+  - Agent.role = AgentRole.ORCHESTRATOR / SUPERVISOR / WORKER
+  - Agent.team = [WorkerClass]  — declares managed sub-agents
+  - build_guard_from_agents([...]) — builds guard from class metadata
+  - ctrl.pause_agent(worker)     — pass agent object, not a string
+  - guard.delegate(actor, delegate, permissions)
 
 Run:
-    uv run python examples/agent_authority.py
+    uv run python examples/07_multi_agent/agent_authority.py
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
+from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+from syrin import Agent, Model
 from syrin.enums import AgentPermission, AgentRole, AgentStatus, DelegationScope
 from syrin.swarm import (
     AgentPermissionError,
     AgentStateSnapshot,
-    SwarmAuthorityGuard,
     SwarmController,
+    build_guard_from_agents,
 )
 
-# ── Helper: build a minimal state + task registry ────────────────────────────
+_MODEL = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+
+# ── Agent class definitions with roles ───────────────────────────────────────
 
 
-def _make_state(agent_id: str, role: AgentRole) -> AgentStateSnapshot:
-    """Build a minimal AgentStateSnapshot for an agent."""
+class WorkerAgent(Agent):
+    model = _MODEL
+    system_prompt = "You process tasks."
+    role = AgentRole.WORKER
+
+
+class OrchestratorAgent(Agent):
+    model = _MODEL
+    system_prompt = "You delegate tasks to workers."
+    role = AgentRole.ORCHESTRATOR
+    team = [WorkerAgent]
+
+
+class SupervisorAgent(Agent):
+    model = _MODEL
+    system_prompt = "You supervise workers."
+    role = AgentRole.SUPERVISOR
+    team = [WorkerAgent]
+
+
+# ── Helper ────────────────────────────────────────────────────────────────────
+
+
+def _state_for(agent: Agent) -> AgentStateSnapshot:
     return AgentStateSnapshot(
-        agent_id=agent_id,
+        agent_id=agent.agent_id,
         status=AgentStatus.RUNNING,
-        role=role,
+        role=type(agent).role,
         last_output_summary="",
         cost_spent=0.0,
-        task="Process task",
+        task="process task",
         context_override=None,
         supervisor_id=None,
     )
 
 
-# ── Example 1: Orchestrator pauses and resumes a worker ───────────────────────
-#
-# OrchestratorAgent has AgentRole.ORCHESTRATOR and has WorkerAgent in its team.
-# It can pause, resume, change_context, and kill any agent in its team.
+# ── Example 1: Orchestrator controls its team ────────────────────────────────
 
 
 async def example_orchestrator_controls_worker() -> None:
-    print("\n── Example 1: Orchestrator controls worker ───────────────────────")
+    print("\n── Example 1: Orchestrator controls workers ─────────────────────")
 
-    # Set up roles and teams
-    guard = SwarmAuthorityGuard(
-        roles={
-            "orchestrator-1": AgentRole.ORCHESTRATOR,
-            "worker-1": AgentRole.WORKER,
-            "worker-2": AgentRole.WORKER,
-        },
-        teams={
-            "orchestrator-1": ["worker-1", "worker-2"],  # orchestrator manages these workers
-        },
-    )
+    orch = OrchestratorAgent()
+    w1 = WorkerAgent()
+    w2 = WorkerAgent()
 
-    # State and task registries
-    state: dict[str, AgentStateSnapshot] = {
-        "worker-1": _make_state("worker-1", AgentRole.WORKER),
-        "worker-2": _make_state("worker-2", AgentRole.WORKER),
-    }
-    tasks: dict[str, asyncio.Task[object]] = {}  # no real tasks in this example
+    guard = build_guard_from_agents([orch, w1, w2])
+    state = {a.agent_id: _state_for(a) for a in (orch, w1, w2)}
 
-    # Orchestrator controller
-    ctrl = SwarmController(
-        actor_id="orchestrator-1",
-        guard=guard,
-        state_registry=state,
-        task_registry=tasks,
-    )
+    ctrl = SwarmController(actor_id=orch, guard=guard, state_registry=state, task_registry={})
 
-    # Pause worker-1
-    await ctrl.pause_agent("worker-1")
-    print(f"  worker-1 status after pause:  {state['worker-1'].status}")
+    await ctrl.pause_agent(w1)
+    print(f"  w1 after pause:  {state[w1.agent_id].status}")
 
-    # Resume worker-1
-    await ctrl.resume_agent("worker-1")
-    print(f"  worker-1 status after resume: {state['worker-1'].status}")
+    await ctrl.resume_agent(w1)
+    print(f"  w1 after resume: {state[w1.agent_id].status}")
 
-    # Change context on worker-2 (inject new instructions)
-    await ctrl.change_context("worker-2", "Focus on healthcare sector analysis only")
-    print(f"  worker-2 context override: '{state['worker-2'].context_override}'")
+    await ctrl.change_context(w2, "Focus on healthcare sector only")
+    snap = await ctrl.read_agent_state(w2)
+    print(f"  w2 context: {snap.context_override!r}")
 
-    # Read worker-2 state
-    snap = await ctrl.read_agent_state("worker-2")
-    print(f"  worker-2 snapshot: id={snap.agent_id}  status={snap.status}  role={snap.role}")
-
-    # Audit log
-    audit = guard.audit_log()
-    print(f"\n  Audit log ({len(audit)} entries):")
-    for entry in audit:
-        print(f"    actor={entry.actor_id}  target={entry.target_id}  action={entry.action}")
+    for entry in guard.audit_log():
+        print(f"  [{entry.action}] {entry.actor_id} → {entry.target_id}")
 
 
-# ── Example 2: AgentPermissionError when worker tries to control orchestrator ──
+# ── Example 2: Worker denied when trying to control orchestrator ──────────────
 
 
 async def example_worker_denied() -> None:
-    print("\n── Example 2: Worker denied — AgentPermissionError ─────────────")
+    print("\n── Example 2: Worker cannot control orchestrator ────────────────")
 
-    guard = SwarmAuthorityGuard(
-        roles={
-            "orchestrator-1": AgentRole.ORCHESTRATOR,
-            "worker-1": AgentRole.WORKER,
-        },
-        teams={"orchestrator-1": ["worker-1"]},
-    )
+    orch = OrchestratorAgent()
+    worker = WorkerAgent()
 
-    state: dict[str, AgentStateSnapshot] = {
-        "orchestrator-1": _make_state("orchestrator-1", AgentRole.ORCHESTRATOR),
-    }
+    guard = build_guard_from_agents([orch, worker])
+    state = {orch.agent_id: _state_for(orch)}
 
-    # Worker controller — actor is worker-1
     worker_ctrl = SwarmController(
-        actor_id="worker-1",
-        guard=guard,
-        state_registry=state,
-        task_registry={},
+        actor_id=worker, guard=guard, state_registry=state, task_registry={}
     )
 
-    # Worker attempts to pause orchestrator — should be denied
     try:
-        await worker_ctrl.pause_agent("orchestrator-1")
-        print("  ERROR: pause should have been denied")
+        await worker_ctrl.pause_agent(orch)
     except AgentPermissionError as e:
-        print("  AgentPermissionError caught!")
-        print(f"    actor_id:         {e.actor_id}")
-        print(f"    target_id:        {e.target_id}")
-        print(f"    attempted_action: {e.attempted_action}")
-        print(f"    reason:           {e.reason}")
+        print(f"  DENIED: {e.reason}")
 
-    # Worker attempts to read orchestrator state — also denied (worker has no READ)
     try:
-        await worker_ctrl.read_agent_state("orchestrator-1")
-        print("  ERROR: read should have been denied")
+        await worker_ctrl.read_agent_state(orch)
     except AgentPermissionError as e:
-        print(f"\n  AgentPermissionError on read: {e.attempted_action}")
+        print(f"  DENIED (read): {e.reason}")
 
 
-# ── Example 3: Permission check without raising ───────────────────────────────
+# ── Example 3: guard.check() without raising ─────────────────────────────────
 
 
 async def example_permission_check() -> None:
     print("\n── Example 3: guard.check() — non-raising permission test ──────")
 
-    guard = SwarmAuthorityGuard(
-        roles={
-            "admin-1": AgentRole.ADMIN,
-            "orch-1": AgentRole.ORCHESTRATOR,
-            "worker-1": AgentRole.WORKER,
-        },
-        teams={"orch-1": ["worker-1"]},
-    )
+    orch = OrchestratorAgent()
+    sup = SupervisorAgent()
+    worker = WorkerAgent()
 
-    checks = [
-        ("admin-1", AgentPermission.CONTROL, "worker-1", True),  # admin can do anything
-        ("orch-1", AgentPermission.CONTROL, "worker-1", True),  # orch controls team
-        ("orch-1", AgentPermission.CONTROL, "admin-1", False),  # orch can't control admin
-        ("worker-1", AgentPermission.CONTROL, "orch-1", False),  # worker can't control orch
-        ("worker-1", AgentPermission.SIGNAL, "orch-1", True),  # worker can signal
-        ("worker-1", AgentPermission.READ, "orch-1", False),  # worker can't read
-    ]
+    guard = build_guard_from_agents([orch, sup, worker])
 
-    print(f"  {'Actor':<12} {'Permission':<12} {'Target':<12} {'Expected':<10} Result")
-    for actor, perm, target, expected in checks:
+    for actor, perm, target, expected in [
+        (orch, AgentPermission.CONTROL, worker, True),
+        (sup, AgentPermission.CONTROL, worker, True),
+        (worker, AgentPermission.CONTROL, orch, False),
+        (worker, AgentPermission.SIGNAL, orch, True),
+    ]:
         result = guard.check(actor, perm, target)
-        status = "PASS" if result == expected else "MISMATCH"
-        print(f"  {actor:<12} {perm!s:<12} {target:<12} {str(expected):<10} {result}  [{status}]")
+        mark = "✓" if result == expected else "✗"
+        print(f"  {mark} {type(actor).__name__} → {perm} {type(target).__name__}: {result}")
 
 
-# ── Example 4: Delegation — grant temporary authority ─────────────────────────
-#
-# An orchestrator can delegate CONTROL permission to another agent for
-# the duration of the current swarm run.
+# ── Example 4: Delegation of authority ───────────────────────────────────────
 
 
 async def example_delegation() -> None:
-    print("\n── Example 4: Delegation of authority ───────────────────────────")
+    print("\n── Example 4: Delegation ────────────────────────────────────────")
 
-    guard = SwarmAuthorityGuard(
-        roles={
-            "orchestrator-1": AgentRole.ORCHESTRATOR,
-            "supervisor-1": AgentRole.SUPERVISOR,
-            "worker-1": AgentRole.WORKER,
-        },
-        teams={"orchestrator-1": ["supervisor-1", "worker-1"]},
-    )
+    orch = OrchestratorAgent()
+    sup = SupervisorAgent()
+    worker = WorkerAgent()
 
-    # Before delegation: supervisor-1 cannot change context on worker-1
-    # (supervisor can only CONTROL = pause/resume, not CONTEXT)
-    can_context_before = guard.check("supervisor-1", AgentPermission.CONTEXT, "worker-1")
-    print(f"  Before delegation — supervisor can CONTEXT worker: {can_context_before}")
+    guard = build_guard_from_agents([orch, sup, worker])
 
-    # Delegate CONTEXT permission from orchestrator to supervisor
+    before = guard.check(sup, AgentPermission.CONTEXT, worker)
+    print(f"  Before delegation — supervisor CONTEXT worker: {before}")
+
     guard.delegate(
-        delegator_id="orchestrator-1",
-        delegate_id="supervisor-1",
+        delegator_id=orch,
+        delegate_id=sup,
         permissions=[AgentPermission.CONTEXT],
         scope=DelegationScope.CURRENT_RUN,
     )
+    after = guard.check(sup, AgentPermission.CONTEXT, worker)
+    print(f"  After delegation  — supervisor CONTEXT worker: {after}")
 
-    # After delegation: supervisor-1 now has CONTEXT permission
-    can_context_after = guard.check("supervisor-1", AgentPermission.CONTEXT, "worker-1")
-    print(f"  After delegation  — supervisor can CONTEXT worker: {can_context_after}")
-
-    # Revoke delegation
-    guard.revoke_delegation("orchestrator-1", "supervisor-1")
-    can_context_revoked = guard.check("supervisor-1", AgentPermission.CONTEXT, "worker-1")
-    print(f"  After revocation  — supervisor can CONTEXT worker: {can_context_revoked}")
+    guard.revoke_delegation(orch, sup)
+    revoked = guard.check(sup, AgentPermission.CONTEXT, worker)
+    print(f"  After revocation  — supervisor CONTEXT worker: {revoked}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────

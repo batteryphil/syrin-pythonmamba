@@ -28,12 +28,11 @@ class TestRateLimitExceededRaises:
         """Agent with rpm=1: first call ok, second call in same minute raises."""
         model = Model("anthropic/claude-3-5-sonnet")
         config = APIRateLimit(rpm=1)
-        from syrin.agent.config import AgentConfig
 
         agent = Agent(
             model=model,
             system_prompt="Test.",
-            config=AgentConfig(rate_limit=config),
+            rate_limit=config,
         )
         with patch.object(
             agent._provider,
@@ -74,12 +73,11 @@ class TestRateLimitThresholdActionCallback:
                 RateLimitThreshold(at=50, action=stop_at_50, metric=ThresholdMetric.RPM),
             ],
         )
-        from syrin.agent.config import AgentConfig
 
         agent = Agent(
             model=model,
             system_prompt="Test.",
-            config=AgentConfig(rate_limit=config),
+            rate_limit=config,
         )
         with patch.object(
             agent._provider,

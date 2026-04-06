@@ -71,7 +71,7 @@ class TestAgentWithWithoutMemory:
         mem = Memory()
         agent = Agent(model=model, system_prompt="You are helpful.", memory=mem)
 
-        agent.remember("User prefers Python over Java", memory_type=MemoryType.CORE)
+        agent.remember("User prefers Python over Java", memory_type=MemoryType.FACTS)
         response = agent.run("What do I prefer?")
 
         assert response.content is not None

@@ -12,52 +12,52 @@ from syrin.memory import (
 )
 from syrin.memory.store import MemoryStore
 from syrin.memory.types import (
-    CoreMemory,
-    EpisodicMemory,
-    ProceduralMemory,
-    SemanticMemory,
+    FactsMemory,
+    HistoryMemory,
+    InstructionsMemory,
+    KnowledgeMemory,
 )
 
 
 class TestMemoryTypes:
     """Tests for memory type-specific classes."""
 
-    def test_core_memory_creation(self) -> None:
-        """Core memory should be permanent and high importance."""
-        memory = CoreMemory(
+    def test_facts_memory_creation(self) -> None:
+        """Facts memory should be permanent and high importance."""
+        memory = FactsMemory(
             id="core-1",
             content="My name is John",
             importance=0.9,
         )
-        assert memory.type == MemoryType.CORE
-        assert memory.importance >= 0.8  # Core should default to high importance
+        assert memory.type == MemoryType.FACTS
+        assert memory.importance >= 0.8  # Facts should default to high importance
 
-    def test_episodic_memory_creation(self) -> None:
-        """Episodic memory stores specific events/experiences."""
-        memory = EpisodicMemory(
+    def test_history_memory_creation(self) -> None:
+        """History memory stores specific events/experiences."""
+        memory = HistoryMemory(
             id="ep-1",
             content="Yesterday I visited Paris",
             importance=0.7,
         )
-        assert memory.type == MemoryType.EPISODIC
+        assert memory.type == MemoryType.HISTORY
 
-    def test_semantic_memory_creation(self) -> None:
-        """Semantic memory stores facts and knowledge."""
-        memory = SemanticMemory(
+    def test_knowledge_memory_creation(self) -> None:
+        """Knowledge memory stores facts and knowledge."""
+        memory = KnowledgeMemory(
             id="sem-1",
             content="Paris is the capital of France",
             importance=0.8,
         )
-        assert memory.type == MemoryType.SEMANTIC
+        assert memory.type == MemoryType.KNOWLEDGE
 
-    def test_procedural_memory_creation(self) -> None:
-        """Procedural memory stores how-to knowledge."""
-        memory = ProceduralMemory(
+    def test_instructions_memory_creation(self) -> None:
+        """Instructions memory stores how-to knowledge."""
+        memory = InstructionsMemory(
             id="proc-1",
             content="How to make coffee: boil water, add coffee, pour hot water",
             importance=0.9,
         )
-        assert memory.type == MemoryType.PROCEDURAL
+        assert memory.type == MemoryType.INSTRUCTIONS
 
 
 class TestDecayCurves:
@@ -70,7 +70,7 @@ class TestDecayCurves:
         entry = MemoryEntry(
             id="test-1",
             content="Test",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=1.0,
             created_at=datetime.now() - timedelta(hours=24),
         )
@@ -86,7 +86,7 @@ class TestDecayCurves:
         entry = MemoryEntry(
             id="test-2",
             content="Test",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=1.0,
             created_at=datetime.now() - timedelta(hours=24),
         )
@@ -101,7 +101,7 @@ class TestDecayCurves:
         entry = MemoryEntry(
             id="test-3",
             content="Test",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=0.5,
             created_at=datetime.now() - timedelta(days=365),
         )
@@ -117,7 +117,7 @@ class TestDecayCurves:
         entry = MemoryEntry(
             id="test-4",
             content="Test",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=0.5,
             created_at=datetime.now() - timedelta(hours=24),
         )
@@ -146,7 +146,7 @@ class TestMemoryBudget:
         entry = MemoryEntry(
             id="test-1",
             content="Some content that is quite long to exceed the tiny budget",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=0.5,
         )
 
@@ -162,7 +162,7 @@ class TestMemoryBudget:
                 MemoryEntry(
                     id="test-2",
                     content="Some content",
-                    type=MemoryType.EPISODIC,
+                    type=MemoryType.HISTORY,
                     importance=0.5,
                 )
             )
@@ -178,7 +178,7 @@ class TestMemoryStore:
         entry = MemoryEntry(
             id="mem-1",
             content="Test memory",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=0.7,
         )
 
@@ -191,26 +191,26 @@ class TestMemoryStore:
         store = MemoryStore()
 
         store.add(
-            MemoryEntry(id="1", content="I love coffee", type=MemoryType.EPISODIC, importance=0.8)
+            MemoryEntry(id="1", content="I love coffee", type=MemoryType.HISTORY, importance=0.8)
         )
         store.add(
             MemoryEntry(
-                id="2", content="Coffee has caffeine", type=MemoryType.SEMANTIC, importance=0.9
+                id="2", content="Coffee has caffeine", type=MemoryType.KNOWLEDGE, importance=0.9
             )
         )
         store.add(
             MemoryEntry(
-                id="3", content="Yesterday I drank coffee", type=MemoryType.EPISODIC, importance=0.6
+                id="3", content="Yesterday I drank coffee", type=MemoryType.HISTORY, importance=0.6
             )
         )
 
-        results = store.recall("coffee", memory_type=MemoryType.EPISODIC)
+        results = store.recall("coffee", memory_type=MemoryType.HISTORY)
         assert len(results) >= 1
 
     def test_forget_by_id(self) -> None:
         """Forgetting by ID should remove specific memory."""
         store = MemoryStore()
-        store.add(MemoryEntry(id="to-delete", content="Temp", type=MemoryType.EPISODIC))
+        store.add(MemoryEntry(id="to-delete", content="Temp", type=MemoryType.HISTORY))
 
         store.forget(memory_id="to-delete")
         assert store.get("to-delete") is None
@@ -218,11 +218,11 @@ class TestMemoryStore:
     def test_forget_by_type(self) -> None:
         """Forgetting by type should remove all of that type."""
         store = MemoryStore()
-        store.add(MemoryEntry(id="1", content="Temp", type=MemoryType.EPISODIC))
-        store.add(MemoryEntry(id="2", content="Temp", type=MemoryType.EPISODIC))
-        store.add(MemoryEntry(id="3", content="Important", type=MemoryType.CORE))
+        store.add(MemoryEntry(id="1", content="Temp", type=MemoryType.HISTORY))
+        store.add(MemoryEntry(id="2", content="Temp", type=MemoryType.HISTORY))
+        store.add(MemoryEntry(id="3", content="Important", type=MemoryType.FACTS))
 
-        store.forget(memory_type=MemoryType.EPISODIC)
+        store.forget(memory_type=MemoryType.HISTORY)
 
         assert store.get("1") is None
         assert store.get("2") is None
@@ -236,7 +236,7 @@ class TestMemoryStore:
         old_memory = MemoryEntry(
             id="old",
             content="Old memory",
-            type=MemoryType.EPISODIC,
+            type=MemoryType.HISTORY,
             importance=1.0,
             created_at=datetime.now() - timedelta(days=30),
         )
@@ -260,7 +260,7 @@ class TestMemoryObservability:
                 MemoryEntry(
                     id="span-test",
                     content="Test",
-                    type=MemoryType.EPISODIC,
+                    type=MemoryType.HISTORY,
                 )
             )
 
@@ -289,7 +289,7 @@ class TestMemoryHooks:
         events.on("memory.recall", lambda _ctx: None)
 
         store = MemoryStore(events=events)
-        store.add(MemoryEntry(id="1", content="Test", type=MemoryType.EPISODIC))
+        store.add(MemoryEntry(id="1", content="Test", type=MemoryType.HISTORY))
         store.recall("test")
 
         # Events are emitted internally but handlers are called
@@ -304,24 +304,24 @@ class TestMemoryHooks:
 class TestMemoryTypesEdgeCases:
     """Edge cases for 4-type memory system."""
 
-    def test_core_memory_with_zero_importance(self):
-        """CoreMemory with zero importance."""
-        memory = CoreMemory(id="c1", content="Test", importance=0.0)
+    def test_facts_memory_with_zero_importance(self):
+        """FactsMemory with zero importance."""
+        memory = FactsMemory(id="c1", content="Test", importance=0.0)
         assert memory.importance == 0.0
 
-    def test_episodic_memory_with_max_importance(self):
-        """EpisodicMemory with max importance."""
-        memory = EpisodicMemory(id="e1", content="Test", importance=1.0)
+    def test_history_memory_with_max_importance(self):
+        """HistoryMemory with max importance."""
+        memory = HistoryMemory(id="e1", content="Test", importance=1.0)
         assert memory.importance == 1.0
 
     def test_memory_entry_with_empty_content(self):
         """MemoryEntry with empty content."""
-        entry = MemoryEntry(id="e1", content="", type=MemoryType.CORE)
+        entry = MemoryEntry(id="e1", content="", type=MemoryType.FACTS)
         assert entry.content == ""
 
     def test_memory_entry_with_unicode(self):
         """MemoryEntry with unicode content."""
-        entry = MemoryEntry(id="e1", content="Hello 🌍 你好", type=MemoryType.SEMANTIC)
+        entry = MemoryEntry(id="e1", content="Hello 🌍 你好", type=MemoryType.KNOWLEDGE)
         assert "🌍" in entry.content
 
     def test_memory_type_all_values(self):
@@ -340,6 +340,6 @@ class TestMemoryTypesEdgeCases:
         """MemoryStore with many entries."""
         store = MemoryStore()
         for i in range(100):
-            store.add(MemoryEntry(id=f"e{i}", content=f"content {i}", type=MemoryType.CORE))
+            store.add(MemoryEntry(id=f"e{i}", content=f"content {i}", type=MemoryType.FACTS))
         results = store.list()
         assert len(results) == 100

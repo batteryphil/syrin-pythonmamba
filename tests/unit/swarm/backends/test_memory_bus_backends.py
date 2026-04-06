@@ -23,7 +23,7 @@ from syrin.swarm.backends._sqlite import SqliteBusBackend
 
 def _make_entry(
     content: str = "test content",
-    memory_type: MemoryType = MemoryType.SEMANTIC,
+    memory_type: MemoryType = MemoryType.KNOWLEDGE,
 ) -> MemoryEntry:
     return MemoryEntry(
         id=str(uuid.uuid4()),

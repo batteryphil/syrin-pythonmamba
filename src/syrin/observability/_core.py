@@ -36,7 +36,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 
 _log = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ class Session:
     """
 
     id: str
-    start_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    start_time: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, object] = field(default_factory=dict)
     span_count: int = 0
 
@@ -141,7 +141,7 @@ class Span:
     session_id: str | None = None
 
     # Timing
-    start_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    start_time: datetime = field(default_factory=lambda: datetime.now(UTC))
     end_time: datetime | None = None
 
     # Status and result
@@ -164,7 +164,7 @@ class Span:
     @property
     def duration_ms(self) -> float:
         """Calculate duration in milliseconds."""
-        end = self.end_time or datetime.now(timezone.utc)
+        end = self.end_time or datetime.now(UTC)
         return (end - self.start_time).total_seconds() * 1000
 
     @property
@@ -192,7 +192,7 @@ class Span:
         self.events.append(
             {
                 "name": name,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "attributes": attributes or {},
             }
         )
@@ -216,7 +216,7 @@ class Span:
 
     def end(self, status: SpanStatus | None = None, message: str | None = None) -> None:
         """Mark the span as ended."""
-        self.end_time = datetime.now(timezone.utc)
+        self.end_time = datetime.now(UTC)
         if status:
             self.set_status(status, message)
         elif self.status == SpanStatus.PENDING:
@@ -650,7 +650,7 @@ def memory_span(
         **attributes: Additional attributes
 
     Example:
-        >>> with memory_span("recall", memory_type="episodic", query="user preferences") as span:
+        >>> with memory_span("recall", memory_type="history", query="user preferences") as span:
         ...     results = memory recall(query)
         ...     span.set_attribute("results_count", len(results))
     """

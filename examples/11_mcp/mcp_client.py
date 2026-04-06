@@ -28,8 +28,7 @@ if str(_root) not in sys.path:
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock
-from syrin import Agent, MCPClient
+from syrin import Agent, MCPClient, Model
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -42,7 +41,7 @@ class ProductAgent(Agent):
 
     name = "product-agent"
     description = "E-commerce product search (remote MCP tools)"
-    model = almock
+    model = Model.mock()
     system_prompt = "You help users find products. Use the search and get tools."
     tools = [MCPClient(MCP_URL)]
 

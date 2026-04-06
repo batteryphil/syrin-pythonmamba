@@ -7,7 +7,7 @@ import logging
 import threading
 import uuid
 from collections.abc import Callable, Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from syrin.budget import BudgetExceededContext
 from syrin.enums import BudgetLimitType, DecayStrategy, MemoryScope, MemoryType
@@ -64,7 +64,7 @@ class MemoryStore:
         """Create a span for observability (if available)."""
         span_data: dict[str, object] = {
             "operation": operation,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         try:
             from syrin.observability import (
@@ -98,7 +98,7 @@ class MemoryStore:
         self,
         entry: MemoryEntry | None = None,
         content: str = "",
-        memory_type: MemoryType = MemoryType.EPISODIC,
+        memory_type: MemoryType = MemoryType.HISTORY,
         importance: float | None = None,
         **kwargs: object,
     ) -> bool:

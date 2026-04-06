@@ -1,171 +1,143 @@
 ---
-title: Pipeline
-description: Run multiple agents in sequence or in parallel — each agent's output feeds the next
+title: Sequential & Parallel Helpers
+description: Lightweight one-off agent chaining with sequential() and parallel()
 weight: 92
 ---
 
-## What Is a Pipeline?
+## When to Use These Helpers
 
-A pipeline is the simplest form of multi-agent coordination: agents run one after another. Each agent receives the previous agent's output as its input (or as additional context). The last agent's output becomes the final result.
+For production multi-step workflows, use [`Workflow`](/agent-kit/multi-agent/workflow) — it supports conditional branching, visualization, and lifecycle hooks.
 
-Think of a content creation team: a researcher finds facts, a writer turns them into prose, an editor polishes the prose. Each step depends on the previous step's work. That is a pipeline.
+For quick, one-off agent chains where you don't need the full Workflow API, syrin provides two utility functions:
 
-## Sequential Pipeline
+- `sequential()` — run agents one after another, each receiving the previous output as context
+- `parallel()` — run agents simultaneously and collect all results
 
-The `Pipeline` class runs agents in sequence:
+## Sequential Execution
+
+`sequential()` takes a list of `(agent_instance, task)` tuples. It runs them in order and returns the last agent's `Response`.
 
 ```python
-from syrin import Agent, Model, Pipeline
-
-model = Model.mock()
+from syrin import Agent, Model
+from syrin.agent.pipeline import sequential
 
 class ResearchAgent(Agent):
-    model = model
+    model = Model.mock()
     system_prompt = "You research topics thoroughly."
 
 class WriterAgent(Agent):
-    model = model
+    model = Model.mock()
     system_prompt = "You write clear, engaging summaries."
 
 class EditorAgent(Agent):
-    model = model
-    system_prompt = "You edit and polish content."
+    model = Model.mock()
+    system_prompt = "You edit and polish content for publication."
 
-pipeline = Pipeline()
-result = pipeline.run([
-    (ResearchAgent, "Research the history of Python programming language"),
-    (WriterAgent, "Write a summary of Python's history"),
-    (EditorAgent, "Polish and finalize the Python history article"),
+result = sequential([
+    (ResearchAgent(), "Research the history of Python"),
+    (WriterAgent(),   "Write a summary of Python's history"),
+    (EditorAgent(),   "Polish and finalize the article"),
 ])
 
-print(f"Result: {result.content[:80]}")
+print(result.content)
 print(f"Cost: ${result.cost:.6f}")
 ```
 
-Output:
+Each step receives the previous step's output appended to its task. The final `Response` reflects the total cost across all agents.
 
-```
-Result: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
-Cost: $0.000062
-```
+**Empty list** → returns an empty `Response` with no content and zero cost.
 
-Each step in the `run()` list is a tuple of `(AgentClass, task_description)`. The pipeline creates an instance of each class, runs it with the task, and passes the result forward to the next agent.
+## Parallel Execution
 
-The `result` is the final agent's `Response` object: it has `content`, `cost`, `tokens`, and all the usual fields. The `cost` reflects the total cost of all agents in the pipeline combined.
-
-## Parallel Utilities
-
-Sometimes agents in a step do not depend on each other and can run at the same time. Syrin provides two utility functions:
+`parallel()` is an async function. It runs all agents simultaneously and returns a **list** of `Response` objects — one per agent, in the same order as the input.
 
 ```python
 import asyncio
 from syrin import Agent, Model
-from syrin import parallel
+from syrin.agent.pipeline import parallel
 
-model = Model.mock()
+class NewsAgent(Agent):
+    model = Model.mock()
+    system_prompt = "Summarize AI news."
+
+class StockAgent(Agent):
+    model = Model.mock()
+    system_prompt = "Report on AI stock performance."
 
 class ResearchAgent(Agent):
-    model = model
-    system_prompt = "You research topics."
-
-class SummaryAgent(Agent):
-    model = model
-    system_prompt = "You summarize information."
+    model = Model.mock()
+    system_prompt = "Find recent AI research papers."
 
 async def main():
     results = await parallel([
-        (ResearchAgent(), "Research quantum computing"),
-        (SummaryAgent(), "Summarize AI trends"),
+        (NewsAgent(),     "AI and tech news today"),
+        (StockAgent(),    "AI sector stocks"),
+        (ResearchAgent(), "Latest AI papers"),
     ])
-    print(f"Parallel results: {len(results)} responses")
     for r in results:
-        print(f"  - {r.content[:50]}")
+        print(r.content[:80])
 
 asyncio.run(main())
 ```
 
-Output:
+Wall time equals the **slowest** agent, not the sum of all agents.
 
-```
-Parallel results: 2 responses
-  - Lorem ipsum dolor sit amet, consectetur adipiscing
-  - Lorem ipsum dolor sit amet, consectetur adipiscing
-```
+Note: `parallel()` takes **instances** (not classes). Construct your agents before passing them.
 
-Note: `parallel()` takes **instances** (not classes), and requires `asyncio` because it runs agents concurrently. The return is a list of `Response` objects.
+## Mix Sequential and Parallel
 
-The `sequential()` utility does the same but with instance pairs, useful when you have agents already constructed:
+A common pattern: parallel research, sequential synthesis.
 
 ```python
-from syrin import sequential
+import asyncio
+from syrin import Agent, Model
+from syrin.agent.pipeline import sequential, parallel
 
-result = sequential([
-    (ResearchAgent(), "Research the topic"),
-    (WriterAgent(), "Write about the topic"),
-], pass_previous=True)
-# pass_previous=True appends the previous output to each agent's input
+class SourceA(Agent):
+    model = Model.mock()
+    system_prompt = "Research source A."
+
+class SourceB(Agent):
+    model = Model.mock()
+    system_prompt = "Research source B."
+
+class Writer(Agent):
+    model = Model.mock()
+    system_prompt = "Synthesize research into a report."
+
+async def run():
+    # Gather from both sources simultaneously
+    gathered = await parallel([
+        (SourceA(), "Research AI trends from source A"),
+        (SourceB(), "Research AI trends from source B"),
+    ])
+
+    combined = "\n\n".join(r.content for r in gathered)
+
+    # Synthesize sequentially
+    final = sequential([
+        (Writer(), f"Write a unified report from:\n{combined}"),
+    ])
+    return final
+
+result = asyncio.run(run())
+print(result.content)
 ```
 
-## Pipeline With a Shared Budget
+## When to Use These vs. Workflow vs. Swarm
 
-Add a budget to the pipeline to track total cost and enforce limits:
+| Need | Use |
+|------|-----|
+| Fixed steps, conditional logic, branching | `Workflow` |
+| Multiple agents on the same goal | `Swarm(topology=PARALLEL)` |
+| Quick one-off sequential chain | `sequential()` |
+| Quick one-off parallel run | `parallel()` |
+| LLM decides which agents to use | `AgentRouter` |
 
-```python
-from syrin import Agent, Budget, Model, Pipeline
-from syrin.enums import ExceedPolicy
-
-model = Model.mock()
-
-class ResearchAgent(Agent):
-    model = model
-    system_prompt = "You research topics."
-
-class WriterAgent(Agent):
-    model = model
-    system_prompt = "You write summaries."
-
-pipeline = Pipeline(
-    budget=Budget(max_cost=5.00, exceed_policy=ExceedPolicy.WARN)
-)
-
-result = pipeline.run([
-    (ResearchAgent, "Research renewable energy"),
-    (WriterAgent, "Write about renewable energy"),
-])
-
-print(f"Result: {result.content[:60]}")
-print(f"Total cost: ${result.cost:.6f}")
-```
-
-The pipeline enforces the budget across all agents. If the accumulated cost hits the limit, the remaining agents are skipped.
-
-## When to Use Pipeline vs. Swarm
-
-Use **Pipeline** when:
-- Each step genuinely depends on the previous step's output
-- You want the simplest possible sequential workflow
-- You do not need conditional logic or branching
-
-Use **Swarm** (PARALLEL topology) when:
-- Agents can work on the same goal independently
-- Faster completion matters more than sequential dependency
-- You need shared budget with per-agent limits
-
-Use **Workflow** when:
-- You need conditional logic ("if this, then route to agent A, else route to agent B")
-- You need a mix of sequential and parallel steps
-- You need a visualizable execution graph
-
-## GitHub Examples
-
-Full working examples with more patterns are in the GitHub repository:
-
-- [`examples/07_multi_agent/pipeline.py`](https://github.com/syrin-labs/syrin-python/blob/main/examples/07_multi_agent/pipeline.py) — Basic pipeline with dynamic prompts
-- [`examples/07_multi_agent/workflow_sequential.py`](https://github.com/syrin-labs/syrin-python/blob/main/examples/07_multi_agent/workflow_sequential.py) — Sequential workflow pattern
-- [`examples/07_multi_agent/workflow_parallel.py`](https://github.com/syrin-labs/syrin-python/blob/main/examples/07_multi_agent/workflow_parallel.py) — Parallel within a workflow
+`sequential()` and `parallel()` are intentionally minimal. No lifecycle hooks, no budget enforcement, no visualization. If you need those features, use `Workflow` or `Swarm`.
 
 ## What's Next
 
 - [Workflow](/agent-kit/multi-agent/workflow) — Conditional routing, parallel steps, visualization
-- [Swarm](/agent-kit/multi-agent/swarm) — Shared goals, shared budgets, five topologies
+- [Swarm](/agent-kit/multi-agent/swarm) — Five topologies: PARALLEL, CONSENSUS, REFLECTION, ORCHESTRATOR, WORKFLOW
 - [Budget Delegation](/agent-kit/multi-agent/budget-delegation) — Cost control across multi-agent systems

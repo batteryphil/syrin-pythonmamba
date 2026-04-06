@@ -128,11 +128,13 @@ class TestReflectionBasicRun:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="Write a haiku about AI",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=CriticAgent,
-                max_rounds=1,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=CriticAgent,
+                    max_rounds=1,
+                ),
             ),
         )
         result = await swarm.run()
@@ -146,11 +148,13 @@ class TestReflectionBasicRun:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="Write a poem",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=CriticAgent,
-                max_rounds=1,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=CriticAgent,
+                    max_rounds=1,
+                ),
             ),
         )
         result = await swarm.run()
@@ -176,12 +180,14 @@ class TestReflectionEarlyStopping:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="Write something",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=CriticAgent,
-                max_rounds=5,
-                stop_when=stop_fn,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=CriticAgent,
+                    max_rounds=5,
+                    stop_when=stop_fn,
+                ),
             ),
         )
         result = await swarm.run()
@@ -195,12 +201,14 @@ class TestReflectionEarlyStopping:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="Write something",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=LowScoreCritic,
-                max_rounds=3,
-                stop_when=None,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=LowScoreCritic,
+                    max_rounds=3,
+                    stop_when=None,
+                ),
             ),
         )
         result = await swarm.run()
@@ -223,11 +231,13 @@ class TestReflectionRoundOutputs:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="Write a haiku",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=CriticAgent,
-                max_rounds=1,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=CriticAgent,
+                    max_rounds=1,
+                ),
             ),
         )
         result = await swarm.run()
@@ -242,11 +252,13 @@ class TestReflectionRoundOutputs:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="Write a haiku",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=CriticAgent,
-                max_rounds=1,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=CriticAgent,
+                    max_rounds=1,
+                ),
             ),
         )
         result = await swarm.run()
@@ -269,16 +281,18 @@ class TestReflectionRoundOutputs:
         swarm = Swarm(
             agents=[_TrackWriter()],
             goal="Write a haiku",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=_TrackWriter,
-                critic=CriticAgent,  # returns "Good work. Score: 0.9"
-                max_rounds=2,
-                stop_when=None,  # run all rounds
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=_TrackWriter,
+                    critic=CriticAgent,  # returns "Good work. Score: 0.9"
+                    max_rounds=2,
+                    stop_when=None,  # run all rounds
+                ),
             ),
         )
         # Override CriticAgent to always give low score so we run round 2
-        swarm.reflection_config = ReflectionConfig(  # type: ignore[attr-defined]
+        swarm.config.reflection = ReflectionConfig(  # type: ignore[attr-defined]
             producer=_TrackWriter,
             critic=LowScoreCritic,
             max_rounds=2,
@@ -308,12 +322,14 @@ class TestReflectionRoundCount:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="Write something",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=LowScoreCritic,
-                max_rounds=3,
-                stop_when=None,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=LowScoreCritic,
+                    max_rounds=3,
+                    stop_when=None,
+                ),
             ),
         )
         result = await swarm.run()
@@ -337,12 +353,14 @@ class TestReflectionFinalRound:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="Write something",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=CriticAgent,  # score 0.9
-                max_rounds=5,
-                stop_when=lambda ro: ro.score >= 0.85,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=CriticAgent,  # score 0.9
+                    max_rounds=5,
+                    stop_when=lambda ro: ro.score >= 0.85,
+                ),
             ),
         )
         result = await swarm.run()
@@ -355,12 +373,14 @@ class TestReflectionFinalRound:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="Write something",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=LowScoreCritic,
-                max_rounds=3,
-                stop_when=None,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=LowScoreCritic,
+                    max_rounds=3,
+                    stop_when=None,
+                ),
             ),
         )
         result = await swarm.run()
@@ -403,12 +423,14 @@ class TestReflectionBestResult:
         swarm = Swarm(
             agents=[_SimpleWriter()],
             goal="Best result test",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=_SimpleWriter,
-                critic=_VaryingCritic,
-                max_rounds=3,
-                stop_when=None,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=_SimpleWriter,
+                    critic=_VaryingCritic,
+                    max_rounds=3,
+                    stop_when=None,
+                ),
             ),
         )
         result = await swarm.run()
@@ -454,11 +476,13 @@ class TestReflectionHooks:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="hook test",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=CriticAgent,
-                max_rounds=1,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=CriticAgent,
+                    max_rounds=1,
+                ),
             ),
         )
         swarm.events.on(Hook.SWARM_STARTED, lambda ctx: fired.append(ctx))
@@ -472,12 +496,14 @@ class TestReflectionHooks:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="end hook",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=CriticAgent,
-                max_rounds=2,
-                stop_when=None,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=CriticAgent,
+                    max_rounds=2,
+                    stop_when=None,
+                ),
             ),
         )
         swarm.events.on(Hook.SWARM_ENDED, lambda ctx: ended.append(ctx))
@@ -492,11 +518,13 @@ class TestReflectionHooks:
         swarm = Swarm(
             agents=[WriterAgent()],
             goal="join hooks",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=WriterAgent,
-                critic=CriticAgent,
-                max_rounds=1,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=WriterAgent,
+                    critic=CriticAgent,
+                    max_rounds=1,
+                ),
             ),
         )
         swarm.events.on(Hook.AGENT_JOINED_SWARM, lambda ctx: joined.append(ctx))
@@ -529,12 +557,14 @@ class TestReflectionFeedbackPropagation:
         swarm = Swarm(
             agents=[_TrackWriter2()],
             goal="Original goal",
-            config=SwarmConfig(topology=SwarmTopology.REFLECTION),
-            reflection_config=ReflectionConfig(
-                producer=_TrackWriter2,
-                critic=LowScoreCritic,  # Score: 0.3 — will not stop early
-                max_rounds=2,
-                stop_when=None,
+            config=SwarmConfig(
+                topology=SwarmTopology.REFLECTION,
+                reflection=ReflectionConfig(
+                    producer=_TrackWriter2,
+                    critic=LowScoreCritic,  # Score: 0.3 — will not stop early
+                    max_rounds=2,
+                    stop_when=None,
+                ),
             ),
         )
         result = await swarm.run()

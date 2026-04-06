@@ -122,10 +122,10 @@ def test_response_repr() -> None:
     assert "Hello world" in repr(r)
 
 
-def test_response_output_is_none_when_no_structured() -> None:
-    """response.output is None when no structured output configured."""
+def test_response_output_returns_content_when_no_structured() -> None:
+    """response.output returns content string for plain text agents (no structured output)."""
     r = Response(content="plain text")
-    assert r.output is None
+    assert r.output == "plain text"
 
 
 def test_response_output_returns_structured_parsed() -> None:

@@ -461,12 +461,12 @@ class TestAgentContextSnapshotFacade:
 
     def test_agent_context_snapshot_returns_snapshot(self) -> None:
         """Agent with DefaultContextManager exposes context.snapshot()."""
-        from syrin import Agent, AgentConfig, Context, Model
+        from syrin import Agent, Context, Model
 
         # Use a simple model stub so we don't need real API
         agent = Agent(
             model=Model("openai/gpt-4o-mini"),
-            config=AgentConfig(context=Context(max_tokens=8000)),
+            context=Context(max_tokens=8000),
         )
         # Before any run, snapshot is empty
         snap = agent.context.snapshot()

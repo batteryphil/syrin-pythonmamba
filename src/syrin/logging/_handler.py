@@ -69,7 +69,7 @@ class SyrinHandler(logging.Handler):
             self.handleError(record)
 
     def _format_json(self, record: logging.LogRecord) -> str:
-        ts = datetime.datetime.fromtimestamp(record.created, tz=datetime.timezone.utc).strftime(
+        ts = datetime.datetime.fromtimestamp(record.created, tz=datetime.UTC).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
         data: dict[str, object] = {
@@ -110,7 +110,5 @@ class SyrinHandler(logging.Handler):
         return json.dumps(data, default=str)
 
     def _format_text(self, record: logging.LogRecord) -> str:
-        ts = datetime.datetime.fromtimestamp(record.created, tz=datetime.timezone.utc).strftime(
-            "%H:%M:%S"
-        )
+        ts = datetime.datetime.fromtimestamp(record.created, tz=datetime.UTC).strftime("%H:%M:%S")
         return f"[{ts}] {record.levelname:<8} {record.name}: {record.getMessage()}"

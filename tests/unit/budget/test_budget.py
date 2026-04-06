@@ -13,8 +13,6 @@ from syrin.budget import (
     CheckBudgetResult,
     RateLimit,
     TokenLimits,
-    raise_on_exceeded,
-    warn_on_exceeded,
 )
 from syrin.enums import ExceedPolicy, ThresholdMetric
 from syrin.types import CostInfo, TokenUsage
@@ -30,7 +28,7 @@ def test_rate_limit_model() -> None:
 def test_budget_model() -> None:
     b = Budget(max_cost=5.0, exceed_policy=ExceedPolicy.WARN, thresholds=[])
     assert b.max_cost == 5.0
-    assert b.on_exceeded is warn_on_exceeded
+    assert callable(b._handler)
     assert b.thresholds == []
 
 
@@ -339,17 +337,21 @@ def test_budget_with_no_thresholds() -> None:
     assert b.thresholds == []
 
 
-def test_budget_on_exceeded_various_valid_actions() -> None:
-    """ExceedPolicy values map to the correct internal handlers."""
+def test_budget_exceed_policy_handlers() -> None:
+    """ExceedPolicy values map to callable handlers via _handler."""
     b1 = Budget(max_cost=1.0, exceed_policy=ExceedPolicy.STOP)
-    assert b1.on_exceeded is raise_on_exceeded
+    assert callable(b1._handler)
 
     b2 = Budget(max_cost=1.0, exceed_policy=ExceedPolicy.WARN)
-    assert b2.on_exceeded is warn_on_exceeded
+    assert callable(b2._handler)
 
-    # IGNORE → no-op lambda (callable but not one of the named handlers)
+    # IGNORE → callable no-op
     b3 = Budget(max_cost=1.0, exceed_policy=ExceedPolicy.IGNORE)
-    assert callable(b3.on_exceeded)
+    assert callable(b3._handler)
+
+    # No policy → _handler is None
+    b4 = Budget(max_cost=1.0)
+    assert b4._handler is None
 
 
 def test_budget_tracker_reset_run_multiple_times() -> None:
@@ -463,16 +465,16 @@ def test_budget_threshold_requires_action() -> None:
 
 def test_budget_reserve_effective_limit() -> None:
     """Reserve reduces effective run limit."""
-    b = Budget(max_cost=10.0, reserve=2.0)
+    b = Budget(max_cost=10.0, safety_margin=2.0)
     assert b.max_cost == 10.0
-    assert b.reserve == 2.0
+    assert b.safety_margin == 2.0
     b._set_spent(0)
     assert b.remaining == 8.0  # 10 - 2 - 0
 
 
 def test_budget_remaining_with_reserve_after_spend() -> None:
     """Remaining accounts for reserve and spent."""
-    b = Budget(max_cost=10.0, reserve=1.0)
+    b = Budget(max_cost=10.0, safety_margin=1.0)
     b._set_spent(4.0)
     assert b.remaining == 5.0  # (10 - 1) - 4
 
@@ -481,7 +483,7 @@ def test_budget_tracker_check_budget_reserve_exceeded() -> None:
     """check_budget uses effective run (run - reserve)."""
     tracker = BudgetTracker()
     tracker.record(CostInfo(cost_usd=5.0, token_usage=TokenUsage()))
-    budget = Budget(max_cost=10.0, reserve=5.0)  # effective = 5
+    budget = Budget(max_cost=10.0, safety_margin=5.0)  # effective = 5
     assert tracker.check_budget(budget).status == BudgetStatus.EXCEEDED
 
 
@@ -489,7 +491,7 @@ def test_budget_tracker_check_budget_reserve_ok() -> None:
     """Under effective limit is OK."""
     tracker = BudgetTracker()
     tracker.record(CostInfo(cost_usd=3.0, token_usage=TokenUsage()))
-    budget = Budget(max_cost=10.0, reserve=5.0)  # effective = 5
+    budget = Budget(max_cost=10.0, safety_margin=5.0)  # effective = 5
     assert tracker.check_budget(budget).status == BudgetStatus.OK
 
 
@@ -691,14 +693,14 @@ def test_budget_consume_zero_or_negative_no_op() -> None:
 
 def test_budget_reserve_equals_run_remaining_based_on_spent_only() -> None:
     """When reserve >= run, effective limit is run (remaining clamped to 0)."""
-    b = Budget(max_cost=5.0, reserve=5.0)
+    b = Budget(max_cost=5.0, safety_margin=5.0)
     b._set_spent(0)
     assert b.remaining == 0.0  # (5 - 5) - 0
 
 
 def test_budget_reserve_exceeds_run_remaining_clamped_to_zero() -> None:
     """When reserve > run, remaining is clamped to 0 (never negative)."""
-    b = Budget(max_cost=5.0, reserve=10.0)
+    b = Budget(max_cost=5.0, safety_margin=10.0)
     b._set_spent(0)
     assert b.remaining == 0.0
 

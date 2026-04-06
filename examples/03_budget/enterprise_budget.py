@@ -2,11 +2,11 @@
 
 Covers:
 1.  Pre-call estimation vs. post-call actual cost
-2.  What happens when a limit is exceeded (STOP / WARN / IGNORE / SWITCH)
+2.  What happens when a limit is exceeded (STOP / WARN / IGNORE)
 3.  Keeping an important task alive when the budget is hit
 4.  Getting warned *before* the budget is fully gone (thresholds)
 5.  Model switching at a cost threshold
-6.  What `reserve` does and why you need it
+6.  What `safety_margin` does and why you need it
 7.  Budget in observability (hooks / events)
 8.  budget_summary() and export_costs() — the dashboard API
 9.  Remote config — tweak limits without redeployment
@@ -95,14 +95,10 @@ result_ignore = agent_ignore.run("Budget ignored for this agent")
 print(f"   IGNORE→ silent continue. Cost: ${result_ignore.cost:.6f}")
 
 
-# Custom callable: full control
-def custom_handler(ctx: object) -> None:
-    print(f"   CUSTOM→ handler called: {getattr(ctx, 'message', '')[:60]}")
-
-
+# WARN policy: log and continue (exceed_policy is the canonical way to configure behaviour)
 agent_custom = Agent(
     model=model,
-    budget=Budget(max_cost=0.0001, on_exceeded=custom_handler),
+    budget=Budget(max_cost=0.0001, exceed_policy=ExceedPolicy.WARN),
 )
 agent_custom.run("Custom handler fires here")
 print()
@@ -115,13 +111,13 @@ print("3. KEEPING AN IMPORTANT TASK ALIVE WHEN BUDGET IS HIT")
 print(SEP)
 
 # Use ExceedPolicy.WARN or ExceedPolicy.IGNORE so the task completes.
-# Pair with `reserve` to guarantee budget for the reply.
+# Pair with `safety_margin` to guarantee budget for the reply.
 
 agent_critical = Agent(
     model=model,
     budget=Budget(
         max_cost=0.0001,  # Tiny budget to trigger the scenario
-        reserve=0.00005,  # Always hold this back for the final reply
+        safety_margin=0.00005,  # Always hold this back for the final reply
         exceed_policy=ExceedPolicy.WARN,  # Warn but never abort
     ),
 )
@@ -194,26 +190,26 @@ agent_switch = Agent(
     ),
 )
 agent_switch.run("This call trips the 70% threshold and switches to cheap model")
-print("   → ExceedPolicy.SWITCH (v0.10) will automate this without a threshold.")
+print("   → Use BudgetThreshold(at=N, action=switch_fn) to automate model switching.")
 print()
 
 # ============================================================
-# 6. What reserve does and why you need it
+# 6. What safety_margin does and why you need it
 # ============================================================
 print(SEP)
 print("6. WHAT RESERVE DOES")
 print(SEP)
 
-# max_cost=1.00, reserve=0.20:
+# max_cost=1.00, safety_margin=0.20:
 #   effective limit for processing = $0.80
 #   the remaining $0.20 is held back so the model always has room to write the reply
 #
-# Without reserve: agent might spend $0.99 on tool calls and get a 2-token reply.
-# With reserve:    agent stops processing at $0.80 and replies with its full budget.
+# Without safety_margin: agent might spend $0.99 on tool calls and get a 2-token reply.
+# With safety_margin:    agent stops processing at $0.80 and replies with its full budget.
 
-b = Budget(max_cost=1.00, reserve=0.20)
-# effective_limit = max_cost - reserve = $0.80
-print("   max_cost: $1.00  reserve: $0.20  → effective processing limit: $0.80")
+b = Budget(max_cost=1.00, safety_margin=0.20)
+# effective_limit = max_cost - safety_margin = $0.80
+print("   max_cost: $1.00  safety_margin: $0.20  → effective processing limit: $0.80")
 print(f"   Summary: {Agent(model=model, budget=b).budget_summary()}")
 print()
 
@@ -256,7 +252,7 @@ print(SEP)
 
 agent_dash = Agent(
     model=model,
-    budget=Budget(max_cost=10.00, reserve=0.50, exceed_policy=ExceedPolicy.WARN),
+    budget=Budget(max_cost=10.00, safety_margin=0.50, exceed_policy=ExceedPolicy.WARN),
 )
 agent_dash.run("First query")
 agent_dash.run("Second query")
@@ -286,7 +282,7 @@ print(SEP)
 # Budget implements RemoteConfigurable. A config server or feature-flag system
 # can push new limits to a running agent without touching code or restarting.
 #
-# Supported fields via remote config: max_cost, reserve, shared.
+# Supported fields via remote config: max_cost, safety_margin, shared.
 # Rate limits are NOT remote-configurable (require restart to avoid race conditions).
 #
 # Usage with syrin's remote config system:
@@ -301,7 +297,7 @@ print(SEP)
 # Whitelisted to prevent arbitrary field injection (security by default):
 #   GlobalConfig._PUBLIC_KEYS enforces only documented fields can be set remotely.
 
-print("   Budget fields remotely configurable: max_cost, reserve, shared")
+print("   Budget fields remotely configurable: max_cost, safety_margin, shared")
 print("   Attach a RemoteConfig source to push live updates without restart.")
 print("   → See docs/production/remote-config.md for a full walkthrough.")
 print()
@@ -404,8 +400,8 @@ print("SUMMARY")
 print(SEP)
 print("  Budget = per-run USD cap + rate windows + thresholds + callbacks")
 print("  Two-stage checking: pre-call estimate + post-call actual")
-print("  ExceedPolicy: STOP | WARN | IGNORE | SWITCH")
-print("  reserve: always hold back budget for the reply")
+print("  ExceedPolicy: STOP | WARN | IGNORE")
+print("  safety_margin: always hold back budget for the reply")
 print("  Thresholds: proactive alerts at any percentage")
 print("  budget_summary() / export_costs(): programmatic dashboard")
 print("  apply_remote_overrides(): live tuning without restart")

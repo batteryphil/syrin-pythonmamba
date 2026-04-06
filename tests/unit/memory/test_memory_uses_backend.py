@@ -34,7 +34,7 @@ class TestMemoryUsesSQLiteBackend:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("Fact stored in SQLite", memory_type=MemoryType.CORE, importance=0.9)
+        mem.remember("Fact stored in SQLite", memory_type=MemoryType.FACTS, importance=0.9)
         results = mem.recall(query="SQLite", count=10)
         assert len(results) >= 1
         assert any("Fact stored in SQLite" in e.content for e in results)
@@ -46,7 +46,7 @@ class TestMemoryUsesSQLiteBackend:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem1.remember("Cross-instance persistence", memory_type=MemoryType.EPISODIC)
+        mem1.remember("Cross-instance persistence", memory_type=MemoryType.HISTORY)
         mem1.recall(count=5)  # Ensure written
 
         mem2 = Memory(
@@ -65,7 +65,7 @@ class TestMemoryUsesSQLiteBackend:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("To be forgotten", memory_type=MemoryType.EPISODIC)
+        mem.remember("To be forgotten", memory_type=MemoryType.HISTORY)
         entries_before = mem.recall(query="forgotten", count=10)
         assert len(entries_before) >= 1
 
@@ -80,8 +80,8 @@ class TestMemoryUsesSQLiteBackend:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("Entry A", memory_type=MemoryType.CORE)
-        mem.remember("Entry B", memory_type=MemoryType.EPISODIC)
+        mem.remember("Entry A", memory_type=MemoryType.FACTS)
+        mem.remember("Entry B", memory_type=MemoryType.HISTORY)
         all_entries = mem.entries(limit=100)
         assert len(all_entries) >= 2
         contents = [e.content for e in all_entries]
@@ -98,7 +98,7 @@ class TestMemoryUsesInMemoryBackend:
             backend=MemoryBackend.MEMORY,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("In-memory fact", memory_type=MemoryType.CORE)
+        mem.remember("In-memory fact", memory_type=MemoryType.FACTS)
         results = mem.recall(query="In-memory", count=10)
         assert len(results) >= 1
 
@@ -108,7 +108,7 @@ class TestMemoryUsesInMemoryBackend:
             backend=MemoryBackend.MEMORY,
             write_mode=WriteMode.SYNC,
         )
-        mem1.remember("Ephemeral", memory_type=MemoryType.EPISODIC)
+        mem1.remember("Ephemeral", memory_type=MemoryType.HISTORY)
         mem2 = Memory(backend=MemoryBackend.MEMORY)
         results = mem2.recall(count=10)
         assert len(results) == 0  # Different instance, different store
@@ -119,8 +119,8 @@ class TestMemoryUsesInMemoryBackend:
             backend=MemoryBackend.MEMORY,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("dupe", memory_type=MemoryType.EPISODIC)
-        mem.remember("dupe", memory_type=MemoryType.EPISODIC)
+        mem.remember("dupe", memory_type=MemoryType.HISTORY)
+        mem.remember("dupe", memory_type=MemoryType.HISTORY)
         removed = mem.consolidate()
         assert removed == 1
         recalled = mem.recall(count=10)
@@ -145,7 +145,7 @@ class TestMemoryBackendEdgeCases:
             path=None,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("Default path test", memory_type=MemoryType.CORE)
+        mem.remember("Default path test", memory_type=MemoryType.FACTS)
         results = mem.recall(count=5)
         assert len(results) >= 1
 
@@ -156,8 +156,8 @@ class TestMemoryBackendEdgeCases:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("A", memory_type=MemoryType.EPISODIC)
-        mem.remember("B", memory_type=MemoryType.EPISODIC)
+        mem.remember("A", memory_type=MemoryType.HISTORY)
+        mem.remember("B", memory_type=MemoryType.HISTORY)
         results = mem.recall(query="", count=5)
         assert len(results) >= 1
         assert len(results) <= 5
@@ -169,7 +169,7 @@ class TestMemoryBackendEdgeCases:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("Unique content XZY", memory_type=MemoryType.CORE)
+        mem.remember("Unique content XZY", memory_type=MemoryType.FACTS)
         entries = mem.recall(query="XZY", count=10)
         assert len(entries) >= 1
         mid = entries[0].id
@@ -184,5 +184,5 @@ class TestMemoryBackendEdgeCases:
             backend=MemoryBackend.MEMORY,
             write_mode=WriteMode.SYNC,
         )
-        ok = mem.remember("Test", memory_type=MemoryType.EPISODIC)
+        ok = mem.remember("Test", memory_type=MemoryType.HISTORY)
         assert ok is True

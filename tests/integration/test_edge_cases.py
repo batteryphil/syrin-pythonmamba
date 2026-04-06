@@ -92,11 +92,10 @@ class TestNoMemoryBackendConfigured:
     def test_agent_default_memory_remember_recall_work(self) -> None:
         """Default persistent memory: remember and recall work."""
         from syrin.enums import MemoryType
+        from syrin.memory import Memory
 
         model = Model("anthropic/claude-3-5-sonnet")
-        from syrin.enums import MemoryPreset
-
-        agent = Agent(model=model, system_prompt="Test.", memory=MemoryPreset.DEFAULT)
-        agent.remember("Fact", memory_type=MemoryType.EPISODIC)
+        agent = Agent(model=model, system_prompt="Test.", memory=Memory())
+        agent.remember("Fact", memory_type=MemoryType.HISTORY)
         entries = agent.recall(limit=5)
         assert isinstance(entries, list)

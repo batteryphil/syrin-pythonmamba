@@ -7,7 +7,7 @@ import logging
 import time
 import uuid
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from syrin.watch._trigger import TriggerEvent
 
@@ -73,7 +73,7 @@ class CronProtocol:
                 "croniter is required for CronProtocol. Install it with: pip install croniter"
             ) from exc
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cron = croniter(self.schedule, now)
         result = cron.get_next(float)
         return float(result)

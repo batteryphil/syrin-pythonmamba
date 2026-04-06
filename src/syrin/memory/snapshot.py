@@ -56,7 +56,7 @@ class MemorySnapshot:
                 MemorySnapshotEntry(
                     id=m.get("id", ""),
                     content=m.get("content", ""),
-                    type=m.get("type", "episodic"),
+                    type=m.get("type", "history"),
                     importance=m.get("importance", 1.0),
                     scope=m.get("scope", "user"),
                     created_at=m.get("created_at"),

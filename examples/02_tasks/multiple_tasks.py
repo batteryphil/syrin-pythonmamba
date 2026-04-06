@@ -11,9 +11,6 @@ Run: python examples/02_tasks/multiple_tasks.py
 from __future__ import annotations
 
 from syrin import Agent, Model
-from syrin.debug import Pry
-
-_PRY = Pry.from_debug_flag()
 
 
 class Writer(Agent):
@@ -36,29 +33,10 @@ class Writer(Agent):
 
 
 if __name__ == "__main__":
-    use_debug_ui = _PRY is not None
     writer = Writer()
 
-    if use_debug_ui:
-        out: list[str] = ["", ""]
-
-        def _research() -> None:
-            out[0] = writer.research("artificial intelligence")
-
-        def _write() -> None:
-            out[1] = writer.write("artificial intelligence", style="casual")
-
-        ui = _PRY or Pry()
-        with ui:
-            ui.attach(writer)
-            ui.run(_research).join()
-            ui.run(_write).join()
-            ui.wait()
-
-        research_result, write_result = out[0], out[1]
-    else:
-        research_result = writer.research("artificial intelligence")
-        write_result = writer.write("artificial intelligence", style="casual")
+    research_result = writer.research("artificial intelligence")
+    write_result = writer.write("artificial intelligence", style="casual")
 
     print("--- Research ---")
     print(research_result)

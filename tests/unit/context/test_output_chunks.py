@@ -8,7 +8,6 @@ from __future__ import annotations
 import pytest
 
 from syrin import Agent, Model
-from syrin.agent.config import AgentConfig
 from syrin.context import Context
 from syrin.enums import OutputChunkStrategy
 from syrin.memory import Memory
@@ -119,7 +118,7 @@ class TestOutputChunksAgentFlow:
             model=_almock(),
             system_prompt="Help.",
             memory=Memory(),
-            config=AgentConfig(context=Context(store_output_chunks=False)),
+            context=Context(store_output_chunks=False),
         )
         agent.run("Tell me a long story.")
         snap = agent.context.snapshot()
@@ -130,12 +129,10 @@ class TestOutputChunksAgentFlow:
             model=_almock(),
             system_prompt="Be verbose. Use multiple paragraphs.",
             memory=Memory(),
-            config=AgentConfig(
-                context=Context(
-                    store_output_chunks=True,
-                    output_chunk_top_k=5,
-                    output_chunk_threshold=0.0,
-                )
+            context=Context(
+                store_output_chunks=True,
+                output_chunk_top_k=5,
+                output_chunk_threshold=0.0,
             ),
         )
         agent.run("Explain Syrin memory in detail.")
@@ -153,7 +150,7 @@ class TestOutputChunksAgentFlow:
             model=_almock(),
             system_prompt="Help.",
             memory=None,
-            config=AgentConfig(context=Context(store_output_chunks=True)),
+            context=Context(store_output_chunks=True),
         )
         r = agent.run("Hi")
         assert r.content is not None
@@ -167,12 +164,10 @@ class TestOutputChunksAgentFlow:
             model=_almock(),
             system_prompt="Help.",
             memory=memory,
-            config=AgentConfig(
-                context=Context(
-                    store_output_chunks=True,
-                    output_chunk_top_k=5,
-                    output_chunk_threshold=0.0,
-                )
+            context=Context(
+                store_output_chunks=True,
+                output_chunk_top_k=5,
+                output_chunk_threshold=0.0,
             ),
         )
         agent.run("Tell me about Syrin memory")

@@ -175,7 +175,6 @@ def test_agent_budget_exceeded_raises() -> None:
 
 def test_agent_budget_exceeded_run_tokens_raises_with_correct_message_and_type() -> None:
     """When context.token_limits run limit exceeded, BudgetExceededError has budget_type 'run_tokens' and message."""
-    from syrin.agent.config import AgentConfig
     from syrin.budget import Budget, TokenLimits
     from syrin.context import Context
     from syrin.exceptions import BudgetExceededError
@@ -184,11 +183,7 @@ def test_agent_budget_exceeded_run_tokens_raises_with_correct_message_and_type()
     agent = Agent(
         model=model,
         budget=Budget(max_cost=10.0, exceed_policy=ExceedPolicy.STOP),
-        config=AgentConfig(
-            context=Context(
-                token_limits=TokenLimits(max_tokens=50, exceed_policy=ExceedPolicy.STOP)
-            )
-        ),
+        context=Context(token_limits=TokenLimits(max_tokens=50, exceed_policy=ExceedPolicy.STOP)),
     )
     with patch.object(
         agent._provider,
@@ -243,26 +238,16 @@ def test_agent_budget_exceeded_hour_rate_raises_with_correct_message_and_type() 
         assert "hour" in str(exc_info.value).lower()
 
 
-def test_agent_budget_exceeded_context_passed_to_on_exceeded_callback() -> None:
-    """When budget is exceeded, on_exceeded receives BudgetExceededContext with correct fields."""
-    from syrin.budget import Budget, BudgetExceededContext, BudgetLimitType
+def test_agent_budget_exceeded_stop_policy_raises() -> None:
+    """When budget is exceeded with STOP policy, BudgetExceededError is raised with correct fields."""
+    from syrin.budget import Budget
+    from syrin.enums import ExceedPolicy
     from syrin.exceptions import BudgetExceededError
-
-    contexts: list[BudgetExceededContext] = []
-
-    def capture_and_raise(ctx: BudgetExceededContext) -> None:
-        contexts.append(ctx)
-        raise BudgetExceededError(
-            ctx.message,
-            current_cost=ctx.current_cost,
-            limit=ctx.limit,
-            budget_type=ctx.budget_type,
-        )
 
     model = Model("openai/gpt-4")
     agent = Agent(
         model=model,
-        budget=Budget(max_cost=0.0, on_exceeded=capture_and_raise),
+        budget=Budget(max_cost=0.0, exceed_policy=ExceedPolicy.STOP),
     )
     with (
         patch.object(
@@ -274,15 +259,11 @@ def test_agent_budget_exceeded_context_passed_to_on_exceeded_callback() -> None:
                 token_usage=TokenUsage(input_tokens=100, output_tokens=50),
             ),
         ),
-        pytest.raises(BudgetExceededError),
+        pytest.raises(BudgetExceededError) as exc_info,
     ):
         agent.run("Hello")
-    assert len(contexts) == 1
-    ctx = contexts[0]
-    assert ctx.current_cost >= 0
-    assert ctx.limit == 0.0
-    assert ctx.budget_type == BudgetLimitType.RUN
-    assert "run cost" in ctx.message.lower() or "budget" in ctx.message.lower()
+    assert exc_info.value.limit == 0.0
+    assert exc_info.value.budget_type == "run"
 
 
 def test_agent_budget_uses_cost_from_pricing_override() -> None:
@@ -325,8 +306,6 @@ def test_agent_budget_exceeded_hour_tokens_raises_with_correct_type_and_message(
     from syrin.exceptions import BudgetExceededError
 
     model = Model("openai/gpt-4")
-    from syrin.agent.config import AgentConfig
-
     agent = Agent(
         model=model,
         budget=Budget(
@@ -334,12 +313,10 @@ def test_agent_budget_exceeded_hour_tokens_raises_with_correct_type_and_message(
             rate_limits=RateLimit(hour=100.0),
             exceed_policy=ExceedPolicy.STOP,
         ),
-        config=AgentConfig(
-            context=Context(
-                token_limits=TokenLimits(
-                    rate_limits=TokenRateLimit(hour=50),
-                    exceed_policy=ExceedPolicy.STOP,
-                )
+        context=Context(
+            token_limits=TokenLimits(
+                rate_limits=TokenRateLimit(hour=50),
+                exceed_policy=ExceedPolicy.STOP,
             )
         ),
     )

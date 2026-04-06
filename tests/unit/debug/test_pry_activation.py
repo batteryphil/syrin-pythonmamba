@@ -1,13 +1,12 @@
 """Tests that pry=True activates correctly on all primitives.
 
 Exit criteria:
-- pry=True on Workflow, Swarm, Pipeline, and single Agent — all activate correctly
+- pry=True on Workflow, Swarm, and single Agent — all activate correctly
 """
 
 from __future__ import annotations
 
 from syrin import Agent, Model
-from syrin.agent.multi_agent import Pipeline
 from syrin.enums import SwarmTopology
 from syrin.swarm import Swarm, SwarmConfig
 from syrin.workflow._core import Workflow
@@ -62,23 +61,6 @@ def test_swarm_pry_false_is_default() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Pipeline pry=True
-# ---------------------------------------------------------------------------
-
-
-def test_pipeline_pry_true_stores_flag() -> None:
-    """Pipeline(pry=True) stores _pry=True."""
-    pipeline = Pipeline(pry=True)
-    assert pipeline._pry is True
-
-
-def test_pipeline_pry_false_is_default() -> None:
-    """Pipeline() has pry=False by default."""
-    pipeline = Pipeline()
-    assert pipeline._pry is False
-
-
-# ---------------------------------------------------------------------------
 # Agent pry=True (instance parameter)
 # ---------------------------------------------------------------------------
 
@@ -101,8 +83,7 @@ def test_agent_pry_false_is_default() -> None:
 
 
 def test_all_primitives_pry_true_no_crash() -> None:
-    """pry=True on all primitives constructs without raising."""
+    """pry=True on all supported primitives constructs without raising."""
     Workflow("wf", pry=True).step(_StubAgent)
     Swarm(agents=[_StubAgent], goal="test", pry=True)
-    Pipeline(pry=True)
     _StubAgent(pry=True)

@@ -17,8 +17,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock
-from syrin import Agent, Budget, RateLimit
+from syrin import Agent, Budget, ExceedPolicy, Model, RateLimit
 from syrin.budget_store import BudgetStore
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -32,7 +31,7 @@ store_path.parent.mkdir(parents=True, exist_ok=True)
 class PersistentAgent(Agent):
     name = "persistent-budget"
     description = "Agent with BudgetStore file backend (persists across restarts)"
-    model = almock
+    model = Model.mock()
     system_prompt = "You are concise."
     budget = Budget(
         max_cost=0.10,

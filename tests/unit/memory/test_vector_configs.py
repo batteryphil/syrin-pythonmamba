@@ -72,7 +72,7 @@ class TestMemoryWithVectorConfigs:
             write_mode=WriteMode.SYNC,
             qdrant=QdrantConfig(path=temp_dir, collection="test_mem"),
         )
-        mem.remember("Test memory", memory_type=MemoryType.CORE)
+        mem.remember("Test memory", memory_type=MemoryType.FACTS)
         results = mem.recall(query="Test", count=5)
         assert len(results) >= 1
         assert any("Test memory" in e.content for e in results)
@@ -85,7 +85,7 @@ class TestMemoryWithVectorConfigs:
             write_mode=WriteMode.SYNC,
             chroma=ChromaConfig(path=chroma_path, collection="test_chroma"),
         )
-        mem.remember("Chroma test", memory_type=MemoryType.EPISODIC)
+        mem.remember("Chroma test", memory_type=MemoryType.HISTORY)
         results = mem.recall(query="Chroma", count=5)
         assert len(results) >= 1
 
@@ -98,7 +98,7 @@ class TestMemoryWithVectorConfigs:
             write_mode=WriteMode.SYNC,
             qdrant=QdrantConfig(path=qdrant_path, namespace="tenant_123"),
         )
-        mem.remember("Namespaced memory", memory_type=MemoryType.CORE)
+        mem.remember("Namespaced memory", memory_type=MemoryType.FACTS)
         results = mem.recall(query="Namespaced", count=10)
         assert len(results) >= 1
         assert any("Namespaced memory" in e.content for e in results)

@@ -288,8 +288,11 @@ agent = Agent(
 
 All five loop strategies implement the same `Loop` protocol — you can write your own by subclassing it. The loop you choose determines the shape of `response.iterations` and what hooks fire during a run.
 
+See [Loop Strategies](/agent-kit/agent/loops) for the full reference — constructor parameters, comparison table, and how to write a custom loop.
+
 ## What's Next
 
+- [Loop Strategies](/agent-kit/agent/loops) — Full reference: SingleShot, ReAct, PlanExecute, CodeAction, HumanInTheLoop
 - [Response Object](/agent-kit/agent/response-object) — The full `Response` reference
 - [Structured Output](/agent-kit/agent/structured-output) — Get typed, validated responses
 - [Streaming](/agent-kit/agent/streaming) — Streaming in depth

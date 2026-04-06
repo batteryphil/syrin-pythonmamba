@@ -1,9 +1,7 @@
 """AgentRouter — LLM-driven dynamic multi-agent orchestration.
 
 The LLM analyses the task and decides which agents to spawn, how many, and in
-what order.  Formerly called ``DynamicPipeline``; renamed to ``AgentRouter`` in
-v0.11.0.  The old name is available as a deprecated alias for the duration of
-v0.11.0 and will be removed in v0.12.0.
+what order.
 
 .. note:: **AgentRouter vs. ModelRouter**
 
@@ -15,14 +13,14 @@ v0.11.0 and will be removed in v0.12.0.
 
     They are orthogonal and can be combined.
 
-.. note:: **AgentRouter vs. Pipeline vs. Workflow**
+.. note:: **AgentRouter vs. Workflow vs. Swarm**
 
-    * :class:`~syrin.agent.pipeline.Pipeline` — *static*, fixed-order list of agents,
-      sequential or parallel.  Use when you know the agents upfront.
-    * :class:`~syrin.workflow._core.Workflow` — *static* DAG with branching and
-      dynamic steps.  Use when you need conditional branching or >2 agents.
-    * ``AgentRouter`` — *dynamic*, the LLM chooses agents at runtime.  Use when
-      the required agents depend on the task content.
+    * :class:`~syrin.workflow._core.Workflow` — deterministic DAG with explicit
+      steps, branching, and lifecycle control.  Use when agent order is known.
+    * :class:`~syrin.swarm._core.Swarm` — concurrent agents sharing a goal and
+      budget, with multiple topologies (PARALLEL, CONSENSUS, REFLECTION, etc.).
+    * ``AgentRouter`` — dynamic: the LLM decides which agents to invoke and in
+      what order.  Use when agent selection depends on task content.
 
 Example::
 
@@ -41,7 +39,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-import warnings
 from collections.abc import Callable
 from typing import TypedDict, Unpack, cast
 
@@ -371,12 +368,11 @@ class AgentRouter(Watchable, Servable):
         Returns:
             FastAPI ``APIRouter`` instance.
         """
-        from syrin.agent.multi_agent import DynamicPipeline as _DynamicPipeline  # noqa: PLC0415
         from syrin.serve.config import ServeConfig as _ServeConfig  # noqa: PLC0415
         from syrin.serve.http import build_router  # noqa: PLC0415
 
         cfg = config if isinstance(config, _ServeConfig) else _ServeConfig(**config_kwargs)
-        return build_router(cast(_DynamicPipeline, self), cfg)
+        return build_router(self, cfg)
 
     def visualize(self) -> None:
         """Print a rich summary of this router to stdout.
@@ -832,51 +828,6 @@ class AgentRouter(Watchable, Servable):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Deprecated alias — removed in v0.12.0
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-class DynamicPipeline(AgentRouter):
-    """Deprecated alias for :class:`AgentRouter`.
-
-    .. deprecated:: 0.11.0
-        Use :class:`AgentRouter` instead.  ``DynamicPipeline`` will be removed
-        in v0.12.0.
-
-    Example migration::
-
-        # Before (v0.10.x)
-        from syrin import DynamicPipeline
-        pipeline = DynamicPipeline(agents=[...], model=...)
-
-        # After (v0.11.0+)
-        from syrin import AgentRouter
-        router = AgentRouter(agents=[...], model=...)
-    """
-
-    def __init_subclass__(cls, **kwargs: object) -> None:
-        """Emit DeprecationWarning when subclassed."""
-        super().__init_subclass__(**kwargs)
-        warnings.warn(
-            f"{cls.__name__} inherits from deprecated DynamicPipeline. "
-            "Use AgentRouter instead. DynamicPipeline will be removed in v0.12.0.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    def __new__(cls, *_args: object, **_kwargs: object) -> DynamicPipeline:
-        """Emit DeprecationWarning when instantiated."""
-        if cls is DynamicPipeline:
-            warnings.warn(
-                "DynamicPipeline is deprecated and will be removed in v0.12.0. "
-                "Use AgentRouter instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        return super().__new__(cls)
-
-
 __all__ = [
     "AgentRouter",
-    "DynamicPipeline",  # deprecated alias
 ]

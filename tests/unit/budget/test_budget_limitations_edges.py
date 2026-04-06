@@ -43,10 +43,10 @@ def test_rate_limits_not_shared_between_trackers() -> None:
 
 
 def test_run_reserve_effective_limit_in_check_budget() -> None:
-    """Effective run limit is run - reserve when run > reserve; exceed when cost >= effective."""
+    """Effective run limit is run - safety_margin when run > reserve; exceed when cost >= effective."""
     tracker = BudgetTracker()
     tracker.record(CostInfo(cost_usd=7.0, token_usage=TokenUsage()))
-    budget = Budget(max_cost=10.0, reserve=2.0)
+    budget = Budget(max_cost=10.0, safety_margin=2.0)
     result = tracker.check_budget(budget)
     assert result.status == BudgetStatus.OK
     assert result.exceeded_limit is None
@@ -57,10 +57,10 @@ def test_run_reserve_effective_limit_in_check_budget() -> None:
 
 
 def test_run_reserve_greater_than_run_uses_run_as_limit() -> None:
-    """When reserve >= run, effective limit is still run (no negative)."""
+    """When safety_margin >= run, effective limit is still run (no negative)."""
     tracker = BudgetTracker()
     tracker.record(CostInfo(cost_usd=5.0, token_usage=TokenUsage()))
-    budget = Budget(max_cost=5.0, reserve=10.0)
+    budget = Budget(max_cost=5.0, safety_margin=10.0)
     result = tracker.check_budget(budget)
     assert result.status == BudgetStatus.EXCEEDED
     assert result.exceeded_limit == BudgetLimitType.RUN

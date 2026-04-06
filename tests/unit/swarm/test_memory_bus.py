@@ -21,7 +21,7 @@ from syrin.swarm._memory_bus import MemoryBus
 
 def _make_entry(
     content: str = "test content",
-    memory_type: MemoryType = MemoryType.SEMANTIC,
+    memory_type: MemoryType = MemoryType.KNOWLEDGE,
     importance: float = 0.8,
     keywords: list[str] | None = None,
 ) -> MemoryEntry:
@@ -67,8 +67,8 @@ async def test_memory_bus_rejects_disallowed_type() -> None:
     captured: list[tuple[Hook, EventContext]] = []
     events = _events_with_capture(captured)
 
-    bus = MemoryBus(allow_types=[MemoryType.SEMANTIC], swarm_events=events)
-    entry = _make_entry(memory_type=MemoryType.EPISODIC)
+    bus = MemoryBus(allow_types=[MemoryType.KNOWLEDGE], swarm_events=events)
+    entry = _make_entry(memory_type=MemoryType.HISTORY)
 
     stored = await bus.publish(entry, agent_id="a1")
 
@@ -83,8 +83,8 @@ async def test_memory_bus_rejects_disallowed_fires_filtered_hook() -> None:
     captured: list[tuple[Hook, EventContext]] = []
     events = _events_with_capture(captured)
 
-    bus = MemoryBus(allow_types=[MemoryType.SEMANTIC], swarm_events=events)
-    entry = _make_entry(memory_type=MemoryType.EPISODIC)
+    bus = MemoryBus(allow_types=[MemoryType.KNOWLEDGE], swarm_events=events)
+    entry = _make_entry(memory_type=MemoryType.HISTORY)
 
     await bus.publish(entry, agent_id="a1")
 

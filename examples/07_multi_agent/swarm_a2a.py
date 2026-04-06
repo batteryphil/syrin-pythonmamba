@@ -24,22 +24,29 @@ Run:
 from __future__ import annotations
 
 import asyncio
+import os
+from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from syrin import Agent, Model
 from syrin.enums import A2AChannel, MemoryType
 from syrin.memory.config import MemoryEntry
-from syrin.model import structured
 from syrin.swarm import A2AConfig, A2ARouter, MemoryBus
+
+_MODEL = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
 
 # ── Message types ─────────────────────────────────────────────────────────────
 #
-# Use @structured for A2A message payloads — it applies @dataclass internally
-# so instances are directly constructable and their JSON schemas are registered.
-# One type per message keeps the protocol explicit and self-documenting.
+# Use @dataclass for A2A message payloads — one type per message keeps the
+# protocol explicit and self-documenting.
 
 
-@structured
+@dataclass
 class ResearchTask:
     """Sent from orchestrator to researcher to kick off a research assignment."""
 
@@ -48,7 +55,7 @@ class ResearchTask:
     priority: int = 1
 
 
-@structured
+@dataclass
 class ResearchFindings:
     """Sent from researcher back to orchestrator once research is complete."""
 
@@ -57,7 +64,7 @@ class ResearchFindings:
     confidence: float = 0.9
 
 
-@structured
+@dataclass
 class PhaseComplete:
     """Broadcast from orchestrator to all agents when a pipeline phase finishes."""
 
@@ -75,7 +82,7 @@ class PhaseComplete:
 class OrchestratorAgent(Agent):
     """Assigns research tasks and coordinates the pipeline phases."""
 
-    model = Model.mock(latency_seconds=0.01)
+    model = _MODEL
     system_prompt = (
         "You are a research pipeline orchestrator. "
         "Assign tasks to specialist agents, track progress, and synthesise findings "
@@ -86,7 +93,7 @@ class OrchestratorAgent(Agent):
 class ResearchAgent(Agent):
     """Gathers primary sources and publishes findings to the shared MemoryBus."""
 
-    model = Model.mock(latency_seconds=0.01)
+    model = _MODEL
     system_prompt = (
         "You are a research specialist. Gather credible primary sources on your "
         "assigned topic and publish a concise findings summary with a confidence score."
@@ -96,7 +103,7 @@ class ResearchAgent(Agent):
 class AnalysisAgent(Agent):
     """Reads research from the MemoryBus and synthesises strategic insights."""
 
-    model = Model.mock(latency_seconds=0.01)
+    model = _MODEL
     system_prompt = (
         "You are a strategic analyst. Read research findings from shared memory "
         "and synthesise them into three actionable recommendations with supporting evidence."
@@ -170,7 +177,7 @@ async def demo_memory_bus(bus: MemoryBus) -> None:
             "by using a small draft model to propose tokens verified by the larger model in parallel. "
             "Continuous batching improves GPU utilisation from ~30% (static) to ~85% under load."
         ),
-        type=MemoryType.SEMANTIC,
+        type=MemoryType.KNOWLEDGE,
         importance=0.88,
         keywords=["inference", "latency", "speculative-decoding", "batching"],
         created_at=datetime.now(),
@@ -250,7 +257,7 @@ async def main() -> None:
     # MemoryBus restricted to SEMANTIC knowledge entries
     # Entries tagged "private" are blocked from the shared bus
     bus = MemoryBus(
-        allow_types=[MemoryType.SEMANTIC],
+        allow_types=[MemoryType.KNOWLEDGE],
         filter=lambda e: "private" not in e.keywords,
     )
 

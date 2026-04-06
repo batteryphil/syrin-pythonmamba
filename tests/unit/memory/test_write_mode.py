@@ -31,7 +31,7 @@ class TestWriteModeAsync:
             write_mode=WriteMode.ASYNC,
         )
         t0 = time.perf_counter()
-        ok = mem.remember("Async write", memory_type=MemoryType.EPISODIC)
+        ok = mem.remember("Async write", memory_type=MemoryType.HISTORY)
         elapsed = time.perf_counter() - t0
         # A13: async mode returns a Future; truthy check still works
         assert ok
@@ -44,7 +44,7 @@ class TestWriteModeAsync:
             path=temp_db,
             write_mode=WriteMode.ASYNC,
         )
-        mem.remember("To forget", memory_type=MemoryType.EPISODIC)
+        mem.remember("To forget", memory_type=MemoryType.HISTORY)
         t0 = time.perf_counter()
         mem.forget(query="To forget")
         elapsed = time.perf_counter() - t0
@@ -57,7 +57,7 @@ class TestWriteModeAsync:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        ok = mem.remember("Sync write", memory_type=MemoryType.CORE)
+        ok = mem.remember("Sync write", memory_type=MemoryType.FACTS)
         assert ok is True
         results = mem.recall(query="Sync", count=5)
         assert len(results) >= 1
@@ -69,7 +69,7 @@ class TestWriteModeAsync:
             path=temp_db,
             write_mode=WriteMode.ASYNC,
         )
-        mem.remember("Delayed persistence", memory_type=MemoryType.CORE)
+        mem.remember("Delayed persistence", memory_type=MemoryType.FACTS)
         time.sleep(0.2)  # Allow background thread to complete
         results = mem.recall(query="Delayed", count=5)
         assert len(results) >= 1
@@ -93,8 +93,8 @@ class TestWriteModeEdgeCases:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("A", memory_type=MemoryType.CORE)
-        mem.remember("B", memory_type=MemoryType.CORE)
+        mem.remember("A", memory_type=MemoryType.FACTS)
+        mem.remember("B", memory_type=MemoryType.FACTS)
         deleted = mem.forget(query="A")
         assert deleted == 1
 
@@ -105,7 +105,7 @@ class TestWriteModeEdgeCases:
             path=temp_db,
             write_mode=WriteMode.ASYNC,
         )
-        mem.remember("To forget", memory_type=MemoryType.EPISODIC)
+        mem.remember("To forget", memory_type=MemoryType.HISTORY)
         time.sleep(0.2)
         deleted = mem.forget(query="To forget")
         # ASYNC returns 0 for query-based forget (unknown count until background completes)
@@ -118,7 +118,7 @@ class TestWriteModeEdgeCases:
             path=temp_db,
             write_mode=WriteMode.SYNC,
         )
-        mem.remember("Target", memory_type=MemoryType.CORE)
+        mem.remember("Target", memory_type=MemoryType.FACTS)
         results = mem.recall(query="Target", count=1)
         assert len(results) >= 1
         mem_id = results[0].id

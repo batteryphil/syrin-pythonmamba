@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -27,7 +27,7 @@ def _make_store_with_records(
     store.clear("TestAgent")
 
     if timestamps is None:
-        timestamps = [datetime.now(tz=timezone.utc)] * len(costs)
+        timestamps = [datetime.now(tz=UTC)] * len(costs)
 
     import json
 
@@ -139,7 +139,7 @@ def test_trend_weekly_pct_no_data() -> None:
 
 def test_trend_weekly_pct_only_recent_data() -> None:
     """Only recent 7 days data → no prior 7 days → 0.0 (insufficient)."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     timestamps = [now - timedelta(days=i) for i in range(3)]
     store, _ = _make_store_with_records([0.10, 0.12, 0.11], timestamps=timestamps)
     stats = store.stats("TestAgent")
@@ -149,7 +149,7 @@ def test_trend_weekly_pct_only_recent_data() -> None:
 
 def test_trend_weekly_pct_with_prior_and_recent_data() -> None:
     """Recent avg > prior avg → positive trend."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     # Prior 7 days (8-14 days ago): avg 0.10
     prior_timestamps = [now - timedelta(days=10), now - timedelta(days=9)]
     prior_costs = [0.10, 0.10]
@@ -168,7 +168,7 @@ def test_trend_weekly_pct_with_prior_and_recent_data() -> None:
 
 def test_trend_weekly_pct_negative_trend() -> None:
     """Recent avg < prior avg → negative trend."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     prior_timestamps = [now - timedelta(days=10), now - timedelta(days=9)]
     prior_costs = [0.20, 0.20]
     recent_timestamps = [now - timedelta(days=3), now - timedelta(days=1)]

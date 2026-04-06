@@ -51,7 +51,7 @@ class TestSQLiteThreadSafety:
                     entry = MemoryEntry(
                         id=str(uuid.uuid4()),
                         content="thread test",
-                        type=MemoryType.EPISODIC,
+                        type=MemoryType.HISTORY,
                         scope=MemoryScope.SESSION,
                     )
                     backend.add(entry)
@@ -89,7 +89,7 @@ class TestSQLiteThreadSafety:
                 entry = MemoryEntry(
                     id=str(uuid.uuid4()),
                     content="async write test",
-                    type=MemoryType.EPISODIC,
+                    type=MemoryType.HISTORY,
                     scope=MemoryScope.SESSION,
                 )
                 # Use asyncio.to_thread to avoid blocking the event loop

@@ -6,9 +6,18 @@ Run:
     python examples/07_multi_agent/handoff.py
 """
 
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 from syrin import Agent, Model
 
-model = Model.mock(latency_min=0, latency_max=0)
+_MODEL = Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+
+model = _MODEL
 
 
 class Analyzer(Agent):

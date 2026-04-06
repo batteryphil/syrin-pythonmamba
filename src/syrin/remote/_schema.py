@@ -316,7 +316,6 @@ def extract_schema(cls: type[object], prefix: str) -> list[FieldSchema]:
 _AGENT_TOP_LEVEL: list[tuple[str, str, type[object]]] = [
     ("max_tool_iterations", "int", int),
     ("debug", "bool", bool),
-    ("loop_strategy", "str", type(None)),  # StrEnum → str
     ("system_prompt", "str", str),
     ("human_approval_timeout", "int", int),
 ]
@@ -324,49 +323,31 @@ _AGENT_TOP_LEVEL: list[tuple[str, str, type[object]]] = [
 
 def _agent_section_schema() -> ConfigSchema:
     """Build the fixed 'agent' section schema (top-level agent params)."""
-    from syrin.enums import LoopStrategy
-
-    enum_vals = [m.value for m in LoopStrategy]
     fields: list[FieldSchema] = []
     for name, type_str, _ in _AGENT_TOP_LEVEL:
         path = f"agent.{name}"
-        if name == "loop_strategy":
-            fields.append(
-                FieldSchema(
-                    name=name,
-                    path=path,
-                    type=type_str,
-                    default=None,
-                    description=None,
-                    constraints={},
-                    enum_values=enum_vals,
-                    children=None,
-                    remote_excluded=False,
-                )
+        default: object | None = None
+        if name == "max_tool_iterations":
+            default = 10
+        elif name == "debug":
+            default = False
+        elif name == "system_prompt":
+            default = ""
+        elif name == "human_approval_timeout":
+            default = 300
+        fields.append(
+            FieldSchema(
+                name=name,
+                path=path,
+                type=type_str,
+                default=default,
+                description=None,
+                constraints={},
+                enum_values=None,
+                children=None,
+                remote_excluded=False,
             )
-        else:
-            default: object | None = None
-            if name == "max_tool_iterations":
-                default = 10
-            elif name == "debug":
-                default = False
-            elif name == "system_prompt":
-                default = ""
-            elif name == "human_approval_timeout":
-                default = 300
-            fields.append(
-                FieldSchema(
-                    name=name,
-                    path=path,
-                    type=type_str,
-                    default=default,
-                    description=None,
-                    constraints={},
-                    enum_values=None,
-                    children=None,
-                    remote_excluded=False,
-                )
-            )
+        )
     return ConfigSchema(section="agent", class_name="Agent", fields=fields)
 
 
@@ -384,20 +365,6 @@ def get_agent_section_schema_and_values(agent: object) -> tuple[ConfigSchema, di
             v = getattr(agent, "_system_prompt_source", "") or ""
         elif attr == "human_approval_timeout":
             v = getattr(agent, "_human_approval_timeout", None)
-        elif attr == "loop_strategy":
-            from syrin.enums import LoopStrategy as LS
-
-            loop = getattr(agent, "_loop", None)
-            v = getattr(loop, "strategy", None)
-            if v is not None and hasattr(v, "value"):
-                v = v.value
-            elif loop is not None:
-                # Loop instances don't have .strategy; infer from class .name (e.g. ReactLoop.name = "react")
-                name = getattr(type(loop), "name", None)
-                v = name.lower().replace(" ", "_") if isinstance(name, str) else None
-            valid = [m.value for m in LS]
-            if v is None or (isinstance(v, str) and v not in valid):
-                v = LS.REACT.value
         else:
             v = getattr(agent, f"_{attr}", getattr(agent, attr, None))
         if v is not None or f.default is not None:

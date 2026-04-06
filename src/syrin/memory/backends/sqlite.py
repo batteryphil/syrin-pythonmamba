@@ -66,12 +66,22 @@ class SQLiteBackend:
             """)
             self._conn.commit()
 
+    # Backward-compatibility: map old MemoryType string values to new ones.
+    _LEGACY_TYPE_MAP: dict[str, str] = {
+        "core": "facts",
+        "episodic": "history",
+        "semantic": "knowledge",
+        "procedural": "instructions",
+    }
+
     def _row_to_entry(self, row: sqlite3.Row) -> MemoryEntry:
         """Convert a database row to a MemoryEntry."""
+        raw_type = row["type"]
+        resolved_type = self._LEGACY_TYPE_MAP.get(raw_type, raw_type)
         return MemoryEntry(
             id=row["id"],
             content=row["content"],
-            type=MemoryType(row["type"]),
+            type=MemoryType(resolved_type),
             importance=row["importance"],
             scope=MemoryScope(row["scope"]),
             source=row["source"],

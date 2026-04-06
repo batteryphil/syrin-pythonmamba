@@ -1,15 +1,15 @@
-"""Pipeline Watch — Trigger a Pipeline via cron, webhook, or queue.
+"""Agent Watch — Trigger an Agent (or Workflow) via cron schedule.
 
 Demonstrates:
-- pipeline.watch(protocol=CronProtocol(...)) — Pipeline reacts to schedules
-- Pipeline and DynamicPipeline both inherit Watchable
-- watch_handler() routes each trigger through all agents sequentially
-- on_trigger / on_result / on_error callbacks on the pipeline level
+- agent.watch(protocol=CronProtocol(...)) — Agent reacts to scheduled events
+- watch_handler() routes each trigger through the agent
+- on_trigger / on_result / on_error callbacks at the agent level
+- Workflow.watch() pattern note for multi-step pipelines
 
 Run:
     python examples/22_watch/pipeline_watch.py
 
-The pipeline fires once immediately (run_on_start=True) via CronProtocol.
+The agent fires once immediately (run_on_start=True) via CronProtocol.
 """
 
 from __future__ import annotations
@@ -23,46 +23,37 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from examples.models.models import almock  # noqa: E402
-from syrin import Agent  # noqa: E402
-from syrin.agent.multi_agent import Pipeline  # noqa: E402
+from syrin import Agent, Model  # noqa: E402
 from syrin.watch import CronProtocol, TriggerEvent  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# Agents used in the pipeline
+# Agent used for the cron demo
 # ---------------------------------------------------------------------------
 
 
 class ResearchAgent(Agent):
     name = "researcher"
-    model = almock
+    model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
     system_prompt = "You research topics and return key findings in 1-2 sentences."
 
 
-class SummaryAgent(Agent):
-    name = "summarizer"
-    model = almock
-    system_prompt = "You condense research into a 1-sentence executive brief."
-
-
 # ---------------------------------------------------------------------------
-# Demo: Pipeline with CronProtocol
+# Demo 1: Agent.watch() with CronProtocol
 # ---------------------------------------------------------------------------
 
 
-async def demo_pipeline_cron() -> None:
+async def demo_agent_cron() -> None:
     print("=" * 60)
-    print("Pipeline.watch() with CronProtocol")
+    print("Agent.watch() with CronProtocol")
     print("=" * 60)
 
-    # Pre-configure agents — required for pipeline.watch()/trigger()
-    pipeline = Pipeline(agents=[ResearchAgent, SummaryAgent])
+    agent = ResearchAgent()
 
     run_count = 0
     stop_event = asyncio.Event()
 
     def on_trigger(event: TriggerEvent) -> None:
-        print(f"  → pipeline trigger: {event.input!r}")
+        print(f"  → agent trigger: {event.input!r}")
 
     def on_result(event: TriggerEvent, result: object) -> None:
         nonlocal run_count
@@ -84,15 +75,15 @@ async def demo_pipeline_cron() -> None:
         run_on_start=True,
     )
 
-    # pipeline.watch() — works because Pipeline inherits Watchable
-    pipeline.watch(
+    # agent.watch() — Agent inherits Watchable
+    agent.watch(
         protocol=protocol,
         on_trigger=on_trigger,
         on_result=on_result,
         on_error=on_error,
     )
 
-    handler = pipeline.watch_handler(
+    handler = agent.watch_handler(
         concurrency=1,
         timeout=30.0,
         on_result=on_result,
@@ -106,37 +97,38 @@ async def demo_pipeline_cron() -> None:
     with contextlib.suppress(asyncio.CancelledError, Exception):
         await proto_task
 
-    print(f"\n  Pipeline processed {run_count} run(s)\n")
+    print(f"\n  Agent processed {run_count} run(s)\n")
 
 
 # ---------------------------------------------------------------------------
-# Usage note: DynamicPipeline.watch()
+# Demo 2: Workflow.watch() usage pattern note
 # ---------------------------------------------------------------------------
 
 
-def demo_dynamic_pipeline_note() -> None:
+def demo_workflow_watch_note() -> None:
     print("=" * 60)
-    print("DynamicPipeline.watch() (usage pattern)")
+    print("Workflow.watch() (usage pattern)")
     print("=" * 60)
     print("""
-DynamicPipeline also inherits Watchable:
+For multi-step agent chains, use Workflow instead of a single Agent:
 
-    from syrin.agent.multi_agent import DynamicPipeline
+    from syrin.workflow import Workflow
     from syrin.watch import WebhookProtocol
 
-    pipeline = DynamicPipeline(
-        agents=[ResearchAgent, AnalystAgent, WriterAgent],
-        model=Model.OpenAI("gpt-4o-mini", api_key="..."),
+    wf = (
+        Workflow("research-pipeline")
+        .step(ResearchAgent, "Research the topic")
+        .step(SummaryAgent, "Summarize the findings")
     )
 
     protocol = WebhookProtocol(
-        path="/pipeline/trigger",
+        path="/workflow/trigger",
         port=9090,
         input_field="task",
         secret="my-hmac-secret",   # HMAC validation — rejects tampered POSTs
     )
 
-    pipeline.watch(
+    wf.watch(
         protocol=protocol,
         concurrency=3,
         timeout=120.0,
@@ -145,22 +137,30 @@ DynamicPipeline also inherits Watchable:
         on_error=lambda e, exc: print(f"Error: {exc}"),
     )
 
-    handler = pipeline.watch_handler(concurrency=3, timeout=120.0)
+    handler = wf.watch_handler(concurrency=3, timeout=120.0)
     await protocol.start(handler)
 
 Test with curl:
-    curl -X POST http://localhost:9090/pipeline/trigger \\
+    curl -X POST http://localhost:9090/workflow/trigger \\
         -H "Content-Type: application/json" \\
         -d '{"task": "Research and summarize AI chip trends"}'
+
+AgentRouter also inherits Watchable for LLM-driven dynamic routing:
+
+    from syrin import AgentRouter
+    from syrin.watch import QueueProtocol
+
+    router = AgentRouter(agents=[ResearchAgent, SummaryAgent], model=model)
+    router.watch(protocol=QueueProtocol(...), on_result=on_result)
 """)
 
 
 async def main() -> None:
-    await demo_pipeline_cron()
-    demo_dynamic_pipeline_note()
+    await demo_agent_cron()
+    demo_workflow_watch_note()
 
     print("=" * 60)
-    print("Both Pipeline and DynamicPipeline inherit Watchable.")
+    print("Agent, Workflow, and AgentRouter all inherit Watchable.")
     print("=" * 60)
 
 

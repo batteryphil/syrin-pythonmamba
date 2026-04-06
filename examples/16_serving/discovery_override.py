@@ -21,8 +21,7 @@ if str(_root) not in sys.path:
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock
-from syrin import Agent
+from syrin import Agent, Model
 from syrin.enums import Hook
 from syrin.serve.discovery import AgentCard, AgentCardAuth, AgentCardProvider
 
@@ -32,7 +31,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 class CustomDiscoveryAgent(Agent):
     name = "custom-discovery-agent"
     description = "Agent with custom Agent Card (provider, auth)"
-    model = almock
+    model = Model.mock(latency_min=1, latency_max=3, lorem_length=800, pricing_tier="high")
     system_prompt = "You are a helpful assistant."
 
     # Override auto-generated Agent Card fields

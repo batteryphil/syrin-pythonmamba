@@ -26,7 +26,7 @@ def main() -> None:
             path=path,
             write_mode=WriteMode.ASYNC,
         )
-        memory_async.remember("Async write", memory_type=MemoryType.EPISODIC)
+        memory_async.remember("Async write", memory_type=MemoryType.HISTORY)
         # Returns immediately; write happens in background
 
         # SYNC: blocks until complete; use when you need immediate persistence
@@ -35,8 +35,8 @@ def main() -> None:
             path=path,
             write_mode=WriteMode.SYNC,
         )
-        memory_sync.remember("Sync write", memory_type=MemoryType.CORE)
-        results = memory_sync.recall(query="Sync", count=5)
+        memory_sync.remember("Sync write", memory_type=MemoryType.FACTS)
+        results = memory_sync.recall(query="Sync", limit=5)
         print(f"Recalled {len(results)} memories after sync write")
     finally:
         import os

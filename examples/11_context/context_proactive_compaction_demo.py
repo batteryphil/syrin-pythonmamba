@@ -16,13 +16,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from examples.models.models import almock, gpt4_mini
-from syrin import Agent, AgentConfig
+from examples.models.models import gpt4_mini
+from syrin import Agent, Model
 from syrin.context import Context
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-_model = gpt4_mini if os.environ.get("USE_REAL_MODEL") == "1" else almock
+_model = gpt4_mini if os.environ.get("USE_REAL_MODEL") == "1" else Model.mock()
 
 
 def main() -> None:
@@ -36,12 +36,10 @@ def main() -> None:
     agent = Agent(
         model=_model,
         system_prompt="You are a helpful assistant. Be very brief.",
-        config=AgentConfig(
-            context=Context(
-                max_tokens=200,
-                reserve=20,
-                auto_compact_at=0.6,  # Compact when utilization >= 60%
-            )
+        context=Context(
+            max_tokens=200,
+            reserve=20,
+            auto_compact_at=0.6,  # Compact when utilization >= 60%
         ),
     )
 

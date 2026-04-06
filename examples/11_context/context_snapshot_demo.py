@@ -13,7 +13,7 @@ Run:
 
 from __future__ import annotations
 
-from syrin import Agent, AgentConfig, tool
+from syrin import Agent, tool
 from syrin.context import Context
 from syrin.context.snapshot import ContextSegmentSource
 from syrin.model import Model
@@ -45,7 +45,7 @@ def main() -> None:
     agent = Agent(
         model=_model,
         system_prompt="You are a concise assistant. Use tools when asked to compute.",
-        config=AgentConfig(context=Context(max_tokens=8_000)),
+        context=Context(max_tokens=8_000),
         tools=[add_numbers, get_word_count],
     )
 

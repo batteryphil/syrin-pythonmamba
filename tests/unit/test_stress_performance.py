@@ -410,7 +410,7 @@ class TestPerformanceBenchmarks:
             entry = MemoryEntry(
                 id=str(uuid.uuid4()),
                 content=f"memory content item {i} about topic-{i % 50}",
-                type=MemoryType.EPISODIC,
+                type=MemoryType.HISTORY,
                 scope=MemoryScope.SESSION,
             )
             backend.add(entry)
@@ -500,7 +500,7 @@ class TestPerformanceBenchmarks:
             MemoryEntry(
                 id=str(uuid.uuid4()),
                 content=f"entry {i}",
-                type=MemoryType.CORE,
+                type=MemoryType.FACTS,
                 scope=MemoryScope.GLOBAL,
             )
             for i in range(1000)

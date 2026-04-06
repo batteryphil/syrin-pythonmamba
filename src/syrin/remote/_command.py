@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
@@ -276,7 +276,7 @@ class CommandProcessor:
         self._audit.append(
             CommandAuditEntry(
                 command=result.command,
-                timestamp=datetime.now(tz=timezone.utc).isoformat(),
+                timestamp=datetime.now(tz=UTC).isoformat(),
                 actor_id=actor_id,
                 success=result.success,
                 reason=result.reason,

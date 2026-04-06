@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from syrin.agent._run_context import DefaultAgentRunContext
-from syrin.enums import LoopStrategy, MessageRole
+from syrin.enums import MessageRole
 from syrin.exceptions import ProviderError, ToolExecutionError
 from syrin.loop import (
     CodeActionLoop,
@@ -169,20 +169,16 @@ class TestLoopExceptionHandling:
         assert result.iterations >= 1
 
 
-class TestLoopStrategyMapping:
-    """LoopStrategy enum maps to correct loop class."""
+class TestLoopDirectUsage:
+    """Loop classes can be used directly via loop= parameter."""
 
-    def test_react_maps_to_react_loop(self) -> None:
-        from syrin.loop import LoopStrategyMapping
+    def test_react_loop_default(self) -> None:
+        assert ReactLoop is not None
 
-        assert LoopStrategyMapping.get_loop(LoopStrategy.REACT) is ReactLoop
-
-    def test_single_shot_maps_to_single_shot_loop(self) -> None:
-        from syrin.loop import LoopStrategyMapping
-
-        assert LoopStrategyMapping.get_loop(LoopStrategy.SINGLE_SHOT) is SingleShotLoop
+    def test_single_shot_loop_available(self) -> None:
+        assert SingleShotLoop is not None
 
     def test_plan_execute_and_code_action_still_available_as_loop_param(self) -> None:
-        """PlanExecuteLoop and CodeActionLoop can still be passed as loop=... (not via loop_strategy)."""
+        """PlanExecuteLoop and CodeActionLoop can still be passed as loop=..."""
         assert PlanExecuteLoop is not None
         assert CodeActionLoop is not None

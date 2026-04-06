@@ -1,4 +1,4 @@
-"""Basic Budget — Per-run cost limits, callbacks, and tracking.
+"""Basic Budget — Per-run cost limits, exceed policies, and tracking.
 
 Shows how to set a dollar budget, handle exceeded limits, and track spending.
 
@@ -7,6 +7,7 @@ Run:
 """
 
 from syrin import Agent, Budget, Model
+from syrin.enums import ExceedPolicy
 from syrin.exceptions import BudgetExceededError
 
 model = Model.mock()
@@ -24,48 +25,31 @@ print(f"State:  {agent.budget_state}")
 print()
 
 # ============================================================
-# 2. warn_on_exceeded — log a warning but keep running
+# 2. WARN policy — log a warning but keep running
 # ============================================================
 agent2 = Agent(model=model, budget=Budget(max_cost=0.05, exceed_policy=ExceedPolicy.WARN))
 result2 = agent2.run("Summarize Python in two sentences.")
 
-print("=== Warn on Exceeded ===")
+print("=== WARN Policy ===")
 print(f"Cost:  ${result2.cost:.6f}")
 print(f"State: {agent2.budget_state}")
 print()
 
 # ============================================================
-# 3. raise_on_exceeded — hard stop when budget is hit
+# 3. STOP policy — hard stop when budget is hit
 # ============================================================
 agent3 = Agent(model=model, budget=Budget(max_cost=0.0001, exceed_policy=ExceedPolicy.STOP))
 
-print("=== Raise on Exceeded ===")
+print("=== STOP Policy ===")
 try:
     agent3.run("This will likely exceed the tiny budget")
 except BudgetExceededError as e:
     print(f"Caught: {e}")
 print()
 
-# ============================================================
-# 4. Custom callback — do whatever you want
-# ============================================================
-exceeded_events = []
-
-
-def my_callback(ctx):
-    """Custom handler: log the event and continue."""
-    exceeded_events.append(ctx.message)
-    print(f"  [custom callback] {ctx.message}")
-
-
-agent4 = Agent(model=model, budget=Budget(max_cost=0.0001, on_exceeded=my_callback))
-agent4.run("Hello!")
-print(f"Events captured: {len(exceeded_events)}")
-print()
-
 
 # ============================================================
-# 5. Class-level budget — reusable agent definition
+# 4. Class-level budget — reusable agent definition
 # ============================================================
 class CostAwareAgent(Agent):
     model = model

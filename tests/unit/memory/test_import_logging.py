@@ -76,22 +76,22 @@ class TestImportFromBasic:
 
     def test_core_memory_type_accepted(self) -> None:
         mem = Memory()
-        count = mem.import_from(_snapshot(_entry("core fact", memory_type="core")))
+        count = mem.import_from(_snapshot(_entry("facts fact", memory_type="facts")))
         assert count == 1
 
     def test_semantic_memory_type_accepted(self) -> None:
         mem = Memory()
-        count = mem.import_from(_snapshot(_entry("semantic knowledge", memory_type="semantic")))
+        count = mem.import_from(_snapshot(_entry("knowledge fact", memory_type="knowledge")))
         assert count == 1
 
     def test_procedural_memory_type_accepted(self) -> None:
         mem = Memory()
-        count = mem.import_from(_snapshot(_entry("how to do X", memory_type="procedural")))
+        count = mem.import_from(_snapshot(_entry("how to do X", memory_type="instructions")))
         assert count == 1
 
     def test_unknown_type_defaults_to_episodic(self) -> None:
         mem = Memory()
-        # Unknown type should not raise; should default to EPISODIC
+        # Unknown type should not raise; should default to HISTORY
         count = mem.import_from(_snapshot(_entry("unknown type", memory_type="unknown")))
         assert count == 1
 
