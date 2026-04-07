@@ -329,6 +329,7 @@ class SingleShotLoop(Loop):
                 output_tokens=u.output_tokens,
                 duration=latency_ms / 1000.0,
                 stop_reason=stop_reason,
+                metadata=getattr(response, "metadata", {}) or {},
             ),
         )
 
@@ -441,6 +442,7 @@ class ReactLoop(Loop):
                         pricing_override=ctx.pricing_override,  # type: ignore[arg-type]
                     ),
                     model=ctx.model_id,
+                    metadata=getattr(response, "metadata", {}) or {},
                 ),
             )
 
@@ -593,6 +595,7 @@ class ReactLoop(Loop):
                 output_tokens=total_output,
                 duration=latency_ms / 1000.0,
                 stop_reason=getattr(stop_reason, "value", str(stop_reason)),
+                metadata=getattr(response, "metadata", {}) or {},
             ),
         )
 
@@ -827,6 +830,7 @@ class HumanInTheLoop(Loop):
                 tokens=total_tokens,
                 duration=latency_ms / 1000.0,
                 stop_reason="end_turn",
+                metadata=getattr(response, "metadata", {}) or {},
             ),
         )
 
@@ -969,6 +973,7 @@ class PlanExecuteLoop(Loop):
                         pricing_override=ctx.pricing_override,  # type: ignore[arg-type]
                     ),
                     model=ctx.model_id,
+                    metadata=getattr(response, "metadata", {}) or {},
                 ),
             )
 
@@ -1053,6 +1058,7 @@ class PlanExecuteLoop(Loop):
                         pricing_override=ctx.pricing_override,  # type: ignore[arg-type]
                     ),
                     model=ctx.model_id,
+                    metadata=getattr(response, "metadata", {}) or {},
                 ),
             )
 
@@ -1083,6 +1089,7 @@ class PlanExecuteLoop(Loop):
                 output_tokens=total_output,
                 duration=latency_ms / 1000.0,
                 stop_reason=getattr(final_response, "stop_reason", "end_turn") or "end_turn",
+                metadata=getattr(final_response, "metadata", {}) or {},
             ),
         )
 
@@ -1235,6 +1242,7 @@ class CodeActionLoop(Loop):
                         pricing_override=ctx.pricing_override,  # type: ignore[arg-type]
                     ),
                     model=ctx.model_id,
+                    metadata=getattr(response, "metadata", {}) or {},
                 ),
             )
 
@@ -1384,6 +1392,7 @@ class CodeActionLoop(Loop):
                 output_tokens=total_output,
                 duration=latency_ms / 1000.0,
                 stop_reason=getattr(response, "stop_reason", "end_turn") or "end_turn",
+                metadata=getattr(response, "metadata", {}) or {},
             ),
         )
 

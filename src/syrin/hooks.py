@@ -180,6 +180,7 @@ HOOK_SCHEMAS: dict[Hook, HookContextSchema] = {
             "duration": float,
             "stop_reason": str,
             "iteration": int,
+            "metadata": dict,
         },
         example={
             "content": "I'm doing well, thanks!",
@@ -188,6 +189,7 @@ HOOK_SCHEMAS: dict[Hook, HookContextSchema] = {
             "duration": 1.2,
             "stop_reason": "end_turn",
             "iteration": 1,
+            "metadata": {"loops": 2, "p_halt": 0.9},
         },
     ),
     Hook.LLM_REQUEST_START: HookContextSchema(
@@ -210,10 +212,12 @@ HOOK_SCHEMAS: dict[Hook, HookContextSchema] = {
         fields={
             "content": str,
             "iteration": int,
+            "metadata": dict,
         },
         example={
             "content": "Hello! How can I help?",
             "iteration": 1,
+            "metadata": {"loops": 12, "p_halt": 0.99},
         },
     ),
     Hook.TOOL_CALL_START: HookContextSchema(
